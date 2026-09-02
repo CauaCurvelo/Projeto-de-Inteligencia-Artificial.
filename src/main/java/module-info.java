@@ -1,6 +1,6 @@
 module br.edu.unex.sentinela {
-    requires javafx.controls;
-    requires javafx.graphics;
+    requires transitive javafx.controls;
+    requires transitive javafx.graphics;
 
     exports br.edu.unex.sentinela.app;
     exports br.edu.unex.sentinela.core;

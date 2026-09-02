@@ -1,6 +1,8 @@
 package br.edu.unex.sentinela.rendering;
 
 import br.edu.unex.sentinela.world.World;
+import br.edu.unex.sentinela.world.TileMap;
+import br.edu.unex.sentinela.world.TileType;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 
@@ -16,16 +18,30 @@ public class Renderer {
     }
 
     public void render(World world) {
-        // Clear screen and draw a nicer background (Grass-like color)
+        // Clear screen
         gc.clearRect(0, 0, width, height);
-        gc.setFill(Color.web("#2E4F2D")); // Dark green background
-        gc.fillRect(0, 0, width, height);
-
-        // Grid effect for a classic feel
-        gc.setStroke(Color.web("#3A6339"));
-        gc.setLineWidth(1);
-        for (int i = 0; i < width; i += 32) gc.strokeLine(i, 0, i, height);
-        for (int i = 0; i < height; i += 32) gc.strokeLine(0, i, width, i);
+        
+        TileMap tileMap = world.getTileMap();
+        if (tileMap != null) {
+            int ts = TileMap.TILE_SIZE;
+            for (int row = 0; row < tileMap.getRows(); row++) {
+                for (int col = 0; col < tileMap.getCols(); col++) {
+                    TileType type = tileMap.getTileAt(col, row);
+                    switch (type) {
+                        case GRASS: gc.setFill(Color.web("#7EC850")); break;
+                        case WALL:  gc.setFill(Color.web("#555555")); break;
+                        case MUD:   gc.setFill(Color.web("#70543E")); break;
+                        case WATER: gc.setFill(Color.web("#3B83BD")); break;
+                    }
+                    gc.fillRect(col * ts, row * ts, ts, ts);
+                    
+                    // Optional grid outline
+                    gc.setStroke(Color.web("#3A6339"));
+                    gc.setLineWidth(1);
+                    gc.strokeRect(col * ts, row * ts, ts, ts);
+                }
+            }
+        }
 
         // Draw Player
         double px = world.getPlayer().getX();
