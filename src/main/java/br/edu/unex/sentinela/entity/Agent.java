@@ -21,14 +21,23 @@ public class Agent {
     public Agent(double startX, double startY, int targetCol, int targetRow, TileMap tileMap) {
         this.x = startX;
         this.y = startY;
-        this.targetCol = targetCol;
-        this.targetRow = targetRow;
-        
-        int startCol = (int) Math.floor(startX / TileMap.TILE_SIZE);
-        int startRow = (int) Math.floor(startY / TileMap.TILE_SIZE);
-        
-        Pathfinder pathfinder = new Pathfinder();
-        this.currentPath = pathfinder.findPath(tileMap, startCol, startRow, targetCol, targetRow);
+        this.targetCol = -1; // Force initial calculation
+        this.targetRow = -1;
+        setDestination(targetCol, targetRow, tileMap);
+    }
+    
+    public void setDestination(int newTargetCol, int newTargetRow, TileMap tileMap) {
+        if (this.targetCol != newTargetCol || this.targetRow != newTargetRow) {
+            this.targetCol = newTargetCol;
+            this.targetRow = newTargetRow;
+            
+            int startCol = (int) Math.floor(this.x / TileMap.TILE_SIZE);
+            int startRow = (int) Math.floor(this.y / TileMap.TILE_SIZE);
+            
+            Pathfinder pathfinder = new Pathfinder();
+            this.currentPath = pathfinder.findPath(tileMap, startCol, startRow, targetCol, targetRow);
+            this.currentPathIndex = 0;
+        }
     }
     
     public void update(double deltaTime) {

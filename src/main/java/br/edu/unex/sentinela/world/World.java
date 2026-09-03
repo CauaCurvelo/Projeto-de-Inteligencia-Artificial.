@@ -19,6 +19,11 @@ public class World {
 
     public void update(double deltaTime, InputManager inputManager) {
         player.move(inputManager.getDx(), inputManager.getDy(), deltaTime, tileMap);
+        
+        int playerCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
+        int playerRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
+        
+        agent.setDestination(playerCol, playerRow, tileMap);
         agent.update(deltaTime);
     }
 
