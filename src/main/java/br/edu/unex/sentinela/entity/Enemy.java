@@ -23,6 +23,12 @@ public class Enemy {
     private final int maxHp;
     private double damageFlashTimer = 0.0;
     private double attackCooldown = 0.0;
+    private double attackWindupTimer = 0.0;
+    private double attackLungeTimer = 0.0;
+    private double targetAimX = 0.0;
+    private double targetAimY = 0.0;
+    private double knockbackVx = 0.0;
+    private double knockbackVy = 0.0;
 
     private AIState state = AIState.PATROL;
     private List<Node> currentPath;
@@ -92,6 +98,27 @@ public class Enemy {
         if (shootCooldown > 0) shootCooldown -= deltaTime;
         if (damageFlashTimer > 0) damageFlashTimer -= deltaTime;
         if (attackCooldown > 0) attackCooldown -= deltaTime;
+        if (attackWindupTimer > 0) {
+            attackWindupTimer -= deltaTime;
+            if (attackWindupTimer <= 0) {
+                // Wind-up completed -> unleash violent lunge strike!
+                executeLungeStrike();
+            }
+        }
+        if (attackLungeTimer > 0) attackLungeTimer -= deltaTime;
+
+        // Apply physical knockback decay
+        if (Math.abs(knockbackVx) > 0.1 || Math.abs(knockbackVy) > 0.1) {
+            double nextKx = x + knockbackVx * deltaTime;
+            double nextKy = y + knockbackVy * deltaTime;
+            if (tileMap.isWalkable(nextKx, y)) x = nextKx;
+            if (tileMap.isWalkable(x, nextKy)) y = nextKy;
+            knockbackVx *= Math.pow(0.05, deltaTime);
+            knockbackVy *= Math.pow(0.05, deltaTime);
+        } else {
+            knockbackVx = 0;
+            knockbackVy = 0;
+        }
 
         this.currentVisionRange = baseVisionRange * weather.getVisionMultiplier();
         this.currentHearingSensitivity = baseHearingSensitivity * weather.getSoundMultiplier();
@@ -103,9 +130,15 @@ public class Enemy {
         int curRow = (int) Math.floor(y / TileMap.TILE_SIZE);
         TileType currentTile = tileMap.getTileAt(curCol, curRow);
         
-        // Crocodile boss swims FAST in water!
-        if (skin == EnemySkin.CROCODILE && currentTile == TileType.WATER) {
-            currentActualSpeed *= 1.30;
+        // Crocodile boss has specialized reversed aquatic speeds!
+        if (skin == EnemySkin.CROCODILE) {
+            if (currentTile == TileType.WATER) {
+                currentActualSpeed = baseSpeed * 1.50; // Fast apex predator in water!
+            } else if (currentTile == TileType.MUD) {
+                currentActualSpeed = baseSpeed * 0.85;
+            } else {
+                currentActualSpeed = baseSpeed * 0.55; // Sluggish on dry land!
+            }
         } else if (currentTile == TileType.MUD) {
             currentActualSpeed *= 0.50;
         } else if (currentTile == TileType.WATER) {
@@ -198,11 +231,13 @@ public class Enemy {
                 state = AIState.SUSPICIOUS;
             } else {
                 alertTimer = 5.0;
-                if (distToPlayer < 260.0) {
+                targetAimX = player.getX();
+                targetAimY = player.getY();
+                if (distToPlayer < 280.0) {
                     state = AIState.AIMING;
                     if (shootCooldown <= 0) {
                         projectiles.add(new Projectile(x, y, player.getX(), player.getY()));
-                        shootCooldown = 1.6;
+                        shootCooldown = 1.8;
                     }
                 } else {
                     state = AIState.CHASE;
@@ -303,10 +338,118 @@ public class Enemy {
         }
     }
 
-    public boolean takeDamage(int amount) {
+    public boolean takeDamage(int amount, double fromX, double fromY) {
         this.hp -= amount;
-        this.damageFlashTimer = 0.25;
+        this.damageFlashTimer = 0.22;
+        
+        // Pushback away from strike point
+        double dx = x - fromX;
+        double dy = y - fromY;
+        double dist = Math.hypot(dx, dy);
+        if (dist > 0.001) {
+            double knockForce = (type == EnemyType.BEAR_BOSS) ? 140.0 : 260.0;
+            this.knockbackVx = (dx / dist) * knockForce;
+            this.knockbackVy = (dy / dist) * knockForce;
+        }
         return hp <= 0;
+    }
+
+    public boolean takeDamage(int amount) {
+        return takeDamage(amount, x, y);
+    }
+
+    public void startAttackWindup(double targetX, double targetY) {
+        if (attackCooldown > 0 || attackWindupTimer > 0) return;
+
+        this.targetAimX = targetX;
+        this.targetAimY = targetY;
+        this.faceAngle = Math.atan2(targetY - y, targetX - x);
+
+        // Wind-up duration before releasing the strike
+        switch (type) {
+            case BEAR_BOSS:
+                this.attackWindupTimer = (skin == EnemySkin.PANTHER) ? 0.35 : (skin == EnemySkin.CROCODILE ? 0.40 : 0.55);
+                break;
+            case HOUND:
+                this.attackWindupTimer = 0.28;
+                break;
+            case RIVAL:
+                this.attackWindupTimer = (skin == EnemySkin.BOAR) ? 0.45 : 0.35; // Boar charges up its tusks!
+                break;
+            case HUNTER:
+            default:
+                this.attackWindupTimer = 0.40;
+                break;
+        }
+    }
+
+    private void executeLungeStrike() {
+        double dist = Math.hypot(targetAimX - x, targetAimY - y);
+        double dirX = dist > 0.001 ? (targetAimX - x) / dist : Math.cos(faceAngle);
+        double dirY = dist > 0.001 ? (targetAimY - y) / dist : Math.sin(faceAngle);
+
+        switch (type) {
+            case BEAR_BOSS:
+                if (skin == EnemySkin.PANTHER) {
+                    this.attackCooldown = 0.95;
+                    this.attackLungeTimer = 0.25;
+                    this.knockbackVx = dirX * 220.0;
+                    this.knockbackVy = dirY * 220.0;
+                } else if (skin == EnemySkin.CROCODILE) {
+                    this.attackCooldown = 1.15;
+                    this.attackLungeTimer = 0.32;
+                    this.knockbackVx = dirX * 180.0;
+                    this.knockbackVy = dirY * 180.0;
+                } else {
+                    this.attackCooldown = 1.45;
+                    this.attackLungeTimer = 0.35;
+                    this.knockbackVx = dirX * 90.0;
+                    this.knockbackVy = dirY * 90.0;
+                }
+                break;
+
+            case HOUND:
+                this.attackCooldown = 0.85;
+                this.attackLungeTimer = 0.22;
+                this.knockbackVx = dirX * 190.0;
+                this.knockbackVy = dirY * 190.0;
+                break;
+
+            case RIVAL:
+                if (skin == EnemySkin.BOAR) {
+                    // Boar violent forward charge
+                    this.attackCooldown = 1.20;
+                    this.attackLungeTimer = 0.38;
+                    this.knockbackVx = dirX * 240.0;
+                    this.knockbackVy = dirY * 240.0;
+                } else {
+                    this.attackCooldown = 0.95;
+                    this.attackLungeTimer = 0.25;
+                    this.knockbackVx = dirX * 150.0;
+                    this.knockbackVy = dirY * 150.0;
+                }
+                break;
+
+            case HUNTER:
+            default:
+                this.attackCooldown = 1.30;
+                this.attackLungeTimer = 0.25;
+                break;
+        }
+    }
+
+    public boolean isWindup() {
+        return attackWindupTimer > 0;
+    }
+
+    public boolean isLunging() {
+        return attackLungeTimer > 0;
+    }
+
+    public double getTargetAimX() { return targetAimX; }
+    public double getTargetAimY() { return targetAimY; }
+    public double getAttackCooldown() {
+        return attackCooldown;
     }
 
     private FoodItem findNearestUnconsumedFood(List<FoodItem> foodList) {
@@ -349,13 +492,20 @@ public class Enemy {
     }
 
     private void pickRandomPatrolPoint(TileMap tileMap, int curCol, int curRow) {
-        for (int tries = 0; tries < 10; tries++) {
-            int dc = rand.nextInt(15) - 7;
-            int dr = rand.nextInt(15) - 7;
+        boolean isCrocodile = (skin == EnemySkin.CROCODILE);
+
+        for (int tries = 0; tries < 15; tries++) {
+            int dc = rand.nextInt(17) - 8;
+            int dr = rand.nextInt(17) - 8;
             int targetC = curCol + dc;
             int targetR = curRow + dr;
 
-            if (tileMap.getTileAt(targetC, targetR).isWalkable()) {
+            TileType t = tileMap.getTileAt(targetC, targetR);
+            if (t.isWalkable()) {
+                // Crocodile prioritizes patrolling in water or mud
+                if (isCrocodile && tries < 10 && t != TileType.WATER && t != TileType.MUD) {
+                    continue;
+                }
                 requestPath(tileMap, curCol, curRow, targetC, targetR, true);
                 break;
             }
@@ -369,7 +519,8 @@ public class Enemy {
         this.targetCol = destCol;
         this.targetRow = destRow;
         Pathfinder pf = new Pathfinder();
-        this.currentPath = pf.findPath(tileMap, startCol, startRow, destCol, destRow);
+        boolean isCrocodile = (skin == EnemySkin.CROCODILE);
+        this.currentPath = pf.findPath(tileMap, startCol, startRow, destCol, destRow, isCrocodile);
         this.currentPathIndex = 0;
         this.repathCooldown = 0.4;
     }

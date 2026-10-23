@@ -35,10 +35,13 @@ public class Player {
     private boolean isAttacking = false;
     private double attackTimer = 0.0;
     private double attackCooldown = 0.0;
+    private boolean attackHitProcessed = false;
 
     // Damage & Adrenaline
     private double invulnerabilityTimer = 0.0;
     private double adrenalineTimer = 0.0;
+    private double knockbackVx = 0.0;
+    private double knockbackVy = 0.0;
 
     private double noiseRadius = 0.0;
 
@@ -61,6 +64,19 @@ public class Player {
         if (burrowCooldown > 0) burrowCooldown -= deltaTime;
         if (attackCooldown > 0) attackCooldown -= deltaTime;
 
+        // Apply physical knockback when struck
+        if (Math.abs(knockbackVx) > 0.1 || Math.abs(knockbackVy) > 0.1) {
+            double nextKx = x + knockbackVx * deltaTime;
+            double nextKy = y + knockbackVy * deltaTime;
+            if (!isColliding(nextKx, y, tileMap)) x = nextKx;
+            if (!isColliding(x, nextKy, tileMap)) y = nextKy;
+            knockbackVx *= Math.pow(0.04, deltaTime);
+            knockbackVy *= Math.pow(0.04, deltaTime);
+        } else {
+            knockbackVx = 0;
+            knockbackVy = 0;
+        }
+
         // Combat attack animation timer
         if (isAttacking) {
             attackTimer -= deltaTime;
@@ -72,6 +88,7 @@ public class Player {
         // Trigger Attack (Spacebar or Left-Click)
         if (attackPressed && attackCooldown <= 0 && !isBurrowed && !isSwimming) {
             isAttacking = true;
+            attackHitProcessed = false;
             attackTimer = 0.22;    // 0.22s slash duration
             attackCooldown = 0.40; // 0.40s cooldown between bites
             noiseRadius = 180.0;   // Attack makes sound
@@ -194,15 +211,28 @@ public class Player {
         }
     }
 
-    public boolean takeDamage() {
+    public boolean takeDamage(double fromX, double fromY) {
         if (invulnerabilityTimer > 0 || isBurrowed) {
             return false;
         }
 
         lives--;
-        invulnerabilityTimer = 0.85; // Faster recovery, higher punishment!
-        adrenalineTimer = 1.2;
+        invulnerabilityTimer = 0.95; // Adrenaline invulnerability
+        adrenalineTimer = 1.3;
+
+        // Knockback away from attacker
+        double dx = x - fromX;
+        double dy = y - fromY;
+        double dist = Math.hypot(dx, dy);
+        if (dist > 0.001) {
+            this.knockbackVx = (dx / dist) * 280.0;
+            this.knockbackVy = (dy / dist) * 280.0;
+        }
         return true;
+    }
+
+    public boolean takeDamage() {
+        return takeDamage(x, y);
     }
 
     public void healLife(int amount) {
@@ -238,5 +268,7 @@ public class Player {
     public boolean isBurrowed() { return isBurrowed; }
     public boolean isInvulnerable() { return invulnerabilityTimer > 0; }
     public boolean isAttacking() { return isAttacking; }
+    public boolean hasProcessedAttackHit() { return attackHitProcessed; }
+    public void markAttackHitProcessed() { this.attackHitProcessed = true; }
     public double getNoiseRadius() { return isBurrowed ? 0.0 : noiseRadius; }
 }
