@@ -22,6 +22,10 @@ public class Pathfinder {
     private static final int MAX_EXPLORED_NODES = 800;
 
     public List<Node> findPath(TileMap map, int startCol, int startRow, int targetCol, int targetRow) {
+        return findPath(map, startCol, startRow, targetCol, targetRow, false);
+    }
+
+    public List<Node> findPath(TileMap map, int startCol, int startRow, int targetCol, int targetRow, boolean isAquaticCrocodile) {
         Node startNode = new Node(startCol, startRow);
         Node targetNode = new Node(targetCol, targetRow);
         
@@ -67,7 +71,18 @@ public class Pathfinder {
                     continue;
                 }
                 
-                int moveCostToNeighbor = currentNode.gCost + neighborTile.getMovementCost();
+                int tileCost = neighborTile.getMovementCost();
+                if (isAquaticCrocodile) {
+                    if (neighborTile == TileType.WATER) {
+                        tileCost = 1; // Crocodile thrives in water!
+                    } else if (neighborTile == TileType.MUD) {
+                        tileCost = 2;
+                    } else {
+                        tileCost = 4; // Dry land is slow and unfavorable for crocodile!
+                    }
+                }
+
+                int moveCostToNeighbor = currentNode.gCost + tileCost;
                 
                 boolean inOpenSet = false;
                 for (Node n : openSet) {

@@ -50,12 +50,12 @@ public class TileMap {
                 }
 
                 // 2. Multi-octave Fractal Perlin-like layered noise (fBm)
-                double elevation = fbm(worldCol * 0.025, worldRow * 0.025, 101);
-                double moisture = fbm(worldCol * 0.035, worldRow * 0.035, 303);
-                double forestClumping = fbm(worldCol * 0.06, worldRow * 0.06, 707);
+                double elevation = fbm(worldCol * 0.022, worldRow * 0.022, 101);
+                double moisture = fbm(worldCol * 0.030, worldRow * 0.030, 303);
+                double forestClumping = fbm(worldCol * 0.055, worldRow * 0.055, 707);
 
                 // 3. Elegant Sinusoidal River with natural gentle meander (placed far enough from spawn)
-                double riverCenterY = Math.sin(worldCol * 0.020) * 16.0 + (worldCol * 0.12) + 48.0;
+                double riverCenterY = Math.sin(worldCol * 0.018) * 16.0 + (worldCol * 0.10) + 48.0;
                 double riverDist = Math.abs(worldRow - riverCenterY);
 
                 // Natural bridges across the river every ~50 tiles
@@ -84,8 +84,8 @@ public class TileMap {
                 }
 
                 // 5. Natural Clustered Lakes / Ponds (low elevation + high moisture)
-                if (elevation < 0.22 && moisture > 0.55) {
-                    if (elevation < 0.18) {
+                if (elevation < 0.20 && moisture > 0.58) {
+                    if (elevation < 0.16) {
                         chunk[r][c] = TileType.WATER;
                     } else {
                         chunk[r][c] = TileType.MUD;
@@ -94,17 +94,17 @@ public class TileMap {
                 }
 
                 // 6. Mountain Cliffs / Granite Formations (high elevation peaks)
-                if (elevation > 0.82) {
-                    // Only place wall if high elevation, clustered naturally
-                    if (moisture < 0.50 && forestClumping > 0.45) {
+                if (elevation > 0.83) {
+                    // Clustered naturally on dry mountain ridges
+                    if (moisture < 0.48 && forestClumping > 0.48) {
                         chunk[r][c] = TileType.WALL;
                         continue;
                     }
                 }
 
                 // 7. Forests & Woods: Formed in organic clustered groves, preserving open glades
-                if (forestClumping > 0.64) {
-                    if (moisture > 0.45) {
+                if (forestClumping > 0.65) {
+                    if (moisture > 0.46) {
                         chunk[r][c] = TileType.TREE;
                     } else {
                         chunk[r][c] = TileType.TALL_GRASS;
@@ -113,7 +113,7 @@ public class TileMap {
                 }
 
                 // 8. Savanna / Tall Grass Meadows
-                if (forestClumping > 0.50 && moisture > 0.52) {
+                if (forestClumping > 0.52 && moisture > 0.54) {
                     chunk[r][c] = TileType.TALL_GRASS;
                     continue;
                 }
