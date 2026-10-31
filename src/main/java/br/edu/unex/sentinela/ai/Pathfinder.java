@@ -12,13 +12,14 @@ import java.util.Set;
 
 public class Pathfinder {
     
-    // Orthogonal movements (4-way)
     private static final int[][] DIRECTIONS = {
         {0, -1}, // UP
         {0, 1},  // DOWN
         {-1, 0}, // LEFT
         {1, 0}   // RIGHT
     };
+
+    private static final int MAX_EXPLORED_NODES = 800;
 
     public List<Node> findPath(TileMap map, int startCol, int startRow, int targetCol, int targetRow) {
         Node startNode = new Node(startCol, startRow);
@@ -28,29 +29,35 @@ public class Pathfinder {
         Set<Node> closedSet = new HashSet<>();
         
         openSet.add(startNode);
+        Node closestNodeSoFar = startNode;
+        int lowestH = getManhattanDistance(startNode, targetNode);
+        int exploredCount = 0;
         
         while (!openSet.isEmpty()) {
             Node currentNode = openSet.poll();
             closedSet.add(currentNode);
+            exploredCount++;
+
+            int currentH = getManhattanDistance(currentNode, targetNode);
+            if (currentH < lowestH) {
+                lowestH = currentH;
+                closestNodeSoFar = currentNode;
+            }
             
-            // Reached destination
             if (currentNode.equals(targetNode)) {
                 return retracePath(startNode, currentNode);
             }
+
+            if (exploredCount >= MAX_EXPLORED_NODES) {
+                return retracePath(startNode, closestNodeSoFar);
+            }
             
-            // Explore neighbors
             for (int[] dir : DIRECTIONS) {
                 int neighborCol = currentNode.col + dir[0];
                 int neighborRow = currentNode.row + dir[1];
                 
-                // Bounds check
-                if (neighborCol < 0 || neighborCol >= map.getCols() || neighborRow < 0 || neighborRow >= map.getRows()) {
-                    continue;
-                }
-                
                 TileType neighborTile = map.getTileAt(neighborCol, neighborRow);
                 
-                // Unwalkable check
                 if (!neighborTile.isWalkable()) {
                     continue;
                 }
@@ -79,7 +86,6 @@ public class Pathfinder {
                     if (!inOpenSet) {
                         openSet.add(neighbor);
                     } else {
-                        // Re-add to update position in PriorityQueue
                         openSet.remove(neighbor);
                         openSet.add(neighbor);
                     }
@@ -87,7 +93,11 @@ public class Pathfinder {
             }
         }
         
-        return new ArrayList<>(); // No path found
+        if (closestNodeSoFar != startNode) {
+            return retracePath(startNode, closestNodeSoFar);
+        }
+
+        return new ArrayList<>();
     }
     
     private int getManhattanDistance(Node nodeA, Node nodeB) {
@@ -100,11 +110,11 @@ public class Pathfinder {
         List<Node> path = new ArrayList<>();
         Node currentNode = endNode;
         
-        while (!currentNode.equals(startNode)) {
+        while (currentNode != null && !currentNode.equals(startNode)) {
             path.add(currentNode);
             currentNode = currentNode.parent;
         }
-        // Don't add the start node, as the agent is already there.
+        
         Collections.reverse(path);
         return path;
     }
