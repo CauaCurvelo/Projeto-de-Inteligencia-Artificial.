@@ -12,31 +12,42 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.stage.Stage;
 
 public class Main extends Application {
-    private static final int WIDTH = 800;
-    private static final int HEIGHT = 600;
+    private static final int INITIAL_WIDTH = 960;
+    private static final int INITIAL_HEIGHT = 640;
 
     @Override
     public void start(Stage primaryStage) {
-        primaryStage.setTitle("Sentinela - Top-down Game");
+        primaryStage.setTitle("Instinto Selvagem (Wild Instinct) - Projeto Final IA");
 
         Group root = new Group();
-        Scene scene = new Scene(root, WIDTH, HEIGHT);
-        Canvas canvas = new Canvas(WIDTH, HEIGHT);
+        Scene scene = new Scene(root, INITIAL_WIDTH, INITIAL_HEIGHT);
+        Canvas canvas = new Canvas(INITIAL_WIDTH, INITIAL_HEIGHT);
         root.getChildren().add(canvas);
 
         GraphicsContext gc = canvas.getGraphicsContext2D();
 
         InputManager inputManager = new InputManager();
-        inputManager.attachToScene(scene);
+        inputManager.attachToScene(scene, primaryStage);
 
         World world = new World();
-        Renderer renderer = new Renderer(gc, WIDTH, HEIGHT);
+        Renderer renderer = new Renderer(gc, INITIAL_WIDTH, INITIAL_HEIGHT);
+
+        // Bind canvas resize automatically when window resizes or goes Fullscreen (F11)
+        scene.widthProperty().addListener((obs, oldVal, newVal) -> {
+            canvas.setWidth(newVal.doubleValue());
+            renderer.updateViewport(newVal.doubleValue(), canvas.getHeight());
+            world.getCamera().updateViewport(newVal.doubleValue(), canvas.getHeight());
+        });
+        scene.heightProperty().addListener((obs, oldVal, newVal) -> {
+            canvas.setHeight(newVal.doubleValue());
+            renderer.updateViewport(canvas.getWidth(), newVal.doubleValue());
+            world.getCamera().updateViewport(canvas.getWidth(), newVal.doubleValue());
+        });
 
         GameEngine engine = new GameEngine(world, renderer, inputManager);
         engine.start();
 
         primaryStage.setScene(scene);
-        primaryStage.setResizable(false);
         primaryStage.show();
     }
 
