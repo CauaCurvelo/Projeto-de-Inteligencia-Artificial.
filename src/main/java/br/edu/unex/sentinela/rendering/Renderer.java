@@ -42,21 +42,29 @@ public class Renderer {
 
     public void render(World world, InputManager inputManager) {
         Camera cam = world.getCamera();
+        double zoom = cam.getZoom();
         double camX = cam.getX();
         double camY = cam.getY();
 
-        // 1. Background Fill
+        // 1. Background Fill (Scaled by zoom to cover full visible world bounds)
         gc.setFill(Color.web("#141E10"));
-        gc.fillRect(0, 0, width, height);
+        gc.fillRect(0, 0, width / zoom, height / zoom);
+
+        // Save transform state for zoom scaling
+        gc.save();
+        gc.scale(zoom, zoom);
 
         // 2. Render Visible Geographic Tiles
         TileMap tileMap = world.getTileMap();
         int ts = TileMap.TILE_SIZE;
 
+        double visibleW = width / zoom;
+        double visibleH = height / zoom;
+
         int startCol = (int) Math.floor(camX / ts);
-        int endCol = (int) Math.ceil((camX + width) / ts);
+        int endCol = (int) Math.ceil((camX + visibleW) / ts);
         int startRow = (int) Math.floor(camY / ts);
-        int endRow = (int) Math.ceil((camY + height) / ts);
+        int endRow = (int) Math.ceil((camY + visibleH) / ts);
 
         for (int row = startRow; row <= endRow; row++) {
             for (int col = startCol; col <= endCol; col++) {
@@ -151,7 +159,7 @@ public class Renderer {
             double ex = enemy.getX() - camX;
             double ey = enemy.getY() - camY;
 
-            if (ex < -50 || ex > width + 50 || ey < -50 || ey > height + 50) continue;
+            if (ex < -60 || ex > visibleW + 60 || ey < -60 || ey > visibleH + 60) continue;
 
             renderEnemy(enemy, ex, ey);
         }
@@ -175,10 +183,13 @@ public class Renderer {
         }
 
         // 12. Weather Effects
-        renderWeatherVisuals(world);
+        renderWeatherVisuals(world, visibleW, visibleH);
 
         // 13. Dynamic Dusk/Night Lighting Filter
-        renderDayNightLighting(world);
+        renderDayNightLighting(world, visibleW, visibleH);
+
+        // Restore normal canvas matrix before drawing Fixed Screen HUD
+        gc.restore();
 
         // 14. Infinite Arcade HUD
         renderInfiniteHUD(world, inputManager);
@@ -211,7 +222,7 @@ public class Renderer {
         gc.strokeArc(slashX - 14, slashY - 14, 28, 28, -Math.toDegrees(angle) - 40, 80, ArcType.OPEN);
     }
 
-    private void renderWeatherVisuals(World world) {
+    private void renderWeatherVisuals(World world, double visibleW, double visibleH) {
         WeatherType weather = world.getCurrentWeather();
 
         if (weather == WeatherType.RAIN) {
@@ -222,14 +233,14 @@ public class Renderer {
             }
 
             gc.setFill(Color.color(0.08, 0.15, 0.28, 0.15));
-            gc.fillRect(0, 0, width, height);
+            gc.fillRect(0, 0, visibleW, visibleH);
 
         } else if (weather == WeatherType.FOG) {
             gc.setFill(Color.color(0.85, 0.90, 0.95, 0.38));
-            gc.fillRect(0, 0, width, height);
+            gc.fillRect(0, 0, visibleW, visibleH);
             
             gc.setFill(Color.color(0.70, 0.75, 0.82, 0.22));
-            gc.fillOval(-width*0.2, -height*0.2, width * 1.4, height * 1.4);
+            gc.fillOval(-visibleW*0.2, -visibleH*0.2, visibleW * 1.4, visibleH * 1.4);
         }
     }
 
@@ -252,14 +263,20 @@ public class Renderer {
                 break;
 
             case DIRT_PATH:
-                gc.setFill(Color.web("#8A6844"));
+                // Earthy dirt with soft organic pebbles
+                gc.setFill(Color.web("#805C3B"));
                 gc.fillRect(sx, sy, ts, ts);
-                gc.setFill(Color.web("#755737"));
-                gc.fillOval(sx + 4, sy + 8, ts - 8, ts - 16);
-                if ((col + row) % 3 == 0) {
-                    gc.setFill(Color.web("#A8947D"));
-                    gc.fillOval(sx + 12, sy + 10, 3, 2);
-                    gc.fillOval(sx + 20, sy + 18, 2, 2);
+
+                // Smooth worn center track
+                gc.setFill(Color.web("#6E4D2E", 0.70));
+                gc.fillOval(sx + 3, sy + 3, ts - 6, ts - 6);
+
+                // Subtle gravel pebbles
+                int pathHash = (col * 37 + row * 19) & 0x7FFFFFFF;
+                if (pathHash % 5 == 0) {
+                    gc.setFill(Color.web("#A1886F"));
+                    gc.fillOval(sx + 8, sy + 10, 4, 3);
+                    gc.fillOval(sx + 18, sy + 18, 3, 2);
                 }
                 break;
 
@@ -283,15 +300,27 @@ public class Renderer {
                 break;
 
             case WATER:
-                gc.setFill(Color.web("#26659E"));
+                // Deep natural water with dynamic animated foam ripple
+                gc.setFill(Color.web("#1E5F99"));
                 gc.fillRect(sx, sy, ts, ts);
-                gc.setFill(Color.web("#387EB8"));
-                gc.fillRect(sx + 4, sy + 8, 12, 2);
-                gc.fillRect(sx + 16, sy + 20, 10, 2);
-                if (tileMap.getTileAt(col, row - 1) != TileType.WATER ||
-                    tileMap.getTileAt(col, row + 1) != TileType.WATER) {
-                    gc.setFill(Color.web("#90C8EB", 0.40));
-                    gc.fillRect(sx, sy + 1, ts, 2);
+
+                // Water depth gradient
+                gc.setFill(Color.web("#174E80", 0.50));
+                gc.fillRect(sx, sy + ts * 0.4, ts, ts * 0.6);
+
+                // Soft water caustics / gentle waves
+                gc.setFill(Color.web("#4FA3E3", 0.60));
+                gc.fillRoundRect(sx + 4, sy + 6, 14, 3, 2, 2);
+                gc.fillRoundRect(sx + 15, sy + 18, 12, 3, 2, 2);
+
+                // Shore foam highlight if touching land
+                boolean nearLand = tileMap.getTileAt(col, row - 1) != TileType.WATER ||
+                                   tileMap.getTileAt(col, row + 1) != TileType.WATER ||
+                                   tileMap.getTileAt(col - 1, row) != TileType.WATER ||
+                                   tileMap.getTileAt(col + 1, row) != TileType.WATER;
+                if (nearLand) {
+                    gc.setFill(Color.web("#E1F5FE", 0.65));
+                    gc.strokeRoundRect(sx + 1, sy + 1, ts - 2, ts - 2, 4, 4);
                 }
                 break;
 
@@ -320,20 +349,29 @@ public class Renderer {
                 break;
 
             case WALL:
-                gc.setFill(Color.web("#474C52"));
+                // Granite Cliff with bevel and moss crevices
+                gc.setFill(Color.web("#50565E"));
                 gc.fillRect(sx, sy, ts, ts);
 
-                gc.setFill(Color.web("#2B2E33"));
-                gc.fillRect(sx, sy + ts - 4, ts, 4);
+                // Top light ledge (3D cliff edge effect)
+                gc.setFill(Color.web("#757D87"));
+                gc.fillRect(sx, sy, ts, 3);
 
-                gc.setStroke(Color.web("#34383D"));
-                gc.setLineWidth(1.5);
-                gc.strokeLine(sx + 2, sy + 16, sx + 16, sy + 16);
-                gc.strokeLine(sx + 16, sy + 4, sx + 16, sy + 28);
-                gc.strokeLine(sx + 16, sy + 20, sx + 30, sy + 20);
+                // Bottom deep rock shadow
+                gc.setFill(Color.web("#25282C"));
+                gc.fillRect(sx, sy + ts - 5, ts, 5);
 
-                gc.setStroke(Color.web("#6C737D"));
-                gc.strokeLine(sx + 1, sy + 2, sx + ts - 1, sy + 2);
+                // Natural rock fracture lines
+                gc.setStroke(Color.web("#383C42"));
+                gc.setLineWidth(1.4);
+                gc.strokeLine(sx + 4, sy + 14, sx + 18, sy + 18);
+                gc.strokeLine(sx + 18, sy + 18, sx + 28, sy + 12);
+
+                // Moss streak in rock cracks
+                if ((col * 13 + row * 29) % 4 == 0) {
+                    gc.setFill(Color.web("#2E5928", 0.60));
+                    gc.fillOval(sx + 6, sy + 12, 6, 4);
+                }
                 break;
         }
 
@@ -447,6 +485,11 @@ public class Renderer {
             gc.fillOval(ex - 18, ey - 18, 36, 36);
         }
 
+        // Zelda telegraph wind-up visual on attack (Line of sight / Targeting / Wind-up charge)
+        if (enemy.isWindup() || enemy.isLunging() || enemy.getState() == br.edu.unex.sentinela.ai.AIState.AIMING) {
+            renderUniqueAttackTelegraph(enemy, ex, ey, angle);
+        }
+
         switch (enemy.getType()) {
             case BEAR_BOSS:
                 renderBossBySkin(enemy.getSkin(), ex, ey, angle);
@@ -529,6 +572,99 @@ public class Renderer {
         gc.fillRect(ex - tagWidth / 2.0, ey - 36, tagWidth, 14);
         gc.setFill(Color.web("#FFFFFF"));
         gc.fillText(tag, ex - tagWidth / 2.0 + 3, ey - 25);
+    }
+
+    private void renderUniqueAttackTelegraph(Enemy enemy, double ex, double ey, double angle) {
+        EnemyType type = enemy.getType();
+        EnemySkin skin = enemy.getSkin();
+
+        if (type == EnemyType.BEAR_BOSS) {
+            if (skin == EnemySkin.CROCODILE) {
+                // Crocodile: massive snapping jaw arc telegraph with emerald splash
+                double mouthX = ex + Math.cos(angle) * 22;
+                double mouthY = ey + Math.sin(angle) * 22;
+                gc.setStroke(Color.web("#00E676", 0.90));
+                gc.setLineWidth(3.0);
+                gc.strokeArc(mouthX - 16, mouthY - 16, 32, 32, -Math.toDegrees(angle) - 50, 100, ArcType.OPEN);
+
+                // Sharp white fangs
+                gc.setFill(Color.web("#FFFFFF"));
+                gc.fillPolygon(
+                    new double[]{mouthX - 4, mouthX + 4, mouthX},
+                    new double[]{mouthY - 6, mouthY - 6, mouthY + 2}, 3
+                );
+            } else if (skin == EnemySkin.PANTHER) {
+                // Panther: razor claw slashing arc streaks
+                gc.setStroke(Color.web("#FFD700", 0.90));
+                gc.setLineWidth(2.5);
+                double slashX = ex + Math.cos(angle) * 20;
+                double slashY = ey + Math.sin(angle) * 20;
+                gc.strokeLine(slashX - 10, slashY - 10, slashX + 10, slashY + 10);
+                gc.strokeLine(slashX - 6, slashY - 14, slashX + 14, slashY + 6);
+                gc.strokeLine(slashX - 14, slashY - 6, slashX + 6, slashY + 14);
+            } else {
+                // Bear Boss: heavy ground slam shockwave expanding ring
+                gc.setStroke(Color.web("#E67E22", 0.95));
+                gc.setLineWidth(3.5);
+                gc.strokeOval(ex - 28, ey - 28, 56, 56);
+                gc.setStroke(Color.web("#D35400", 0.60));
+                gc.strokeOval(ex - 36, ey - 36, 72, 72);
+            }
+        } else if (type == EnemyType.HOUND) {
+            // Hound: quick red bite snap jaws
+            double biteX = ex + Math.cos(angle) * 16;
+            double biteY = ey + Math.sin(angle) * 16;
+            gc.setStroke(Color.web("#FF1744", 0.90));
+            gc.setLineWidth(2.5);
+            gc.strokeArc(biteX - 12, biteY - 12, 24, 24, -Math.toDegrees(angle) - 45, 90, ArcType.OPEN);
+        } else if (type == EnemyType.RIVAL) {
+            if (skin == EnemySkin.BOAR) {
+                // Boar: straight red charge trajectory line with arrow & dust charge indicator
+                double chargeLen = 65.0;
+                double targetX = ex + Math.cos(angle) * chargeLen;
+                double targetY = ey + Math.sin(angle) * chargeLen;
+
+                // Glowing crimson warning trajectory line
+                gc.setStroke(Color.web("#FF1744", 0.85));
+                gc.setLineWidth(2.5);
+                gc.strokeLine(ex, ey, targetX, targetY);
+
+                // Charge arrow tip
+                double arrowAngle1 = angle + Math.PI * 0.85;
+                double arrowAngle2 = angle - Math.PI * 0.85;
+                gc.strokeLine(targetX, targetY, targetX + Math.cos(arrowAngle1) * 10, targetY + Math.sin(arrowAngle1) * 10);
+                gc.strokeLine(targetX, targetY, targetX + Math.cos(arrowAngle2) * 10, targetY + Math.sin(arrowAngle2) * 10);
+
+                // Tusk visual
+                double tuskX = ex + Math.cos(angle) * 18;
+                double tuskY = ey + Math.sin(angle) * 18;
+                gc.setFill(Color.web("#FFF8E1"));
+                gc.fillOval(tuskX - 3, tuskY - 5, 6, 4);
+                gc.fillOval(tuskX - 3, tuskY + 2, 6, 4);
+            } else {
+                // Rival claw / pounce telegraph
+                gc.setStroke(Color.web("#E67E22", 0.85));
+                gc.setLineWidth(2.0);
+                gc.strokeOval(ex - 18, ey - 18, 36, 36);
+            }
+        } else {
+            // Hunter: laser aiming targeting line straight towards player + red sniper reticle
+            double aimLen = 220.0;
+            double aimEndX = ex + Math.cos(angle) * aimLen;
+            double aimEndY = ey + Math.sin(angle) * aimLen;
+
+            // Crimson laser targeting line
+            gc.setStroke(Color.web("#FF1744", 0.75));
+            gc.setLineWidth(1.8);
+            gc.strokeLine(ex, ey, aimEndX, aimEndY);
+
+            // Sniper crosshair at the tip
+            gc.setStroke(Color.web("#FF1744", 0.90));
+            gc.setLineWidth(1.5);
+            gc.strokeOval(aimEndX - 7, aimEndY - 7, 14, 14);
+            gc.strokeLine(aimEndX - 10, aimEndY, aimEndX + 10, aimEndY);
+            gc.strokeLine(aimEndX, aimEndY - 10, aimEndX, aimEndY + 10);
+        }
     }
 
     private void renderBossBySkin(EnemySkin skin, double ex, double ey, double angle) {
@@ -699,14 +835,14 @@ public class Renderer {
         }
     }
 
-    private void renderDayNightLighting(World world) {
+    private void renderDayNightLighting(World world, double visibleW, double visibleH) {
         double cycleProgress = world.getCycleProgressTimer() / world.getCycleDuration();
         double nightFactor = Math.sin(cycleProgress * Math.PI);
         
         if (nightFactor > 0.10) {
             double alpha = Math.min(0.68, (nightFactor - 0.10) * 0.75);
             gc.setFill(Color.color(0.04, 0.06, 0.22, alpha));
-            gc.fillRect(0, 0, width, height);
+            gc.fillRect(0, 0, visibleW, visibleH);
         }
     }
 
@@ -795,7 +931,7 @@ public class Renderer {
         int secs = (int) world.getSurvivalTime() % 60;
         gc.fillText(String.format("TEMPO: %02d:%02d | ABATES: %d", mins, secs, world.getEnemiesDefeated()), width - 172, 30);
         gc.fillText("[ESPAÇO/CLIQUE]: Morder/Atacar", width - 172, 45);
-        gc.fillText("[F11] Tela | [H] IA | [R]", width - 172, 60);
+        gc.fillText("[+] Zoom In | [-] Zoom Out", width - 172, 60);
 
         // Game Over Overlay
         if (world.isGameOver()) {

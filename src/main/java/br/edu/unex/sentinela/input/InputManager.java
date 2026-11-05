@@ -15,6 +15,8 @@ public class InputManager {
     private boolean attackPressed = false;
     private boolean debugOverlay = true;
     private boolean restartRequested = false;
+    private boolean zoomInRequested = false;
+    private boolean zoomOutRequested = false;
     private Stage stage;
 
     public void attachToScene(Scene scene, Stage stage) {
@@ -29,6 +31,12 @@ public class InputManager {
             }
             if (event.getCode() == KeyCode.F11) {
                 toggleFullScreen();
+            }
+            if (event.getCode() == KeyCode.PLUS || event.getCode() == KeyCode.ADD || event.getCode() == KeyCode.EQUALS) {
+                zoomInRequested = true;
+            }
+            if (event.getCode() == KeyCode.MINUS || event.getCode() == KeyCode.SUBTRACT) {
+                zoomOutRequested = true;
             }
             if (event.getCode() == KeyCode.SPACE || event.getCode() == KeyCode.J) {
                 attackPressed = true;
@@ -86,6 +94,18 @@ public class InputManager {
     public boolean pollRestartRequested() {
         boolean req = restartRequested;
         restartRequested = false;
+        return req;
+    }
+
+    public boolean pollZoomInRequested() {
+        boolean req = zoomInRequested;
+        zoomInRequested = false;
+        return req;
+    }
+
+    public boolean pollZoomOutRequested() {
+        boolean req = zoomOutRequested;
+        zoomOutRequested = false;
         return req;
     }
 }
