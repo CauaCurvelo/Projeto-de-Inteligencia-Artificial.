@@ -3,9 +3,5 @@ target/
 *.iml
 .vscode/
 slides aula/
-GUIA_APRESENTACAO_PROJETO.md
-enviar_github.bat
-calc_date.py
-highscore.dat
-
- 
+*.dat
+*.tmp
