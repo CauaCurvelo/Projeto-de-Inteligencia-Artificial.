@@ -3,12 +3,14 @@ package br.edu.unex.sentinela.app;
 import br.edu.unex.sentinela.core.GameEngine;
 import br.edu.unex.sentinela.input.InputManager;
 import br.edu.unex.sentinela.rendering.Renderer;
+import br.edu.unex.sentinela.settings.GameSettings;
+import br.edu.unex.sentinela.ui.ScreenManager;
 import br.edu.unex.sentinela.world.World;
 import javafx.application.Application;
-import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
 public class Main extends Application {
@@ -19,10 +21,10 @@ public class Main extends Application {
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Instinto Selvagem (Wild Instinct) - Projeto Final IA");
 
-        Group root = new Group();
+        StackPane root = new StackPane();
         Scene scene = new Scene(root, INITIAL_WIDTH, INITIAL_HEIGHT);
+        br.edu.unex.sentinela.ui.UiTheme.applyGlobalTheme(scene);
         Canvas canvas = new Canvas(INITIAL_WIDTH, INITIAL_HEIGHT);
-        root.getChildren().add(canvas);
 
         GraphicsContext gc = canvas.getGraphicsContext2D();
 
@@ -31,6 +33,9 @@ public class Main extends Application {
 
         World world = new World();
         Renderer renderer = new Renderer(gc, INITIAL_WIDTH, INITIAL_HEIGHT);
+        ScreenManager screenManager = new ScreenManager(world);
+
+        root.getChildren().addAll(canvas, screenManager);
 
         // Bind canvas resize automatically when window resizes or goes Fullscreen (F11)
         scene.widthProperty().addListener((obs, oldVal, newVal) -> {
@@ -44,7 +49,11 @@ public class Main extends Application {
             world.getCamera().updateViewport(canvas.getWidth(), newVal.doubleValue());
         });
 
-        GameEngine engine = new GameEngine(world, renderer, inputManager);
+        if (GameSettings.get().isFullscreen()) {
+            primaryStage.setFullScreen(true);
+        }
+
+        GameEngine engine = new GameEngine(world, renderer, inputManager, screenManager);
         engine.start();
 
         primaryStage.setScene(scene);

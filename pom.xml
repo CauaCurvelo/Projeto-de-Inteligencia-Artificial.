@@ -40,7 +40,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>br.edu.unex.sentinela.app.Main</mainClass>
+                    <mainClass>br.edu.unex.sentinela/br.edu.unex.sentinela.app.Main</mainClass>
                 </configuration>
             </plugin>
         </plugins>

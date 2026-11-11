@@ -10,19 +10,26 @@ public class Player {
     private double y;
     private double baseSpeed = 190.0;
     private double currentSpeed = 190.0;
-    
+
     private double faceDx = 0;
     private double faceDy = 1;
+    private double visualAngle = Math.PI * 0.5;
 
     private double width = 22.0;
     private double height = 22.0;
+
+    // Animation state (Breathing, Walk Cycle, Footprints)
+    private double walkPhase = 0.0;
+    private double breathTimer = 0.0;
+    private boolean moving = false;
+    private boolean nextFootLeft = true;
 
     // Survival stats & Zelda Hearts
     private int lives;
     private int maxLives;
     private double hunger = 100.0;
     private double maxHunger = 100.0;
-    
+
     // Status flags
     private boolean isSprinting = false;
     private boolean isHiddenInGrass = false;
@@ -57,8 +64,9 @@ public class Player {
         this.maxLives = startingLives;
     }
 
-    public void update(double dx, double dy, boolean sprint, boolean attackPressed, double deltaTime, TileMap tileMap, 
+    public void update(double dx, double dy, boolean sprint, boolean attackPressed, double deltaTime, TileMap tileMap,
                        List<Footprint> scentTrail, List<Particle> particles, List<Burrow> burrows) {
+        breathTimer += deltaTime;
         if (invulnerabilityTimer > 0) invulnerabilityTimer -= deltaTime;
         if (adrenalineTimer > 0) adrenalineTimer -= deltaTime;
         if (burrowCooldown > 0) burrowCooldown -= deltaTime;
@@ -89,10 +97,10 @@ public class Player {
         if (attackPressed && attackCooldown <= 0 && !isBurrowed && !isSwimming) {
             isAttacking = true;
             attackHitProcessed = false;
-            attackTimer = 0.22;    // 0.22s slash duration
-            attackCooldown = 0.40; // 0.40s cooldown between bites
-            noiseRadius = 180.0;   // Attack makes sound
-            hunger -= 0.8;         // Attacking exerts energy
+            attackTimer = 0.22;
+            attackCooldown = 0.40;
+            noiseRadius = 180.0;
+            hunger -= 0.8;
         }
 
         checkBurrowInteraction(dx, dy, deltaTime, burrows);
@@ -102,6 +110,8 @@ public class Player {
         if (dx != 0 || dy != 0) {
             faceDx = dx;
             faceDy = dy;
+            double targetAngle = Math.atan2(dy, dx);
+            visualAngle = lerpAngle(visualAngle, targetAngle, Math.min(1.0, deltaTime * 16.0));
         }
 
         int currentCol = (int) Math.floor(x / TileMap.TILE_SIZE);
@@ -124,13 +134,13 @@ public class Player {
             speedMultiplier *= 1.25;
         }
 
-        boolean isMoving = (dx != 0 || dy != 0) && !isBurrowed;
+        this.moving = (dx != 0 || dy != 0) && !isBurrowed;
 
-        if (isSprinting && isMoving) {
+        if (isSprinting && moving) {
             currentSpeed = baseSpeed * 1.55 * speedMultiplier;
             noiseRadius = 240.0;
             hunger -= 3.8 * deltaTime;
-        } else if (isMoving) {
+        } else if (moving) {
             currentSpeed = baseSpeed * speedMultiplier;
             noiseRadius = 100.0;
             hunger -= 1.4 * deltaTime;
@@ -142,7 +152,9 @@ public class Player {
 
         if (hunger < 0) hunger = 0;
 
-        if (isMoving) {
+        if (moving) {
+            walkPhase += currentSpeed * deltaTime * 0.095;
+
             double nextX = x + dx * currentSpeed * deltaTime;
             double nextY = y + dy * currentSpeed * deltaTime;
 
@@ -153,40 +165,82 @@ public class Player {
                 y = nextY;
             }
 
-            footprintTimer += deltaTime;
-            if (footprintTimer >= 0.25) {
+            // Pegadas direcionadas alternando esquerda/direita (Paw Prints)
+            footprintTimer += deltaTime * (isSprinting ? 1.5 : 1.0);
+            if (footprintTimer >= 0.18) {
                 footprintTimer = 0.0;
-                if (!isSwimming && currentTile != TileType.MUD && !isBurrowed) {
-                    scentTrail.add(new Footprint(x, y, 6.0));
+                if (!isSwimming && !isBurrowed) {
+                    double perpAngle = visualAngle + (nextFootLeft ? -Math.PI * 0.5 : Math.PI * 0.5);
+                    double fpX = x - Math.cos(visualAngle) * 4 + Math.cos(perpAngle) * 3.5;
+                    double fpY = y - Math.sin(visualAngle) * 4 + Math.sin(perpAngle) * 3.5;
+                    scentTrail.add(new Footprint(fpX, fpY, visualAngle, nextFootLeft, Footprint.PrintStyle.PAW, true, 6.5));
+                    nextFootLeft = !nextFootLeft;
                 }
             }
 
+            // Partículas orgânicas de movimento por bioma
             particleTimer += deltaTime;
-            if (particleTimer >= 0.06) {
+            double emitInterval = isSprinting ? 0.045 : 0.095;
+            if (particleTimer >= emitInterval) {
                 particleTimer = 0.0;
-                if (isSwimming) {
-                    particles.add(new Particle(
-                        x + (rand.nextDouble() * 12 - 6),
-                        y + (rand.nextDouble() * 12 - 6),
-                        -dx * 20 + (rand.nextDouble() * 10 - 5),
-                        -dy * 20 + (rand.nextDouble() * 10 - 5),
-                        0.4,
-                        "#73B9EE",
-                        rand.nextDouble() * 4 + 2
-                    ));
-                } else if (isSprinting) {
-                    particles.add(new Particle(
-                        x + (rand.nextDouble() * 8 - 4),
-                        y + 8 + (rand.nextDouble() * 4),
-                        -dx * 30 + (rand.nextDouble() * 16 - 8),
-                        -dy * 30 + (rand.nextDouble() * 16 - 8),
-                        0.35,
-                        (currentTile == TileType.MUD) ? "#6E4E36" : "#A3906F",
-                        rand.nextDouble() * 3 + 2
-                    ));
-                }
+                spawnMovementParticles(currentTile, dx, dy, particles);
             }
         }
+    }
+
+    private void spawnMovementParticles(TileType currentTile, double dx, double dy, List<Particle> particles) {
+        if (isSwimming) {
+            // Espuma e gotículas na água
+            particles.add(new Particle(
+                x - dx * 6 + (rand.nextDouble() * 10 - 5),
+                y - dy * 6 + (rand.nextDouble() * 10 - 5),
+                -dx * 25 + (rand.nextDouble() * 14 - 7),
+                -dy * 25 + (rand.nextDouble() * 14 - 7),
+                0.45,
+                rand.nextBoolean() ? "#81D4FA" : "#E1F5FE",
+                rand.nextDouble() * 3.5 + 2.0
+            ));
+        } else if (currentTile == TileType.TALL_GRASS || (currentTile == TileType.GRASS && isSprinting)) {
+            // Folhinhas verdes voando quando corre na mata
+            particles.add(new Particle(
+                x + (rand.nextDouble() * 10 - 5),
+                y + (rand.nextDouble() * 10 - 5),
+                -dx * 22 + (rand.nextDouble() * 24 - 12),
+                -dy * 22 - 12 + (rand.nextDouble() * 16 - 8),
+                0.40,
+                rand.nextBoolean() ? "#66BB6A" : "#43A047",
+                rand.nextDouble() * 3.0 + 1.8
+            ));
+        } else if (currentTile == TileType.MUD) {
+            // Respingos de lama escura
+            particles.add(new Particle(
+                x - dx * 5 + (rand.nextDouble() * 8 - 4),
+                y - dy * 5 + (rand.nextDouble() * 8 - 4),
+                -dx * 28 + (rand.nextDouble() * 18 - 9),
+                -dy * 28 + (rand.nextDouble() * 18 - 9),
+                0.38,
+                "#5D4037",
+                rand.nextDouble() * 3.5 + 2.0
+            ));
+        } else if (isSprinting || currentTile == TileType.DIRT_PATH) {
+            // Pufes de poeira de corrida
+            particles.add(new Particle(
+                x - dx * 8 + (rand.nextDouble() * 6 - 3),
+                y - dy * 8 + (rand.nextDouble() * 6 - 3),
+                -dx * 32 + (rand.nextDouble() * 16 - 8),
+                -dy * 32 + (rand.nextDouble() * 16 - 8),
+                0.36,
+                "#BCAAA4",
+                rand.nextDouble() * 3.5 + 2.2
+            ));
+        }
+    }
+
+    private double lerpAngle(double current, double target, double factor) {
+        double diff = target - current;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        return current + diff * factor;
     }
 
     private void checkBurrowInteraction(double dx, double dy, double deltaTime, List<Burrow> burrows) {
@@ -217,10 +271,9 @@ public class Player {
         }
 
         lives--;
-        invulnerabilityTimer = 0.95; // Adrenaline invulnerability
+        invulnerabilityTimer = 0.95;
         adrenalineTimer = 1.3;
 
-        // Knockback away from attacker
         double dx = x - fromX;
         double dy = y - fromY;
         double dist = Math.hypot(dx, dy);
@@ -259,6 +312,15 @@ public class Player {
     public double getY() { return y; }
     public double getFaceDx() { return faceDx; }
     public double getFaceDy() { return faceDy; }
+    public double getVisualAngle() { return visualAngle; }
+    public void setVisualAngle(double visualAngle) { this.visualAngle = visualAngle; }
+    public double getWalkPhase() { return walkPhase; }
+    public void setWalkPhase(double walkPhase) { this.walkPhase = walkPhase; }
+    public double getBreathTimer() { return breathTimer; }
+    public void setBreathTimer(double breathTimer) { this.breathTimer = breathTimer; }
+    public boolean isMoving() { return moving; }
+    public void setMoving(boolean moving) { this.moving = moving; }
+    public boolean isSprinting() { return isSprinting; }
     public int getLives() { return lives; }
     public int getMaxLives() { return maxLives; }
     public double getHunger() { return hunger; }

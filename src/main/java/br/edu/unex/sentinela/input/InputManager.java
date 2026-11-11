@@ -1,5 +1,8 @@
 package br.edu.unex.sentinela.input;
 
+import br.edu.unex.sentinela.settings.GameAction;
+import br.edu.unex.sentinela.settings.GameSettings;
+import br.edu.unex.sentinela.settings.KeyBindings;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
@@ -13,7 +16,7 @@ public class InputManager {
     private double dy = 0;
     private boolean sprinting = false;
     private boolean attackPressed = false;
-    private boolean debugOverlay = true;
+    private boolean debugOverlay = false;
     private boolean restartRequested = false;
     private boolean zoomInRequested = false;
     private boolean zoomOutRequested = false;
@@ -23,7 +26,9 @@ public class InputManager {
         this.stage = stage;
         scene.setOnKeyPressed(event -> {
             activeKeys.add(event.getCode());
-            if (event.getCode() == KeyCode.H || event.getCode() == KeyCode.F3) {
+            KeyBindings kb = GameSettings.get().getKeyBindings();
+
+            if (kb.isActionTriggered(GameAction.DEBUG_OVERLAY, activeKeys)) {
                 debugOverlay = !debugOverlay;
             }
             if (event.getCode() == KeyCode.R) {
@@ -32,19 +37,30 @@ public class InputManager {
             if (event.getCode() == KeyCode.F11) {
                 toggleFullScreen();
             }
-            if (event.getCode() == KeyCode.PLUS || event.getCode() == KeyCode.ADD || event.getCode() == KeyCode.EQUALS) {
+            if (kb.isActionTriggered(GameAction.ZOOM_IN, activeKeys)) {
                 zoomInRequested = true;
             }
-            if (event.getCode() == KeyCode.MINUS || event.getCode() == KeyCode.SUBTRACT) {
+            if (kb.isActionTriggered(GameAction.ZOOM_OUT, activeKeys)) {
                 zoomOutRequested = true;
             }
-            if (event.getCode() == KeyCode.SPACE || event.getCode() == KeyCode.J) {
+            if (kb.isActionTriggered(GameAction.ATTACK, activeKeys)) {
                 attackPressed = true;
+            }
+            if (kb.isActionTriggered(GameAction.MUTE_AUDIO, activeKeys)) {
+                br.edu.unex.sentinela.audio.AudioEngine.get().toggleMute();
+            }
+            if (event.getCode() == KeyCode.OPEN_BRACKET) {
+                br.edu.unex.sentinela.audio.AudioEngine.get().changeVolume(-0.1);
+            }
+            if (event.getCode() == KeyCode.CLOSE_BRACKET) {
+                br.edu.unex.sentinela.audio.AudioEngine.get().changeVolume(0.1);
+                br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.UI_CLICK, 0.5, 0, 1);
             }
         });
         scene.setOnKeyReleased(event -> {
             activeKeys.remove(event.getCode());
-            if (event.getCode() == KeyCode.SPACE || event.getCode() == KeyCode.J) {
+            KeyBindings kb = GameSettings.get().getKeyBindings();
+            if (!kb.isActionTriggered(GameAction.ATTACK, activeKeys)) {
                 attackPressed = false;
             }
         });
@@ -71,12 +87,14 @@ public class InputManager {
     public void processInput() {
         dx = 0;
         dy = 0;
-        if (activeKeys.contains(KeyCode.W) || activeKeys.contains(KeyCode.UP)) dy -= 1;
-        if (activeKeys.contains(KeyCode.S) || activeKeys.contains(KeyCode.DOWN)) dy += 1;
-        if (activeKeys.contains(KeyCode.A) || activeKeys.contains(KeyCode.LEFT)) dx -= 1;
-        if (activeKeys.contains(KeyCode.D) || activeKeys.contains(KeyCode.RIGHT)) dx += 1;
+        KeyBindings kb = GameSettings.get().getKeyBindings();
 
-        sprinting = activeKeys.contains(KeyCode.SHIFT);
+        if (kb.isActionTriggered(GameAction.MOVE_UP, activeKeys)) dy -= 1;
+        if (kb.isActionTriggered(GameAction.MOVE_DOWN, activeKeys)) dy += 1;
+        if (kb.isActionTriggered(GameAction.MOVE_LEFT, activeKeys)) dx -= 1;
+        if (kb.isActionTriggered(GameAction.MOVE_RIGHT, activeKeys)) dx += 1;
+
+        sprinting = kb.isActionTriggered(GameAction.SPRINT, activeKeys);
 
         if (dx != 0 && dy != 0) {
             double length = Math.hypot(dx, dy);

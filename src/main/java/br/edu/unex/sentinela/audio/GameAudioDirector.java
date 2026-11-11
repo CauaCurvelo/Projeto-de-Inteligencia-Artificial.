@@ -1,0 +1,198 @@
+package br.edu.unex.sentinela.audio;
+
+import br.edu.unex.sentinela.ai.AIState;
+import br.edu.unex.sentinela.entity.Enemy;
+import br.edu.unex.sentinela.entity.Player;
+import br.edu.unex.sentinela.world.Projectile;
+import br.edu.unex.sentinela.world.TileMap;
+import br.edu.unex.sentinela.world.TileType;
+import br.edu.unex.sentinela.world.WeatherType;
+import br.edu.unex.sentinela.world.World;
+
+import java.util.IdentityHashMap;
+import java.util.Map;
+import java.util.Random;
+
+/**
+ * Fachada de gameplay do áudio. Observa o estado do World a cada frame (diff de snapshots)
+ * e dispara os sons correspondentes, sem acoplar áudio às classes de entidade.
+ */
+public final class GameAudioDirector {
+    private static final double VOICE_COOLDOWN = 1.6;
+
+    private final SpatialAudio spatial = new SpatialAudio();
+    private final AmbienceController ambience = new AmbienceController();
+    private final Random rand = new Random();
+    private final Map<Enemy, EnemySnapshot> enemySnaps = new IdentityHashMap<>();
+    private final Map<Projectile, Boolean> knownProjectiles = new IdentityHashMap<>();
+
+    private Player lastPlayer;
+    private int lastLives, lastApples, lastDefeated, lastDay;
+    private double lastHunger, heartbeatTimer, hungerTimer;
+    private long lastStepIndex;
+    private boolean lastAttacking, lastBurrowed, lastGameOver, lastSwimming;
+    private WeatherType lastWeather;
+
+    private static final class EnemySnapshot {
+        AIState state; boolean windup; long stepIndex; double voiceCooldown; int hp;
+    }
+
+    public void update(World world, double dt) {
+        if (!AudioEngine.get().isReady()) return;
+        Player p = world.getPlayer();
+        if (p != lastPlayer) resetSnapshots(world);
+        spatial.setListener(p.getX(), p.getY());
+
+        ambience.update(world, spatial, dt);
+        handleGameOver(world);
+        if (world.isGameOver()) return;
+
+        handlePlayer(world, p, dt);
+        handleEnemies(world, dt);
+        handleProjectiles(world);
+        handleWorldEvents(world);
+    }
+
+    private void handlePlayer(World world, Player p, double dt) {
+        TileType tile = tileAt(world, p.getX(), p.getY());
+        long step = (long) Math.floor(p.getWalkPhase() / Math.PI);
+        if (p.isMoving() && step != lastStepIndex && !p.isBurrowed()) {
+            double gain = p.isSprinting() ? 0.75 : 0.45;
+            AudioEngine.get().play(CreatureSoundMap.playerFootstep(tile), gain, 0, 0.92 + rand.nextDouble() * 0.16);
+            if (tile == TileType.TALL_GRASS && rand.nextInt(3) == 0) AudioEngine.get().play(SoundId.LEAVES_RUSTLE, 0.35, 0, 1);
+        }
+        lastStepIndex = step;
+
+        if (p.isAttacking() && !lastAttacking) AudioEngine.get().play(SoundId.BITE_WHOOSH, 0.8, 0, 0.95 + rand.nextDouble() * 0.1);
+        lastAttacking = p.isAttacking();
+
+        if (p.isBurrowed() != lastBurrowed) AudioEngine.get().play(p.isBurrowed() ? SoundId.BURROW_ENTER : SoundId.BURROW_EXIT, 0.7, 0, 1);
+        lastBurrowed = p.isBurrowed();
+
+        if (p.isSwimming() && !lastSwimming) AudioEngine.get().play(SoundId.SPLASH, 0.7, 0, 1);
+        lastSwimming = p.isSwimming();
+
+        if (p.getLives() < lastLives) AudioEngine.get().play(SoundId.PLAYER_HURT, 0.9, 0, 1);
+        else if (p.getLives() > lastLives) AudioEngine.get().play(SoundId.HEAL, 0.6, 0, 1);
+        lastLives = p.getLives();
+
+        if (p.getHunger() > lastHunger + 10) {
+            boolean apple = world.getApplesEaten() > lastApples;
+            AudioEngine.get().play(apple ? SoundId.EAT_APPLE : SoundId.EAT_MEAT, 0.75, 0, 1);
+        }
+        lastHunger = p.getHunger();
+        lastApples = world.getApplesEaten();
+
+        updateVitalWarnings(p, dt);
+    }
+
+    /** Batimento cardíaco com vida baixa e ronco de estômago com fome baixa. */
+    private void updateVitalWarnings(Player p, double dt) {
+        heartbeatTimer -= dt;
+        if (p.getLives() <= 1 && heartbeatTimer <= 0) {
+            AudioEngine.get().play(SoundId.HEARTBEAT, 0.8, 0, 1);
+            heartbeatTimer = 0.85;
+        }
+        hungerTimer -= dt;
+        if (p.getHunger() < p.getMaxHunger() * 0.2 && hungerTimer <= 0) {
+            AudioEngine.get().play(SoundId.HUNGER_GROWL, 0.6, 0, 0.9 + rand.nextDouble() * 0.2);
+            hungerTimer = 7.0;
+        }
+    }
+
+    private void handleEnemies(World world, double dt) {
+        enemySnaps.keySet().retainAll(world.getEnemies());
+        for (Enemy e : world.getEnemies()) {
+            EnemySnapshot s = enemySnaps.computeIfAbsent(e, k -> snapshotOf(e));
+            s.voiceCooldown -= dt;
+            double x = e.getX(), y = e.getY();
+            double pitch = 0.9 + rand.nextDouble() * 0.2;
+
+            long step = (long) Math.floor(e.getWalkPhase() / Math.PI);
+            if (e.isMoving() && step != s.stepIndex) {
+                TileType t = tileAt(world, x, y);
+                spatial.playAt(CreatureSoundMap.footstep(e.getSkin(), t), x, y, CreatureSoundMap.footstepGain(e.getSkin()), pitch);
+            }
+            s.stepIndex = step;
+
+            if (e.getState() != s.state) onEnemyStateChange(e, s, x, y, pitch);
+            if (e.isWindup() && !s.windup && s.voiceCooldown <= 0) {
+                spatial.playAt(CreatureSoundMap.attackVoice(e.getSkin()), x, y, 1.0, pitch);
+                s.voiceCooldown = VOICE_COOLDOWN;
+            }
+            s.windup = e.isWindup();
+
+            if (e.getHp() < s.hp) spatial.playAt(SoundId.HIT_IMPACT, x, y, 1.0, pitch);
+            s.hp = e.getHp();
+        }
+    }
+
+    private void onEnemyStateChange(Enemy e, EnemySnapshot s, double x, double y, double pitch) {
+        AIState now = e.getState();
+        boolean wasHostile = s.state == AIState.CHASE || s.state == AIState.ALERT || s.state == AIState.AIMING;
+        if ((now == AIState.CHASE || now == AIState.ALERT || now == AIState.AIMING) && !wasHostile) {
+            spatial.playAt(SoundId.ALERT_STINGER, x, y, 0.9, 1);
+            if (s.voiceCooldown <= 0) {
+                spatial.playAt(CreatureSoundMap.alertVoice(e.getSkin()), x, y, 1.0, pitch);
+                s.voiceCooldown = VOICE_COOLDOWN;
+            }
+        } else if (now == AIState.SNIFFING_TRACK || now == AIState.SUSPICIOUS) {
+            spatial.playAt(SoundId.SNIFF, x, y, 0.8, pitch);
+        } else if (now == AIState.EATING) {
+            spatial.playAt(SoundId.EAT_MEAT, x, y, 0.6, pitch * 0.8);
+        } else if (wasHostile && now == AIState.PATROL) {
+            spatial.playAt(SoundId.LOST_TARGET, x, y, 0.7, 1);
+        }
+        s.state = now;
+    }
+
+    private void handleProjectiles(World world) {
+        Map<Projectile, Boolean> current = new IdentityHashMap<>();
+        for (Projectile pr : world.getProjectiles()) {
+            if (!knownProjectiles.containsKey(pr)) spatial.playAt(SoundId.BOW_SHOT, pr.getX(), pr.getY(), 1.0, 0.95 + rand.nextDouble() * 0.1);
+            current.put(pr, Boolean.TRUE);
+        }
+        knownProjectiles.clear();
+        knownProjectiles.putAll(current);
+    }
+
+    private void handleWorldEvents(World world) {
+        if (world.getEnemiesDefeated() > lastDefeated) AudioEngine.get().play(SoundId.ENEMY_DEATH, 0.8, 0, 1);
+        lastDefeated = world.getEnemiesDefeated();
+        if (world.getDayCycleNumber() > lastDay) AudioEngine.get().play(SoundId.DAY_CHIME, 0.6, 0, 1);
+        lastDay = world.getDayCycleNumber();
+        if (world.getCurrentWeather() != lastWeather) AudioEngine.get().play(SoundId.WEATHER_SHIFT, 0.6, 0, 1);
+        lastWeather = world.getCurrentWeather();
+    }
+
+    private void handleGameOver(World world) {
+        if (world.isGameOver() && !lastGameOver) AudioEngine.get().play(SoundId.GAME_OVER, 0.8, 0, 1);
+        lastGameOver = world.isGameOver();
+    }
+
+    private void resetSnapshots(World world) {
+        Player p = world.getPlayer();
+        lastPlayer = p;
+        lastLives = p.getLives();
+        lastHunger = p.getHunger();
+        lastApples = world.getApplesEaten();
+        lastDefeated = world.getEnemiesDefeated();
+        lastDay = world.getDayCycleNumber();
+        lastWeather = world.getCurrentWeather();
+        lastGameOver = false;
+        enemySnaps.clear();
+        knownProjectiles.clear();
+        for (Projectile pr : world.getProjectiles()) knownProjectiles.put(pr, Boolean.TRUE);
+    }
+
+    private EnemySnapshot snapshotOf(Enemy e) {
+        EnemySnapshot s = new EnemySnapshot();
+        s.state = e.getState(); s.windup = e.isWindup(); s.hp = e.getHp();
+        s.stepIndex = (long) Math.floor(e.getWalkPhase() / Math.PI);
+        return s;
+    }
+
+    private static TileType tileAt(World w, double x, double y) {
+        return w.getTileMap().getTileAt((int) Math.floor(x / TileMap.TILE_SIZE), (int) Math.floor(y / TileMap.TILE_SIZE));
+    }
+}

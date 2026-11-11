@@ -5,3 +5,7 @@ target/
 slides aula/
 *.dat
 *.tmp
+*.properties
+match_history.csv
+*.log
+

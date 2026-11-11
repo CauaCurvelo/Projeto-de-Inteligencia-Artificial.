@@ -6,6 +6,11 @@ import br.edu.unex.sentinela.core.HighScoreManager;
 import br.edu.unex.sentinela.entity.Enemy;
 import br.edu.unex.sentinela.entity.Player;
 import br.edu.unex.sentinela.input.InputManager;
+import br.edu.unex.sentinela.progress.AchievementTracker;
+import br.edu.unex.sentinela.progress.GameEvent;
+import br.edu.unex.sentinela.progress.GameEventBus;
+import br.edu.unex.sentinela.progress.MatchHistoryRepository;
+import br.edu.unex.sentinela.progress.MatchRecord;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -26,6 +31,7 @@ public class World {
 
     // Persistent High Score Manager
     private final HighScoreManager highScoreManager = new HighScoreManager();
+    private final EcosystemSpawner ecosystemSpawner = new EcosystemSpawner();
 
     // Dynamic Weather System
     private WeatherType currentWeather = WeatherType.CLEAR;
@@ -103,68 +109,13 @@ public class World {
     }
 
     private void spawnInitialSurroundings() {
-        for (int i = 0; i < 12; i++) {
-            spawnFoodNearPlayer();
-        }
-
-        for (int i = 0; i < 5; i++) {
-            int c = rand.nextInt(40) - 20;
-            int r = rand.nextInt(40) - 20;
-            TileType t = tileMap.getTileAt(c, r);
-            if (t == TileType.GRASS || t == TileType.TALL_GRASS) {
-                burrows.add(new Burrow(c, r));
-            }
-        }
-
-        // Initial enemy ecosystem: active forest with hunters, hounds, rival wildlife & an early territorial boss
-        spawnEnemyAt(EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, -18, -18);
-        spawnEnemyAt(EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, 20, 20);
-        spawnEnemyAt(EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, -24, 18);
-        spawnEnemyAt(EnemyType.HOUND, EnemySkin.HOUND_TRACKER, 22, -18);
-        spawnEnemyAt(EnemyType.HOUND, EnemySkin.HOUND_TRACKER, -18, 22);
-        spawnEnemyAt(EnemyType.HOUND, EnemySkin.HOUND_TRACKER, 26, 12);
-        
-        // Rivals with varied skins (Boar, Wolf, Badger)
-        spawnEnemyAt(EnemyType.RIVAL, EnemySkin.BOAR, 14, 10);
-        spawnEnemyAt(EnemyType.RIVAL, EnemySkin.BOAR, -12, 14);
-        spawnEnemyAt(EnemyType.RIVAL, EnemySkin.WOLF, -14, -14);
-        spawnEnemyAt(EnemyType.RIVAL, EnemySkin.WOLF, 18, -12);
-        spawnEnemyAt(EnemyType.RIVAL, EnemySkin.BADGER, 16, -16);
-        spawnEnemyAt(EnemyType.RIVAL, EnemySkin.BADGER, -18, -10);
-
-        // An early roaming boss in the distance
-        spawnEnemyAt(EnemyType.BEAR_BOSS, EnemySkin.BEAR, 28, 28);
+        ecosystemSpawner.populateInitialEcosystem(tileMap, enemies, foodItems, burrows);
     }
 
     private void spawnFoodNearPlayer() {
         int playerCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
         int playerRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
-
-        // Berries only spawn naturally near Trees or inside Tall Grass (shrubs)
-        for (int tries = 0; tries < 40; tries++) {
-            int c = playerCol + (rand.nextInt(50) - 25);
-            int r = playerRow + (rand.nextInt(50) - 25);
-            TileType t = tileMap.getTileAt(c, r);
-
-            if (t == TileType.GRASS || t == TileType.TALL_GRASS) {
-                // Must be adjacent to a Tree or inside Tall Grass
-                boolean isNearTreeOrShrub = (t == TileType.TALL_GRASS) ||
-                    tileMap.getTileAt(c + 1, r) == TileType.TREE ||
-                    tileMap.getTileAt(c - 1, r) == TileType.TREE ||
-                    tileMap.getTileAt(c, r + 1) == TileType.TREE ||
-                    tileMap.getTileAt(c, r - 1) == TileType.TREE;
-
-                if (isNearTreeOrShrub) {
-                    foodItems.add(new FoodItem(c, r));
-                    break;
-                }
-            }
-        }
-    }
-
-    private void spawnEnemyAt(EnemyType type, EnemySkin skin, int col, int row) {
-        double scale = 1.0 + (survivalTime / 240.0);
-        enemies.add(new Enemy(type, skin, col * TileMap.TILE_SIZE + 16, row * TileMap.TILE_SIZE + 16, scale, scale));
+        ecosystemSpawner.spawnFoodNearPlayer(tileMap, foodItems, playerCol, playerRow);
     }
 
     public void update(double deltaTime, InputManager inputManager) {
@@ -190,6 +141,7 @@ public class World {
             cycleProgressTimer = 0.0;
             dayCycleNumber++;
             score += 500;
+            GameEventBus.get().post(new GameEvent(GameEvent.Type.DAY_CYCLE_PASSED));
         }
 
         highScoreManager.checkAndSave(score, survivalTime);
@@ -226,21 +178,7 @@ public class World {
         if (enemyReinforcementTimer >= 18.0) {
             enemyReinforcementTimer = 0.0;
             if (enemies.size() < 24) {
-                int pCol = (int)(player.getX() / TileMap.TILE_SIZE);
-                int pRow = (int)(player.getY() / TileMap.TILE_SIZE);
-                int offC = (rand.nextBoolean() ? 1 : -1) * (18 + rand.nextInt(12));
-                int offR = (rand.nextBoolean() ? 1 : -1) * (18 + rand.nextInt(12));
-                
-                int pick = rand.nextInt(4);
-                if (pick == 0) {
-                    spawnEnemyAt(EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, pCol + offC, pRow + offR);
-                } else if (pick == 1) {
-                    spawnEnemyAt(EnemyType.HOUND, EnemySkin.HOUND_TRACKER, pCol + offC, pRow + offR);
-                } else {
-                    int rivalRoll = rand.nextInt(3);
-                    EnemySkin rivalSkin = (rivalRoll == 0) ? EnemySkin.BOAR : (rivalRoll == 1 ? EnemySkin.WOLF : EnemySkin.BADGER);
-                    spawnEnemyAt(EnemyType.RIVAL, rivalSkin, pCol + offC, pRow + offR);
-                }
+                ecosystemSpawner.spawnReinforcementNearPlayer(tileMap, enemies, player, survivalTime);
             }
         }
 
@@ -248,36 +186,7 @@ public class World {
         bossSpawnTimer += deltaTime;
         if (bossSpawnTimer >= 40.0) {
             bossSpawnTimer = 0.0;
-            int pCol = (int)(player.getX() / TileMap.TILE_SIZE);
-            int pRow = (int)(player.getY() / TileMap.TILE_SIZE);
-
-            int bossChoice = rand.nextInt(3);
-            EnemySkin bossSkin;
-            if (bossChoice == 0) bossSkin = EnemySkin.BEAR;
-            else if (bossChoice == 1) bossSkin = EnemySkin.CROCODILE;
-            else bossSkin = EnemySkin.PANTHER;
-
-            // Crocodile specifically spawns near Water / River tiles!
-            if (bossSkin == EnemySkin.CROCODILE) {
-                boolean foundWater = false;
-                for (int t = 0; t < 30; t++) {
-                    int tryC = pCol + (rand.nextBoolean() ? 1 : -1) * (18 + rand.nextInt(15));
-                    int tryR = pRow + (rand.nextBoolean() ? 1 : -1) * (18 + rand.nextInt(15));
-                    TileType tt = tileMap.getTileAt(tryC, tryR);
-                    if (tt == TileType.WATER || tt == TileType.MUD) {
-                        spawnEnemyAt(EnemyType.BEAR_BOSS, bossSkin, tryC, tryR);
-                        foundWater = true;
-                        break;
-                    }
-                }
-                if (!foundWater) {
-                    spawnEnemyAt(EnemyType.BEAR_BOSS, bossSkin, pCol + 22, pRow + 22);
-                }
-            } else {
-                int offC = (rand.nextBoolean() ? 1 : -1) * 22;
-                int offR = (rand.nextBoolean() ? 1 : -1) * 22;
-                spawnEnemyAt(EnemyType.BEAR_BOSS, bossSkin, pCol + offC, pRow + offR);
-            }
+            ecosystemSpawner.spawnApexBossNearPlayer(tileMap, enemies, player, survivalTime);
         }
 
         // Update Player
@@ -298,6 +207,7 @@ public class World {
                     applesEaten++;
                     score += 100;
                     highScoreManager.checkAndSave(score, survivalTime);
+                    GameEventBus.get().post(new GameEvent(GameEvent.Type.APPLE_EATEN));
                 }
             }
         }
@@ -311,9 +221,21 @@ public class World {
                     player.feed(50.0);
                     player.healLife(1);
                     score += 250;
+                    GameEventBus.get().post(new GameEvent(GameEvent.Type.MEAT_EATEN));
                 }
             }
         }
+
+        if (player.isBurrowed()) {
+            GameEventBus.get().post(new GameEvent(GameEvent.Type.BURROW_ENTERED));
+        }
+        if (player.isSwimming()) {
+            GameEventBus.get().post(new GameEvent(GameEvent.Type.RIVER_SWAM));
+        }
+        if (currentWeather == WeatherType.RAIN) {
+            GameEventBus.get().post(new GameEvent(GameEvent.Type.RAIN_SURVIVED));
+        }
+        AchievementTracker.get().updateTick(survivalTime, score, player.getLives());
 
         double scentDecayMultiplier = currentWeather.getScentWashMultiplier();
         Iterator<Footprint> fpIt = scentTrail.iterator();
@@ -365,6 +287,9 @@ public class World {
             enemy.update(deltaTime, player, foodItems, scentTrail, projectiles, enemies, tileMap, timeProgress, currentWeather);
 
             double distToPlayer = Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY());
+            if (distToPlayer < 460.0) {
+                GameEventBus.get().post(new GameEvent(GameEvent.Type.CREATURE_SPOTTED, enemy.getSkin(), 1, ""));
+            }
 
             if (player.isAttacking() && !player.hasProcessedAttackHit()) {
                 double attackRange = 38.0;
@@ -389,6 +314,11 @@ public class World {
                         enemiesDefeated++;
                         score += enemy.getType().getDefeatScore();
                         meatItems.add(new MeatItem(enemy.getX(), enemy.getY()));
+                        if (enemy.getType() == EnemyType.BEAR_BOSS) {
+                            GameEventBus.get().post(new GameEvent(GameEvent.Type.BOSS_DEFEATED, enemy.getSkin(), 1, "Chefe Derrotado"));
+                        } else {
+                            GameEventBus.get().post(new GameEvent(GameEvent.Type.ENEMY_DEFEATED, enemy.getSkin(), 1, "Inimigo Derrotado"));
+                        }
                         enemyIt.remove();
                         continue;
                     }
@@ -445,6 +375,11 @@ public class World {
         this.gameOver = true;
         this.gameOverReason = reason;
         highScoreManager.checkAndSave(score, survivalTime);
+        if (survivalTime >= 3.0) {
+            MatchRecord record = new MatchRecord(survivalTime, score, applesEaten, enemiesDefeated, dayCycleNumber, reason);
+            MatchHistoryRepository.get().recordMatch(record);
+        }
+        GameEventBus.get().post(new GameEvent(GameEvent.Type.GAME_OVER));
     }
 
     private void cleanupDistantEntities() {
@@ -456,37 +391,17 @@ public class World {
         // Despawn enemies that got left too far behind (so new ones spawn close to player)
         enemies.removeIf(e -> Math.hypot(e.getX() - player.getX(), e.getY() - player.getY()) > 1700.0);
 
-        // Dynamic streaming: ensure active enemies are always patrolling within player vicinity
         int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
         int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
 
-        while (enemies.size() < 12) {
-            int offC = (rand.nextBoolean() ? 1 : -1) * (18 + rand.nextInt(14));
-            int offR = (rand.nextBoolean() ? 1 : -1) * (18 + rand.nextInt(14));
-            int pick = rand.nextInt(3);
-            if (pick == 0) {
-                spawnEnemyAt(EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, pCol + offC, pRow + offR);
-            } else if (pick == 1) {
-                spawnEnemyAt(EnemyType.HOUND, EnemySkin.HOUND_TRACKER, pCol + offC, pRow + offR);
-            } else {
-                int rivalRoll = rand.nextInt(3);
-                EnemySkin rivalSkin = (rivalRoll == 0) ? EnemySkin.BOAR : (rivalRoll == 1 ? EnemySkin.WOLF : EnemySkin.BADGER);
-                spawnEnemyAt(EnemyType.RIVAL, rivalSkin, pCol + offC, pRow + offR);
-            }
+        int safetyAttempts = 0;
+        while (enemies.size() < 12 && safetyAttempts < 8) {
+            ecosystemSpawner.spawnReinforcementNearPlayer(tileMap, enemies, player, survivalTime);
+            safetyAttempts++;
         }
 
-        // Procedurally spawn burrows around player if few are nearby
         if (burrows.size() < 7) {
-            int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
-            int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
-            for (int t = 0; t < 15; t++) {
-                int bc = pCol + (rand.nextInt(60) - 30);
-                int br = pRow + (rand.nextInt(60) - 30);
-                if (tileMap.getTileAt(bc, br) == TileType.GRASS) {
-                    burrows.add(new Burrow(bc, br));
-                    break;
-                }
-            }
+            ecosystemSpawner.spawnBurrowInSector(tileMap, burrows, pCol, pRow, rand.nextDouble() * Math.PI * 2.0, 12, 32);
         }
     }
 
