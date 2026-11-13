@@ -238,3 +238,25 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
 - **Tela Interativa de Game Over & Remoção do `[R]` ([GameOverScreen.java](file:///C:/Users/pedro/.gemini/antigravity/scratch/jogo/src/main/java/br/edu/unex/sentinela/ui/GameOverScreen.java), [ScreenState.java](file:///C:/Users/pedro/.gemini/antigravity/scratch/jogo/src/main/java/br/edu/unex/sentinela/ui/ScreenState.java), [ScreenManager.java](file:///C:/Users/pedro/.gemini/antigravity/scratch/jogo/src/main/java/br/edu/unex/sentinela/ui/ScreenManager.java), [GameEngine.java](file:///C:/Users/pedro/.gemini/antigravity/scratch/jogo/src/main/java/br/edu/unex/sentinela/core/GameEngine.java), [HudRenderer.java](file:///C:/Users/pedro/.gemini/antigravity/scratch/jogo/src/main/java/br/edu/unex/sentinela/rendering/HudRenderer.java), [InputManager.java](file:///C:/Users/pedro/.gemini/antigravity/scratch/jogo/src/main/java/br/edu/unex/sentinela/input/InputManager.java), [World.java](file:///C:/Users/pedro/.gemini/antigravity/scratch/jogo/src/main/java/br/edu/unex/sentinela/world/World.java)):**
   - `ScreenState.GAME_OVER` e `GameOverScreen` (`Obsidian Glass`, faixa carmesim, medalhão de crânio, razão da morte, métricas e botões clicáveis `JOGAR DE NOVO` e `MENU PRINCIPAL`).
   - `GameEngine` aciona `screenManager.showGameOver()` ao detectar `world.isGameOver()`; `ScreenManager` protege `recordCurrentMatchIfApplicable` contra gravação duplicada após morte; removidos `HudRenderer.renderGameOverModal`, `InputManager` em `KeyCode.R` e `World.pollRestartRequested`.
+
+## Feature: Fauna Silvestre Passiva, Vagalumes Noturnos, Armadilhas de Urso, Ondulações e Ecossistema Vivo
+- **Fauna Passiva Silvestre ([PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java), [PassiveAnimalType.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimalType.java), [PassiveAnimalRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/PassiveAnimalRenderer.java)):**
+  - Espécies ágeis e autônomas:
+    - `RABBIT`: rápido com saltos elásticos e esquiva em zigue-zague ao notar ameaças.
+    - `DEER`: vigilante de ampla percepção e arrancada em alta velocidade ao notar perigo.
+    - `FROG`: anfíbio saltitante de brejos e rios, nadando e emitindo ondulações na água.
+    - `BIRD`: debica sementes em terra e alça voo rápido batendo asas ao menor sinal de perigo.
+  - Carne miúda e nutrição balanceada (`MeatTier.GAME_MORSEL`): restaura apenas 8% de fome, 0 cura de vida e 75 pontos, mantendo a caça de animais passivos como recurso de emergência.
+  - Renderizador 2.5D dedicado com sombras dinâmicas no solo e animações de debicar, correr e voar.
+- **Vagalumes Noturnos com Bioluminescência ([Firefly.java](src/main/java/br/edu/unex/sentinela/world/Firefly.java), [LightingAndWeatherRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/LightingAndWeatherRenderer.java)):**
+  - Aparecem exclusivamente durante o Crepúsculo e a Noite em biomas de Mata Fechada, Brejo e Pradaria úmida.
+  - Flutuação senoidal suave em 3 eixos e pulso de luz orgânico descompassado com halo radial suave.
+- **Armadilha de Urso dos Caçadores ([BearTrap.java](src/main/java/br/edu/unex/sentinela/world/BearTrap.java), [GroundItemRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/GroundItemRenderer.java)):**
+  - Caçadores armam armadilhas de mola de aço no chão ao longo de suas rotas de patrulha.
+  - Acionamento universal: imobiliza a raposa por 2.5s com 1 coração de dano; atordoa e fere predadores por 3.5s caso pisem nela.
+- **Ondulações Realistas na Água ([WaterRipple.java](src/main/java/br/edu/unex/sentinela/world/WaterRipple.java), [Renderer.java](src/main/java/br/edu/unex/sentinela/rendering/Renderer.java)):**
+  - Ondulações concêntricas com atenuação suave ao caminhar/nadar em água, mergulhos de sapos e impacto de gotas de chuva.
+- **Ecossistema e Rotina Biológica Interativa ([Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - Predadores (Lobos, Panteras, Ursos, Javalis, Crocodilos) perseguem ativamente coelhos, cervos e sapos na mata.
+  - Conflito territorial e latidos/rosnados quando Cães Sabujos e Lobos se cruzam.
+  - Predadores e cães farejam e devoram carcaças de carne caídas no chão.

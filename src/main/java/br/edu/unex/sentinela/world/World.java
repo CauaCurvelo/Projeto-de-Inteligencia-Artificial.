@@ -5,6 +5,8 @@ import br.edu.unex.sentinela.ai.EnemySkin;
 import br.edu.unex.sentinela.ai.EnemyType;
 import br.edu.unex.sentinela.core.HighScoreManager;
 import br.edu.unex.sentinela.entity.Enemy;
+import br.edu.unex.sentinela.entity.PassiveAnimal;
+import br.edu.unex.sentinela.entity.PassiveAnimalType;
 import br.edu.unex.sentinela.entity.Player;
 import br.edu.unex.sentinela.input.InputManager;
 import br.edu.unex.sentinela.progress.AchievementTracker;
@@ -24,12 +26,20 @@ public class World {
     private Player player;
     private Camera camera;
     private final List<Enemy> enemies = new ArrayList<>();
+    private final List<PassiveAnimal> passiveAnimals = new ArrayList<>();
+    private final List<Firefly> fireflies = new ArrayList<>();
+    private final List<BearTrap> bearTraps = new ArrayList<>();
+    private final List<WaterRipple> waterRipples = new ArrayList<>();
     private final List<FoodItem> foodItems = new ArrayList<>();
     private final List<MeatItem> meatItems = new ArrayList<>();
     private final List<Burrow> burrows = new ArrayList<>();
     private final List<Footprint> scentTrail = new ArrayList<>();
     private final List<Particle> particles = new ArrayList<>();
     private final List<Projectile> projectiles = new ArrayList<>();
+
+    private double passiveAnimalStreamTimer = 0.0;
+    private double fireflyStreamTimer = 0.0;
+    private double playerWaterRippleTimer = 0.0;
 
     // Persistent High Score Manager
     private final HighScoreManager highScoreManager = new HighScoreManager();
@@ -139,6 +149,9 @@ public class World {
 
     private void spawnInitialSurroundings() {
         ecosystemSpawner.populateInitialEcosystem(tileMap, enemies, foodItems, burrows);
+        for (int i = 0; i < 14; i++) {
+            spawnPassiveAnimalNearPlayer();
+        }
     }
 
     private void spawnFoodNearPlayer() {
@@ -327,6 +340,132 @@ public class World {
             }
         }
 
+        // 1. Atualizar e limpar ondulações de água (Water Ripples)
+        Iterator<WaterRipple> ripIt = waterRipples.iterator();
+        while (ripIt.hasNext()) {
+            WaterRipple rip = ripIt.next();
+            rip.update(deltaTime);
+            if (rip.isExpired()) {
+                ripIt.remove();
+            }
+        }
+
+        // Jogador nadando na água gera ondulações
+        playerWaterRippleTimer += deltaTime;
+        if (player.isSwimming() && player.isMoving() && playerWaterRippleTimer >= 0.22) {
+            playerWaterRippleTimer = 0.0;
+            waterRipples.add(new WaterRipple(player.getX(), player.getY(), 18.0, 0.70));
+        }
+
+        // Gotas de chuva atingindo água geram micro-ondulações ocasionais
+        if (rainIntensity > 0.20 && rand.nextDouble() < (0.12 * rainIntensity)) {
+            double rx = player.getX() + (rand.nextDouble() - 0.5) * 440.0;
+            double ry = player.getY() + (rand.nextDouble() - 0.5) * 340.0;
+            int rc = (int) Math.floor(rx / TileMap.TILE_SIZE);
+            int rr = (int) Math.floor(ry / TileMap.TILE_SIZE);
+            if (tileMap.getTileAt(rc, rr) == TileType.WATER) {
+                waterRipples.add(new WaterRipple(rx, ry, 10.0, 0.50));
+            }
+        }
+
+        // 2. Atualizar armadilhas de urso (Bear Traps) e verificar acionamentos
+        Iterator<BearTrap> trapIt = bearTraps.iterator();
+        while (trapIt.hasNext()) {
+            BearTrap trap = trapIt.next();
+            trap.update(deltaTime);
+
+            if (trap.isArmed()) {
+                // Jogador pisando na armadilha
+                double distPlayer = Math.hypot(player.getX() - trap.getX(), player.getY() - trap.getY());
+                if (distPlayer < 14.0 && !player.isBurrowed()) {
+                    trap.snap();
+                    player.takeDamage(trap.getX(), trap.getY());
+                    player.trapImmobilize(2.5);
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.95, 0, 0.70);
+                    for (int k = 0; k < 6; k++) {
+                        particles.add(new Particle(trap.getX(), trap.getY(),
+                            (rand.nextDouble() - 0.5) * 60, (rand.nextDouble() - 0.5) * 60,
+                            0.35, "#B0BEC5", 3.0));
+                    }
+                }
+
+                // Inimigos pisando na armadilha
+                for (Enemy enemy : enemies) {
+                    if (enemy.getHp() <= 0) continue;
+                    double distEnemy = Math.hypot(enemy.getX() - trap.getX(), enemy.getY() - trap.getY());
+                    if (distEnemy < 15.0) {
+                        trap.snap();
+                        enemy.takeDamage(2, trap.getX(), trap.getY());
+                        enemy.trapImmobilize(3.5);
+                        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.90, 0, 0.75);
+                        for (int k = 0; k < 6; k++) {
+                            particles.add(new Particle(trap.getX(), trap.getY(),
+                                (rand.nextDouble() - 0.5) * 60, (rand.nextDouble() - 0.5) * 60,
+                                0.35, "#B0BEC5", 3.0));
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (trap.isExpired()) {
+                trapIt.remove();
+            }
+        }
+
+        // 3. Streaming e atualização de fauna passiva silvestre
+        passiveAnimalStreamTimer += deltaTime;
+        if (passiveAnimalStreamTimer >= 4.0) {
+            passiveAnimalStreamTimer = 0.0;
+            passiveAnimals.removeIf(a -> Math.hypot(a.getX() - player.getX(), a.getY() - player.getY()) > 660.0);
+            while (passiveAnimals.size() < 14) {
+                spawnPassiveAnimalNearPlayer();
+            }
+        }
+
+        Iterator<PassiveAnimal> passIt = passiveAnimals.iterator();
+        while (passIt.hasNext()) {
+            PassiveAnimal animal = passIt.next();
+            animal.update(deltaTime, player, enemies, tileMap, waterRipples);
+
+            // Ataque da Raposa contra a fauna passiva
+            if (player.isAttacking() && !player.hasProcessedAttackHit()) {
+                double attackRange = 36.0;
+                double attackX = player.getX() + player.getFaceDx() * 18;
+                double attackY = player.getY() + player.getFaceDy() * 18;
+                double distToAnimal = Math.hypot(animal.getX() - attackX, animal.getY() - attackY);
+
+                if (distToAnimal <= attackRange) {
+                    player.markAttackHitProcessed();
+                    boolean dead = animal.takeDamage(1);
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.8, 0, 1.15);
+                    for (int k = 0; k < 5; k++) {
+                        particles.add(new Particle(animal.getX(), animal.getY(),
+                            player.getFaceDx() * 50 + (rand.nextDouble() * 40 - 20),
+                            player.getFaceDy() * 50 + (rand.nextDouble() * 40 - 20),
+                            0.25, "#D7CCC8", 2.8));
+                    }
+                    if (dead) {
+                        meatItems.addAll(animal.createMorselDrops());
+                        score += 50;
+                    }
+                }
+            }
+
+            if (animal.isDespawned()) {
+                if (animal.getHp() <= 0) {
+                    meatItems.addAll(animal.createMorselDrops());
+                }
+                passIt.remove();
+            }
+        }
+
+        // 4. Streaming e atualização de vagalumes noturnos
+        streamFireflies(deltaTime);
+        for (Firefly f : fireflies) {
+            f.update(deltaTime);
+        }
+
         // Update Enemies & Combat
         double timeProgress = (survivalTime / 240.0);
         Iterator<Enemy> enemyIt = enemies.iterator();
@@ -337,7 +476,7 @@ public class World {
                 enemyIt.remove();
                 continue;
             }
-            enemy.update(deltaTime, player, foodItems, scentTrail, projectiles, enemies, tileMap, timeProgress, currentWeather);
+            enemy.update(deltaTime, player, foodItems, meatItems, passiveAnimals, bearTraps, scentTrail, projectiles, enemies, tileMap, timeProgress, currentWeather);
 
             double distToPlayer = Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY());
             if (distToPlayer < 460.0) {
@@ -523,4 +662,75 @@ public class World {
     public double getCycleDuration() { return cycleDuration; }
     public boolean isGameOver() { return gameOver; }
     public String getGameOverReason() { return gameOverReason; }
+
+    public boolean isNight() {
+        double cycleProgress = cycleProgressTimer / cycleDuration;
+        return Math.sin(cycleProgress * Math.PI) > 0.40;
+    }
+
+    public boolean isDusk() {
+        double cycleProgress = cycleProgressTimer / cycleDuration;
+        double f = Math.sin(cycleProgress * Math.PI);
+        return f >= 0.20 && f <= 0.60;
+    }
+
+    public List<PassiveAnimal> getPassiveAnimals() { return passiveAnimals; }
+    public List<Firefly> getFireflies() { return fireflies; }
+    public List<BearTrap> getBearTraps() { return bearTraps; }
+    public List<WaterRipple> getWaterRipples() { return waterRipples; }
+
+    private void spawnPassiveAnimalNearPlayer() {
+        int playerCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
+        int playerRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
+        double angle = rand.nextDouble() * Math.PI * 2.0;
+        double distTiles = 8.0 + rand.nextDouble() * 20.0;
+        int col = playerCol + (int) Math.round(Math.cos(angle) * distTiles);
+        int row = playerRow + (int) Math.round(Math.sin(angle) * distTiles);
+
+        TileType tile = tileMap.getTileAt(col, row);
+        BiomeType biome = tileMap.getBiomeAt(col, row);
+
+        PassiveAnimalType type;
+        if (tile == TileType.WATER || biome == BiomeType.SWAMP) {
+            type = rand.nextDouble() < 0.65 ? PassiveAnimalType.FROG : PassiveAnimalType.BIRD;
+        } else if (biome == BiomeType.DENSE_FOREST) {
+            type = rand.nextDouble() < 0.60 ? PassiveAnimalType.DEER : (rand.nextBoolean() ? PassiveAnimalType.RABBIT : PassiveAnimalType.BIRD);
+        } else if (biome == BiomeType.MEADOW) {
+            type = rand.nextDouble() < 0.60 ? PassiveAnimalType.RABBIT : PassiveAnimalType.BIRD;
+        } else {
+            type = rand.nextBoolean() ? PassiveAnimalType.RABBIT : PassiveAnimalType.DEER;
+        }
+
+        if (type != PassiveAnimalType.FROG && !tile.isWalkable()) return;
+
+        double wx = col * TileMap.TILE_SIZE + TileMap.TILE_SIZE / 2.0;
+        double wy = row * TileMap.TILE_SIZE + TileMap.TILE_SIZE / 2.0;
+        passiveAnimals.add(new PassiveAnimal(type, wx, wy));
+    }
+
+    private void streamFireflies(double dt) {
+        if (!isNight() && !isDusk()) {
+            if (!fireflies.isEmpty()) {
+                fireflies.remove(fireflies.size() - 1);
+            }
+            return;
+        }
+
+        fireflies.removeIf(f -> Math.hypot(f.getX() - player.getX(), f.getY() - player.getY()) > 560.0);
+
+        fireflyStreamTimer += dt;
+        if (fireflyStreamTimer >= 0.35 && fireflies.size() < 34) {
+            fireflyStreamTimer = 0.0;
+            double ang = rand.nextDouble() * Math.PI * 2.0;
+            double r = 60.0 + rand.nextDouble() * 320.0;
+            double fx = player.getX() + Math.cos(ang) * r;
+            double fy = player.getY() + Math.sin(ang) * r;
+            int col = (int) Math.floor(fx / TileMap.TILE_SIZE);
+            int row = (int) Math.floor(fy / TileMap.TILE_SIZE);
+            BiomeType biome = tileMap.getBiomeAt(col, row);
+            if (biome == BiomeType.DENSE_FOREST || biome == BiomeType.SWAMP || biome == BiomeType.MEADOW) {
+                fireflies.add(new Firefly(fx, fy, biome));
+            }
+        }
+    }
 }

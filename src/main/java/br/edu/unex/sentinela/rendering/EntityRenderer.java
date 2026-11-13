@@ -123,6 +123,10 @@ public class EntityRenderer {
         groundItemRenderer.drawMeatDrop(meat, mx, my, animTime);
     }
 
+    public void drawBearTrap(br.edu.unex.sentinela.world.BearTrap trap, double tx, double ty) {
+        groundItemRenderer.drawBearTrap(trap, tx, ty);
+    }
+
     public void drawPlayerFox(Player player, double px, double py) {
         if (player.isBurrowed()) {
             gc.setFill(Color.web("#F39C12", 0.45));

@@ -158,6 +158,44 @@ public class GroundItemRenderer {
         gc.fillOval(bx - r * 0.5, by - r * 0.65, size * 0.32, size * 0.32);
     }
 
+    public void drawBearTrap(br.edu.unex.sentinela.world.BearTrap trap, double tx, double ty) {
+        if (trap == null) return;
+        boolean armed = trap.isArmed();
+
+        gc.setFill(Color.color(0.01, 0.03, 0.01, 0.50));
+        gc.fillOval(tx - 11, ty - 5, 22, 10);
+
+        if (armed) {
+            gc.setStroke(Color.web("#37474F"));
+            gc.setLineWidth(2.4);
+            gc.strokeOval(tx - 9, ty - 4.5, 18, 9);
+
+            gc.setFill(Color.web("#263238"));
+            gc.fillOval(tx - 3.5, ty - 2, 7, 4);
+            gc.setFill(Color.web("#78909C"));
+            gc.fillOval(tx - 2, ty - 1.2, 4, 2.4);
+
+            gc.setFill(Color.web("#CFD8DC"));
+            for (int i = 0; i < 6; i++) {
+                double ang = i * Math.PI / 3.0;
+                double dx = Math.cos(ang) * 8.5;
+                double dy = Math.sin(ang) * 4.2;
+                gc.fillPolygon(new double[]{tx + dx - 1.2, tx + dx + 1.2, tx + dx},
+                               new double[]{ty + dy, ty + dy, ty + dy - 3.5}, 3);
+            }
+        } else {
+            gc.setStroke(Color.web("#455A64"));
+            gc.setLineWidth(2.8);
+            gc.strokeArc(tx - 7, ty - 9, 14, 13, 30, 120, javafx.scene.shape.ArcType.OPEN);
+            gc.strokeArc(tx - 7, ty - 9, 14, 13, 210, 120, javafx.scene.shape.ArcType.OPEN);
+
+            gc.setFill(Color.web("#263238"));
+            gc.fillOval(tx - 4, ty - 3, 8, 5);
+            gc.setFill(Color.web("#B0BEC5"));
+            gc.fillRect(tx - 1, ty - 7, 2, 8);
+        }
+    }
+
     public void drawMeatDrop(MeatItem meat, double mx, double my, double animTime) {
         MeatTier tier = (meat != null) ? meat.getTier() : MeatTier.SMALL_CUT;
         EnemySkin skin = (meat != null) ? meat.getSourceSkin() : null;
@@ -169,6 +207,9 @@ public class GroundItemRenderer {
         }
 
         switch (tier) {
+            case GAME_MORSEL:
+                drawGameMorsel(mx, my);
+                break;
             case APEX_PRIME_CUT:
                 drawApexPrimeCut(mx, my, skin, animTime);
                 break;
@@ -187,6 +228,20 @@ public class GroundItemRenderer {
         if (expiringSoon) {
             gc.restore();
         }
+    }
+
+    private void drawGameMorsel(double mx, double my) {
+        gc.setFill(SHADOW_SOFT);
+        gc.fillOval(mx - 5.5, my - 1.5, 11.0, 6.5);
+
+        drawBoneKnob(mx + 3.0, my - 1.0, 2.8);
+
+        gc.setFill(Color.web("#5C1D18"));
+        gc.fillOval(mx - 5.0, my - 3.5, 9.5, 7.0);
+        gc.setFill(Color.web("#B71C1C"));
+        gc.fillOval(mx - 4.5, my - 3.0, 8.0, 5.5);
+        gc.setFill(Color.web("#E57373", 0.85));
+        gc.fillOval(mx - 3.0, my - 2.5, 4.0, 2.5);
     }
 
     private void drawSmallCut(double mx, double my) {

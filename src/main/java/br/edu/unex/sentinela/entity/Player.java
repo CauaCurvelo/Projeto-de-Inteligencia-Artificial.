@@ -61,6 +61,7 @@ public class Player {
     // Damage & Adrenaline
     private double invulnerabilityTimer = 0.0;
     private double adrenalineTimer = 0.0;
+    private double trappedTimer = 0.0;
     private double knockbackVx = 0.0;
     private double knockbackVy = 0.0;
 
@@ -146,6 +147,11 @@ public class Player {
 
         if (adrenalineTimer > 0) {
             speedMultiplier *= 1.25;
+        }
+
+        if (trappedTimer > 0) {
+            trappedTimer -= deltaTime;
+            speedMultiplier = 0.0;
         }
 
         if (isSprinting && moving) {
@@ -404,6 +410,10 @@ public class Player {
     public boolean isHiddenInGrass() { return isHiddenInGrass; }
     public boolean isSwimming() { return isSwimming; }
     public boolean isBurrowed() { return isBurrowed; }
+    public void trapImmobilize(double duration) {
+        this.trappedTimer = Math.max(this.trappedTimer, duration);
+    }
+    public boolean isTrapped() { return trappedTimer > 0; }
     public boolean isInvulnerable() { return invulnerabilityTimer > 0; }
     public boolean isAttacking() { return isAttacking; }
     public boolean hasProcessedAttackHit() { return attackHitProcessed; }

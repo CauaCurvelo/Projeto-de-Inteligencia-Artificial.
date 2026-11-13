@@ -71,6 +71,8 @@ public class Enemy {
     private double repathCooldown = 0.0;
     private double patrolPauseTimer = 0.0;
     private double forageCooldownTimer = 0.0;
+    private double trapTimer = 0.0;
+    private double trapDeployCooldown = 18.0 + rand.nextDouble() * 14.0;
     private double patrolHeadingAngle;
     private double stuckTimer = 0.0;
     private double lastCheckX = 0.0;
@@ -141,6 +143,22 @@ public class Enemy {
     public void update(double deltaTime, Player player, List<FoodItem> foodList,
                        List<Footprint> scentTrail, List<Projectile> projectiles, List<Enemy> allEnemies,
                        TileMap tileMap, double timeProgress, WeatherType weather) {
+        update(deltaTime, player, foodList, null, null, null, scentTrail, projectiles, allEnemies, tileMap, timeProgress, weather);
+    }
+
+    public void update(double deltaTime, Player player, List<FoodItem> foodList, List<MeatItem> meatList,
+                       List<PassiveAnimal> preyList, List<BearTrap> trapList,
+                       List<Footprint> scentTrail, List<Projectile> projectiles, List<Enemy> allEnemies,
+                       TileMap tileMap, double timeProgress, WeatherType weather) {
+        if (trapTimer > 0) {
+            trapTimer -= deltaTime;
+            state = AIState.TRAPPED;
+            vx = 0;
+            vy = 0;
+            moving = false;
+            return;
+        }
+
         breathTimer += deltaTime;
         repathCooldown -= deltaTime;
         if (alertTimer > 0) alertTimer -= deltaTime;
@@ -225,13 +243,13 @@ public class Enemy {
 
         switch (type) {
             case HUNTER:
-                updateHunter(canSeePlayer, canHearPlayer, player, allEnemies, tileMap, projectiles, curCol, curRow, distToPlayer);
+                updateHunter(canSeePlayer, canHearPlayer, player, allEnemies, tileMap, projectiles, trapList, deltaTime, curCol, curRow, distToPlayer);
                 break;
             case HOUND:
                 updateHound(canSeePlayer, canHearPlayer, player, allEnemies, scentTrail, tileMap, curCol, curRow);
                 break;
             case RIVAL:
-                updateRival(canSeePlayer, player, foodList, allEnemies, tileMap, curCol, curRow, distToPlayer);
+                updateRival(canSeePlayer, player, foodList, meatList, preyList, allEnemies, tileMap, curCol, curRow, distToPlayer);
                 break;
             case BEAR_BOSS:
                 break;
@@ -281,7 +299,16 @@ public class Enemy {
     }
 
     private void updateHunter(boolean canSee, boolean canHear, Player player, List<Enemy> allEnemies, TileMap tileMap,
-                              List<Projectile> projectiles, int curCol, int curRow, double distToPlayer) {
+                              List<Projectile> projectiles, List<BearTrap> trapList, double dt,
+                              int curCol, int curRow, double distToPlayer) {
+        trapDeployCooldown -= dt;
+        if (state == AIState.PATROL && trapList != null && trapDeployCooldown <= 0 && trapList.size() < 14) {
+            TileType curTile = tileMap.getTileAt(curCol, curRow);
+            if (curTile.isWalkable() && curTile != TileType.WATER) {
+                trapList.add(new BearTrap(x, y));
+                trapDeployCooldown = 26.0 + rand.nextDouble() * 18.0;
+            }
+        }
         if (canSee) {
             patrolPauseTimer = 0;
             int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
@@ -336,6 +363,29 @@ public class Enemy {
             return;
         }
 
+        // Rivalidade territorial com Lobos selvagens
+        if (alertTimer <= 0) {
+            for (Enemy other : allEnemies) {
+                if (other == this || other.getHp() <= 0) continue;
+                if (other.getSkin() == EnemySkin.WOLF) {
+                    double distToWolf = Math.hypot(other.getX() - x, other.getY() - y);
+                    if (distToWolf < 130.0) {
+                        state = AIState.FIGHTING_ENEMY;
+                        patrolPauseTimer = 0;
+                        int wCol = (int) Math.floor(other.getX() / TileMap.TILE_SIZE);
+                        int wRow = (int) Math.floor(other.getY() / TileMap.TILE_SIZE);
+                        requestPath(tileMap, curCol, curRow, wCol, wRow, false);
+                        if (distToWolf < 28.0 && attackCooldown <= 0) {
+                            attackCooldown = 1.75;
+                            other.takeDamage(1, x, y);
+                            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.DOG_BARK, 0.7, 0, 1.2);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
         if (alertTimer > 0) {
             state = AIState.ALERT;
             if (isPathFinished()) {
@@ -375,13 +425,102 @@ public class Enemy {
         return closest;
     }
 
-    private void updateRival(boolean canSee, Player player, List<FoodItem> foodList, List<Enemy> allEnemies,
+    private void updateRival(boolean canSee, Player player, List<FoodItem> foodList, List<MeatItem> meatList,
+                             List<PassiveAnimal> preyList, List<Enemy> allEnemies,
                              TileMap tileMap, int curCol, int curRow, double distToPlayer) {
         if (distToPlayer < 160.0 && canSee) {
             state = AIState.TERRITORIAL_ATTACK;
             patrolPauseTimer = 0;
             requestPath(tileMap, curCol, curRow, (int) Math.floor(player.getX() / TileMap.TILE_SIZE), (int) Math.floor(player.getY() / TileMap.TILE_SIZE), false);
             return;
+        }
+
+        // 1. Predadores caçam presas da fauna passiva (Coelho, Cervo, Sapo)
+        boolean isPredator = (skin == EnemySkin.WOLF || skin == EnemySkin.PANTHER || skin == EnemySkin.BEAR ||
+                              skin == EnemySkin.CROCODILE || skin == EnemySkin.BOAR);
+        if (isPredator && preyList != null && !canSee) {
+            PassiveAnimal nearestPrey = null;
+            double minPreyDist = 180.0;
+            for (PassiveAnimal prey : preyList) {
+                if (prey.isDespawned()) continue;
+                double dp = Math.hypot(prey.getX() - x, prey.getY() - y);
+                if (dp < minPreyDist) {
+                    minPreyDist = dp;
+                    nearestPrey = prey;
+                }
+            }
+
+            if (nearestPrey != null) {
+                state = AIState.HUNTING_PREY;
+                patrolPauseTimer = 0;
+                int preyCol = (int) Math.floor(nearestPrey.getX() / TileMap.TILE_SIZE);
+                int preyRow = (int) Math.floor(nearestPrey.getY() / TileMap.TILE_SIZE);
+                requestPath(tileMap, curCol, curRow, preyCol, preyRow, false);
+
+                if (minPreyDist < 26.0) {
+                    boolean dead = nearestPrey.takeDamage(1);
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.7, 0, 1.1);
+                    if (dead) {
+                        patrolPauseTimer = 1.6;
+                        state = AIState.EATING;
+                        currentPath = null;
+                    }
+                }
+                return;
+            }
+        }
+
+        // 2. Disputa territorial de Lobos contra Cães Sabujos
+        if (skin == EnemySkin.WOLF && !canSee) {
+            for (Enemy other : allEnemies) {
+                if (other == this || other.getHp() <= 0) continue;
+                if (other.getType() == EnemyType.HOUND) {
+                    double distToHound = Math.hypot(other.getX() - x, other.getY() - y);
+                    if (distToHound < 130.0) {
+                        state = AIState.FIGHTING_ENEMY;
+                        patrolPauseTimer = 0;
+                        int hCol = (int) Math.floor(other.getX() / TileMap.TILE_SIZE);
+                        int hRow = (int) Math.floor(other.getY() / TileMap.TILE_SIZE);
+                        requestPath(tileMap, curCol, curRow, hCol, hRow, false);
+                        if (distToHound < 28.0 && attackCooldown <= 0) {
+                            attackCooldown = 1.75;
+                            other.takeDamage(1, x, y);
+                            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.WOLF_SNARL, 0.7, 0, 1.0);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 3. Carnívoros e onívoros disputam carcaças e carnes deixadas no solo
+        if (meatList != null && !canSee && (skin == EnemySkin.WOLF || skin == EnemySkin.BEAR || skin == EnemySkin.PANTHER || skin == EnemySkin.BOAR)) {
+            MeatItem nearestMeat = null;
+            double minMeatDist = 180.0;
+            for (MeatItem meat : meatList) {
+                if (meat.isEaten()) continue;
+                double dm = Math.hypot(meat.getX() - x, meat.getY() - y);
+                if (dm < minMeatDist) {
+                    minMeatDist = dm;
+                    nearestMeat = meat;
+                }
+            }
+
+            if (nearestMeat != null) {
+                state = AIState.SEARCHING_FOOD;
+                int mCol = (int) Math.floor(nearestMeat.getX() / TileMap.TILE_SIZE);
+                int mRow = (int) Math.floor(nearestMeat.getY() / TileMap.TILE_SIZE);
+                requestPath(tileMap, curCol, curRow, mCol, mRow, false);
+
+                if (minMeatDist < 22.0) {
+                    nearestMeat.setEaten(true);
+                    state = AIState.EATING;
+                    patrolPauseTimer = 1.6;
+                    currentPath = null;
+                    if (hp < maxHp) hp++;
+                }
+                return;
+            }
         }
 
         // Apenas onívoros forrageiam arbustos desocupados próximos; carnívoros (Lobo) nunca aglomeram em frutas
@@ -818,6 +957,14 @@ public class Enemy {
     public int getHp() { return hp; }
     public int getMaxHp() { return maxHp; }
     public boolean isFlashing() { return damageFlashTimer > 0; }
+    public boolean isTrapped() { return trapTimer > 0; }
+    public void trapImmobilize(double duration) {
+        this.trapTimer = Math.max(this.trapTimer, duration);
+        this.state = AIState.TRAPPED;
+        this.vx = 0;
+        this.vy = 0;
+        this.moving = false;
+    }
     public AIState getState() { return state; }
     public double getFaceAngle() { return faceAngle; }
     public void setFaceAngle(double faceAngle) { this.faceAngle = faceAngle; }

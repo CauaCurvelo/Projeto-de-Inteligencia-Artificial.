@@ -1,6 +1,7 @@
 package br.edu.unex.sentinela.rendering;
 
 import br.edu.unex.sentinela.entity.Enemy;
+import br.edu.unex.sentinela.entity.PassiveAnimal;
 import br.edu.unex.sentinela.entity.Player;
 import br.edu.unex.sentinela.input.InputManager;
 import br.edu.unex.sentinela.settings.GameSettings;
@@ -32,6 +33,7 @@ public class Renderer {
     private final BossAuraAndTelegraphRenderer bossAuraRenderer;
     private final TacticalAuraRenderer tacticalAuraRenderer;
     private final EntityRenderer entityRenderer;
+    private final PassiveAnimalRenderer passiveAnimalRenderer;
     private final LightingAndWeatherRenderer lightingAndWeatherRenderer;
     private final HudRenderer hudRenderer;
     private final UiIconDrawer overlayDrawer;
@@ -47,6 +49,7 @@ public class Renderer {
         this.bossAuraRenderer = new BossAuraAndTelegraphRenderer(gc);
         this.tacticalAuraRenderer = new TacticalAuraRenderer(gc);
         this.entityRenderer = new EntityRenderer(gc);
+        this.passiveAnimalRenderer = new PassiveAnimalRenderer(gc);
         this.lightingAndWeatherRenderer = new LightingAndWeatherRenderer(gc);
         this.hudRenderer = new HudRenderer(gc);
         this.overlayDrawer = new UiIconDrawer(gc);
@@ -102,6 +105,24 @@ public class Renderer {
                         double sy = row * ts - camY;
                         terrainRenderer.renderAnimatedTileOverlay(type, sx, sy, ts, col, row, animTime, quality, tileMap.getBiomeAt(col, row));
                     }
+                }
+            }
+        }
+
+        // Ondulações concêntricas de água (Water Ripples)
+        if (world.getWaterRipples() != null) {
+            for (WaterRipple ripple : world.getWaterRipples()) {
+                double rx = ripple.getX() - camX;
+                double ry = ripple.getY() - camY;
+                double r = ripple.getRadius();
+                if (rx >= -r && rx <= visibleW + r && ry >= -r && ry <= visibleH + r) {
+                    gc.setStroke(Color.color(0.68, 0.88, 1.0, ripple.getAlpha()));
+                    gc.setLineWidth(1.4);
+                    gc.strokeOval(rx - r, ry - r * 0.55, r * 2.0, r * 1.1);
+
+                    gc.setStroke(Color.color(0.85, 0.96, 1.0, ripple.getAlpha() * 0.55));
+                    gc.setLineWidth(1.0);
+                    gc.strokeOval(rx - r * 0.65, ry - r * 0.35, r * 1.3, r * 0.70);
                 }
             }
         }
@@ -170,6 +191,17 @@ public class Renderer {
             }
         }
 
+        // Armadilhas mecânicas no solo (Bear Traps)
+        if (world.getBearTraps() != null) {
+            for (BearTrap trap : world.getBearTraps()) {
+                double tx = trap.getX() - camX;
+                double ty = trap.getY() - camY;
+                if (tx >= -25 && tx <= visibleW + 25 && ty >= -25 && ty <= visibleH + 25) {
+                    entityRenderer.drawBearTrap(trap, tx, ty);
+                }
+            }
+        }
+
         // PASSO 5: Paredões de Rocha 2.5D e Troncos de Árvore
         for (int row = startRow; row <= endRow; row++) {
             for (int col = startCol; col <= endCol; col++) {
@@ -203,6 +235,17 @@ public class Renderer {
             double ey = enemy.getY() - camY;
             if (ex < -60 || ex > visibleW + 60 || ey < -60 || ey > visibleH + 60) continue;
             entityRenderer.renderEnemy(enemy, ex, ey);
+        }
+
+        // Fauna Passiva Silvestre (Coelho, Cervo, Sapo e Pássaro)
+        if (world.getPassiveAnimals() != null) {
+            for (PassiveAnimal animal : world.getPassiveAnimals()) {
+                double ax = animal.getX() - camX;
+                double ay = animal.getY() - camY;
+                if (ax >= -40 && ax <= visibleW + 40 && ay >= -40 && ay <= visibleH + 40) {
+                    passiveAnimalRenderer.renderPassiveAnimal(animal, ax, ay);
+                }
+            }
         }
 
         Player player = world.getPlayer();

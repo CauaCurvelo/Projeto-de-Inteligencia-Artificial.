@@ -250,7 +250,10 @@ public class TacticalAuraRenderer {
             case CHASE:
             case AIMING:
             case FIGHTING_ENEMY:
+            case HUNTING_PREY:
                 return Color.web("#FF2A55"); // Vermelho Carmesim Tático (Perigo / Combate)
+            case TRAPPED:
+                return Color.web("#90A4AE"); // Aço Acinzentado (Preso)
             case RETREATING:
                 return Color.web("#78909C"); // Azul-Ardósia (Retornando ao Domínio)
             case SUSPICIOUS:

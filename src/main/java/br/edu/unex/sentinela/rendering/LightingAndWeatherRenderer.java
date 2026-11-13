@@ -66,6 +66,9 @@ public class LightingAndWeatherRenderer {
             renderSnowfall(visibleW, visibleH, animTime, quality, rainIntensity > 0.4);
         }
 
+        renderFireflies(world, world.getCamera() != null ? world.getCamera().getX() : 0,
+                        world.getCamera() != null ? world.getCamera().getY() : 0, visibleW, visibleH);
+
         if (rainIntensity > 0.01 && !inSnow) {
             var drops = world.getRainDrops();
             int totalDrops = drops.size();
@@ -140,6 +143,40 @@ public class LightingAndWeatherRenderer {
             double size = 2.0 + (i % 3) * 1.1;
             gc.setFill(i % 4 == 0 ? Color.web("#BAE6FD", 0.72) : Color.web("#FFFFFF", 0.78));
             gc.fillOval(fx, fy, size, size);
+        }
+    }
+
+    public void renderFireflies(World world, double camX, double camY, double visibleW, double visibleH) {
+        if (world == null || world.getFireflies() == null) return;
+        var fireflies = world.getFireflies();
+        if (fireflies.isEmpty()) return;
+
+        GraphicsQuality quality = GameSettings.get().getGraphicsQuality();
+
+        for (br.edu.unex.sentinela.world.Firefly f : fireflies) {
+            double fx = f.getX() - camX;
+            double fy = f.getY() - camY - f.getFloatZ();
+
+            if (fx < -25 || fx > visibleW + 25 || fy < -25 || fy > visibleH + 25) continue;
+
+            double glow = f.getGlowAlpha();
+            if (glow <= 0.04) continue;
+
+            if (quality != GraphicsQuality.LOW) {
+                RadialGradient halo = new RadialGradient(
+                    0, 0, fx, fy, 18.0, false, CycleMethod.NO_CYCLE,
+                    new Stop(0.0, Color.color(0.85, 0.98, 0.35, glow * 0.38)),
+                    new Stop(0.5, Color.color(0.55, 0.90, 0.25, glow * 0.16)),
+                    new Stop(1.0, Color.color(0.20, 0.70, 0.15, 0.0))
+                );
+                gc.setFill(halo);
+                gc.fillOval(fx - 18, fy - 18, 36, 36);
+            }
+
+            gc.setFill(Color.color(0.98, 1.0, 0.70, Math.min(1.0, glow * 1.25)));
+            gc.fillOval(fx - 1.8, fy - 1.8, 3.6, 3.6);
+            gc.setFill(Color.web("#FFFFFF", glow));
+            gc.fillOval(fx - 1.0, fy - 1.0, 2.0, 2.0);
         }
     }
 

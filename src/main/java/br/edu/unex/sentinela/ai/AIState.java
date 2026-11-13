@@ -12,6 +12,8 @@ public enum AIState {
     SEARCHING_FOOD("Buscando Alimento"),
     EATING("Alimentando-se"),
     TERRITORIAL_ATTACK("Ataque Territorial"),
+    HUNTING_PREY("Caçando Presa"),
+    TRAPPED("Preso em Armadilha"),
     ROARING("Rugido de Fúria"),
     RETREATING("Recuando ao Domínio");
 
