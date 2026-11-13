@@ -55,7 +55,8 @@ public class LightingAndWeatherRenderer {
     }
 
     public void renderWeatherVisuals(World world, double visibleW, double visibleH, double animTime) {
-        WeatherType weather = world.getCurrentWeather();
+        double rainIntensity = world.getRainIntensity();
+        double fogIntensity = world.getFogIntensity();
         GraphicsQuality quality = GameSettings.get().getGraphicsQuality();
         BiomeType playerBiome = BiomeType.MEADOW;
         if (world.getPlayer() != null && world.getTileMap() != null) {
@@ -64,35 +65,63 @@ public class LightingAndWeatherRenderer {
         boolean inSnow = playerBiome == BiomeType.SNOW;
 
         if (inSnow) {
-            renderSnowfall(visibleW, visibleH, animTime, quality, weather == WeatherType.RAIN);
+            renderSnowfall(visibleW, visibleH, animTime, quality, rainIntensity > 0.4);
         }
 
-        if (weather == WeatherType.RAIN && !inSnow) {
+        if (rainIntensity > 0.01 && !inSnow) {
             var drops = world.getRainDrops();
+            int totalDrops = drops.size();
+            int activeCount = (int) Math.round(totalDrops * rainIntensity);
+            activeCount = Math.max(1, Math.min(totalDrops, activeCount));
+
             int step = (quality == GraphicsQuality.LOW) ? 2 : 1;
-            gc.setStroke(RAIN_COLOR);
+            double dropAlpha = 0.58 * Math.min(1.0, rainIntensity * 1.25);
+            Color currentRainColor = Color.web("#B3E5FC", dropAlpha);
+            Color currentRippleColor = Color.web("#E1F5FE", 0.35 * Math.min(1.0, rainIntensity * 1.25));
+
+            Camera cam = world.getCamera();
+            double deltaTime = world.getLastDeltaTime();
+            double camDeltaX = cam.getDeltaX();
+            double camDeltaY = cam.getDeltaY();
+            double safeDt = Math.max(0.001, deltaTime);
+
+            // Calcula a inclinação e alongamento relativo da gota conforme a velocidade da câmera
+            // Impede que a chuva pareça lenta ao correr para cima ou para os lados
+            double apparentVx = -45.0 - (camDeltaX / safeDt);
+            double apparentVy = 620.0 - (camDeltaY / safeDt);
+            double streakScale = 0.024;
+            double streakDx = Math.max(-12.0, Math.min(12.0, apparentVx * streakScale));
+            double streakDy = Math.max(7.0, Math.min(26.0, apparentVy * streakScale));
+
+            gc.setStroke(currentRainColor);
             gc.setLineWidth(1.3);
-            for (int i = 0; i < drops.size(); i += step) {
+            for (int i = 0; i < activeCount; i += step) {
                 WeatherDrop drop = drops.get(i);
                 double dx = drop.getX();
                 double dy = drop.getY();
-                gc.strokeLine(dx, dy, dx - 4.5, dy + drop.getLength());
+                gc.strokeLine(dx, dy, dx + streakDx, dy + streakDy);
 
                 // Pequenos anéis de respingo (water splash ripples) no chão quando a gota está no fim do curso
-                if (quality != GraphicsQuality.LOW && ((int) (dy + dx) % 19) == 0) {
-                    gc.setStroke(RAIN_RIPPLE_COLOR);
-                    gc.strokeOval(dx - 6, dy + drop.getLength() - 1.5, 5, 2.5);
-                    gc.setStroke(RAIN_COLOR);
+                if (quality != GraphicsQuality.LOW && rainIntensity > 0.35 && ((int) (dy + dx) % 19) == 0) {
+                    gc.setStroke(currentRippleColor);
+                    gc.strokeOval(dx + streakDx - 2.5, dy + streakDy - 1.2, 5, 2.5);
+                    gc.setStroke(currentRainColor);
                 }
             }
 
-            // Atmosfera nublada azul-acinzentada fria
-            gc.setFill(Color.color(0.06, 0.12, 0.24, 0.18));
+            // Atmosfera nublada azul-acinzentada fria com fade-in suave
+            double cloudAlpha = 0.18 * rainIntensity;
+            gc.setFill(Color.color(0.06, 0.12, 0.24, cloudAlpha));
             gc.fillRect(0, 0, visibleW, visibleH);
 
-        } else if (weather == WeatherType.FOG) {
+        }
+
+        if (fogIntensity > 0.01) {
+            gc.save();
+            gc.setGlobalAlpha(fogIntensity);
             gc.setFill(quality == GraphicsQuality.LOW ? FOG_LOW_COLOR : FOG_GRAD);
             gc.fillRect(0, 0, visibleW, visibleH);
+            gc.restore();
         }
     }
 

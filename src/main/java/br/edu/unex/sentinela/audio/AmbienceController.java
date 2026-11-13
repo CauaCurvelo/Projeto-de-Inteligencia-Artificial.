@@ -35,13 +35,13 @@ public final class AmbienceController {
 
         double night = Math.sin(world.getCycleProgressTimer() / world.getCycleDuration() * Math.PI);
         double day = 1 - night;
-        WeatherType w = world.getCurrentWeather();
-        boolean rain = w == WeatherType.RAIN, fog = w == WeatherType.FOG;
+        double rainIntensity = world.getRainIntensity();
+        double fogIntensity = world.getFogIntensity();
         boolean burrowed = world.getPlayer().isBurrowed();
         double muffle = burrowed ? 0.35 : 1.0;
 
-        applyLoopMix(day, night, rain, fog, muffle);
-        scheduleEvents(world, spatial, dt, night, rain, muffle);
+        applyLoopMix(day, night, rainIntensity, fogIntensity, muffle);
+        scheduleEvents(world, spatial, dt, night, rainIntensity, muffle);
     }
 
     /** Atenua suavemente as camadas em pausa/configs da partida e silencia no menu principal. */
@@ -53,27 +53,27 @@ public final class AmbienceController {
         }
         double night = Math.sin(world.getCycleProgressTimer() / world.getCycleDuration() * Math.PI);
         double day = 1 - night;
-        WeatherType w = world.getCurrentWeather();
-        boolean rain = w == WeatherType.RAIN, fog = w == WeatherType.FOG;
+        double rainIntensity = world.getRainIntensity();
+        double fogIntensity = world.getFogIntensity();
         double muffle = (world.getPlayer().isBurrowed() ? 0.35 : 1.0) * 0.25;
-        applyLoopMix(day, night, rain, fog, muffle);
+        applyLoopMix(day, night, rainIntensity, fogIntensity, muffle);
     }
 
-    private void applyLoopMix(double day, double night, boolean rain, boolean fog, double muffle) {
+    private void applyLoopMix(double day, double night, double rainIntensity, double fogIntensity, double muffle) {
         double windBias = (currentBiome == BiomeType.HIGHLAND) ? 0.14 : (currentBiome == BiomeType.SNOW ? 0.19 : 0.0);
         double forestBias = (currentBiome == BiomeType.DENSE_FOREST) ? 0.16 : 0.0;
         double swampWaterBias = (currentBiome == BiomeType.SWAMP) ? 0.12 : 0.0;
 
         setGain(SoundId.LOOP_WIND, (0.18 + windBias + 0.10 * (1 - forestRatio)) * muffle);
-        setGain(SoundId.LOOP_FOREST, Math.min(1.0, forestRatio + forestBias) * 0.38 * day * muffle);
+        setGain(SoundId.LOOP_FOREST, Math.min(1.0, forestRatio + forestBias) * 0.38 * day * muffle * (1.0 - rainIntensity * 0.55));
         double nightSuppress = (currentBiome == BiomeType.SWAMP ? 0.25 : (currentBiome == BiomeType.SNOW ? 0.72 : 0.35));
-        setGain(SoundId.LOOP_NIGHT, Math.max(0, night - nightSuppress) * 0.69 * muffle);
+        setGain(SoundId.LOOP_NIGHT, Math.max(0, night - nightSuppress) * 0.69 * muffle * (1.0 - rainIntensity * 0.5));
         setGain(SoundId.LOOP_RIVER, Math.min(1, waterRatio * 2.5 + swampWaterBias) * 0.45 * muffle);
-        setGain(SoundId.LOOP_RAIN, (rain && currentBiome != BiomeType.SNOW) ? 0.50 * muffle : 0);
-        setGain(SoundId.LOOP_STORM_WIND, (rain ? 0.22 : fog ? 0.16 : 0) * muffle);
+        setGain(SoundId.LOOP_RAIN, (currentBiome != BiomeType.SNOW) ? 0.50 * rainIntensity * muffle : 0);
+        setGain(SoundId.LOOP_STORM_WIND, (rainIntensity * 0.22 + fogIntensity * 0.16) * muffle);
     }
 
-    private void scheduleEvents(World world, SpatialAudio sp, double dt, double night, boolean rain, double muffle) {
+    private void scheduleEvents(World world, SpatialAudio sp, double dt, double night, double rainIntensity, double muffle) {
         double px = world.getPlayer().getX(), py = world.getPlayer().getY();
         eventTimer -= dt;
         if (eventTimer <= 0) {
@@ -82,15 +82,15 @@ public final class AmbienceController {
             double pitch = 0.9 + rand.nextDouble() * 0.25;
             if (night > 0.6) {
                 sp.playAt(rand.nextInt(3) == 0 ? SoundId.OWL_HOOT : SoundId.CRICKET, ox, oy, 0.42 * muffle, pitch);
-            } else if (!rain && night < 0.45) {
+            } else if (rainIntensity < 0.35 && night < 0.45) {
                 sp.playAt(SoundId.BIRD_CHIRP, ox, oy, (0.22 + 0.28 * forestRatio) * muffle, pitch);
             }
         }
-        if (rain) {
+        if (rainIntensity > 0.35) {
             thunderTimer -= dt;
             if (thunderTimer <= 0) {
-                thunderTimer = 9 + rand.nextDouble() * 16;
-                AudioEngine.get().play(SoundId.THUNDER, 0.8 * muffle, rand.nextDouble() * 1.2 - 0.6, 0.8 + rand.nextDouble() * 0.3);
+                thunderTimer = 11 + rand.nextDouble() * 16;
+                AudioEngine.get().play(SoundId.THUNDER, 0.8 * muffle * rainIntensity, rand.nextDouble() * 1.2 - 0.6, 0.8 + rand.nextDouble() * 0.3);
             }
         }
     }

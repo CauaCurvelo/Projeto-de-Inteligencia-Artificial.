@@ -3,6 +3,9 @@ package br.edu.unex.sentinela.world;
 public class Camera {
     private double x;
     private double y;
+    private double deltaX = 0.0;
+    private double deltaY = 0.0;
+    private boolean initialized = false;
     private double viewportWidth;
     private double viewportHeight;
     private double zoom = 1.0; // Zoom factor: 1.0 is default, 1.4 is close-up, 0.75 is overview
@@ -48,6 +51,15 @@ public class Camera {
         }
     }
 
+    public void reset() {
+        this.initialized = false;
+        this.deltaX = 0.0;
+        this.deltaY = 0.0;
+        this.shakeTimer = 0.0;
+        this.shakeDuration = 0.0;
+        this.shakeIntensity = 0.0;
+    }
+
     // Infinite map camera: directly centers on target with optional shake offset and zoom
     public void update(double targetX, double targetY) {
         double visibleWidth = viewportWidth / zoom;
@@ -60,12 +72,29 @@ public class Camera {
             offsetX = Math.sin(shakePhase) * mag;
             offsetY = Math.cos(shakePhase * 1.37) * mag * 0.85;
         }
-        this.x = targetX - (visibleWidth / 2.0) + offsetX;
-        this.y = targetY - (visibleHeight / 2.0) + offsetY;
+        double nextX = targetX - (visibleWidth / 2.0) + offsetX;
+        double nextY = targetY - (visibleHeight / 2.0) + offsetY;
+
+        if (!initialized) {
+            this.x = nextX;
+            this.y = nextY;
+            this.deltaX = 0.0;
+            this.deltaY = 0.0;
+            this.initialized = true;
+        } else {
+            this.deltaX = nextX - this.x;
+            this.deltaY = nextY - this.y;
+            this.x = nextX;
+            this.y = nextY;
+        }
     }
 
     public double getX() { return x; }
     public double getY() { return y; }
+    public double getDeltaX() { return deltaX; }
+    public double getDeltaY() { return deltaY; }
+    public double getVisibleWidth() { return viewportWidth / zoom; }
+    public double getVisibleHeight() { return viewportHeight / zoom; }
     public double getViewportWidth() { return viewportWidth; }
     public double getViewportHeight() { return viewportHeight; }
     public double getZoom() { return zoom; }

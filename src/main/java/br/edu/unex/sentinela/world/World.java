@@ -39,6 +39,10 @@ public class World {
     private WeatherType currentWeather = WeatherType.CLEAR;
     private double weatherTimer = 0.0;
     private final double weatherDuration = 45.0;
+    private static final double WEATHER_TRANSITION_DURATION = 4.0;
+    private double rainIntensity = 0.0;
+    private double fogIntensity = 0.0;
+    private double lastDeltaTime = 0.016;
     private final List<WeatherDrop> rainDrops = new ArrayList<>();
 
     // Infinite Survival & Scoring Mechanics
@@ -63,13 +67,13 @@ public class World {
     private String gameOverReason = "";
 
     public World() {
-        initRainDrops(90);
+        initRainDrops(130);
         initWorld();
     }
 
     public World(long fixedWorldSeed) {
         this.currentWorldSeed = fixedWorldSeed;
-        initRainDrops(90);
+        initRainDrops(130);
         initWorld();
     }
 
@@ -85,11 +89,11 @@ public class World {
         rainDrops.clear();
         for (int i = 0; i < count; i++) {
             rainDrops.add(new WeatherDrop(
-                Math.random() * 960,
-                Math.random() * 640,
-                -40.0 + (Math.random() * 20 - 10),
-                280.0 + (Math.random() * 80),
-                12.0 + Math.random() * 8
+                Math.random() * 1400 - 100,
+                Math.random() * 900 - 100,
+                -45.0 + (Math.random() * 16 - 8),
+                600.0 + (Math.random() * 90),
+                14.0 + Math.random() * 8
             ));
         }
     }
@@ -115,6 +119,9 @@ public class World {
         bossSpawnTimer = 0.0;
         currentWeather = WeatherType.CLEAR;
         weatherTimer = 0.0;
+        rainIntensity = 0.0;
+        fogIntensity = 0.0;
+        initRainDrops(130);
         currentWorldSeed = generateRandomSeed();
         gameOver = false;
         gameOverReason = "";
@@ -141,6 +148,8 @@ public class World {
     }
 
     public void update(double deltaTime, InputManager inputManager) {
+        this.lastDeltaTime = deltaTime;
+
         if (inputManager.pollZoomInRequested()) {
             camera.zoomIn();
         }
@@ -163,7 +172,7 @@ public class World {
 
         highScoreManager.checkAndSave(score, survivalTime);
 
-        // Weather transitions
+        // Weather transitions & organic smoothing (transição gradual de ~4s)
         weatherTimer += deltaTime;
         if (weatherTimer >= weatherDuration) {
             weatherTimer = 0.0;
@@ -174,10 +183,20 @@ public class World {
             }
         }
 
-        if (currentWeather == WeatherType.RAIN) {
-            for (WeatherDrop drop : rainDrops) {
-                drop.update(deltaTime, camera.getViewportWidth(), camera.getViewportHeight());
-            }
+        double targetRain = (currentWeather == WeatherType.RAIN) ? 1.0 : 0.0;
+        double targetFog = (currentWeather == WeatherType.FOG) ? 1.0 : 0.0;
+        double transStep = deltaTime / WEATHER_TRANSITION_DURATION;
+
+        if (rainIntensity < targetRain) {
+            rainIntensity = Math.min(targetRain, rainIntensity + transStep);
+        } else if (rainIntensity > targetRain) {
+            rainIntensity = Math.max(targetRain, rainIntensity - transStep);
+        }
+
+        if (fogIntensity < targetFog) {
+            fogIntensity = Math.min(targetFog, fogIntensity + transStep);
+        } else if (fogIntensity > targetFog) {
+            fogIntensity = Math.max(targetFog, fogIntensity - transStep);
         }
 
         // Procedural entity & food streaming (limited density, only near trees or bushes)
@@ -415,6 +434,16 @@ public class World {
 
         camera.updateShake(deltaTime);
         camera.update(player.getX(), player.getY());
+
+        if (rainIntensity > 0.001) {
+            double camDeltaX = camera.getDeltaX();
+            double camDeltaY = camera.getDeltaY();
+            double visW = camera.getVisibleWidth();
+            double visH = camera.getVisibleHeight();
+            for (WeatherDrop drop : rainDrops) {
+                drop.update(deltaTime, visW, visH, camDeltaX, camDeltaY);
+            }
+        }
     }
 
     private void triggerGameOver(String reason) {
@@ -479,6 +508,9 @@ public class World {
     public List<Particle> getParticles() { return particles; }
     public List<Projectile> getProjectiles() { return projectiles; }
     public WeatherType getCurrentWeather() { return currentWeather; }
+    public double getRainIntensity() { return rainIntensity; }
+    public double getFogIntensity() { return fogIntensity; }
+    public double getLastDeltaTime() { return lastDeltaTime; }
     public List<WeatherDrop> getRainDrops() { return rainDrops; }
     public HighScoreManager getHighScoreManager() { return highScoreManager; }
     public double getSurvivalTime() { return survivalTime; }
