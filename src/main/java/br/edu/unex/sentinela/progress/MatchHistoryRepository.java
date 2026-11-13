@@ -1,5 +1,7 @@
 package br.edu.unex.sentinela.progress;
 
+import br.edu.unex.sentinela.core.SaveStorage;
+
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -48,7 +50,7 @@ public final class MatchHistoryRepository {
 
     private void migrateLegacyHighScoreIfEmpty() {
         if (personalRecords.getBestScore() > 0) return;
-        File f = new File(LEGACY_HIGHSCORE);
+        File f = SaveStorage.resolveFileForRead(LEGACY_HIGHSCORE);
         if (!f.exists()) return;
         try (DataInputStream in = new DataInputStream(new FileInputStream(f))) {
             int score = in.readInt();
@@ -61,7 +63,7 @@ public final class MatchHistoryRepository {
     }
 
     public synchronized void load() {
-        File f = new File(HISTORY_FILE);
+        File f = SaveStorage.resolveFileForRead(HISTORY_FILE);
         if (!f.exists()) return;
         history.clear();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8))) {
@@ -79,7 +81,7 @@ public final class MatchHistoryRepository {
     }
 
     public synchronized void save() {
-        File f = new File(HISTORY_FILE);
+        File f = SaveStorage.resolveFileForWrite(HISTORY_FILE);
         try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8))) {
             writer.println("# Timestamp;SurvivalSec;Score;Apples;Kills;Days;Cause");
             for (MatchRecord r : history) {

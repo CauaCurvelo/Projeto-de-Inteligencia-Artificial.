@@ -9,6 +9,7 @@ import javafx.scene.input.MouseButton;
 import javafx.stage.Stage;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Supplier;
 
 public class InputManager {
     private final Set<KeyCode> activeKeys = new HashSet<>();
@@ -17,25 +18,42 @@ public class InputManager {
     private boolean sprinting = false;
     private boolean attackPressed = false;
     private boolean debugOverlay = false;
-    private boolean restartRequested = false;
     private boolean zoomInRequested = false;
     private boolean zoomOutRequested = false;
     private Stage stage;
+    private Supplier<Boolean> gameplayInputEnabled = () -> true;
+
+    public void setGameplayInputEnabled(Supplier<Boolean> gameplayInputEnabled) {
+        this.gameplayInputEnabled = gameplayInputEnabled != null ? gameplayInputEnabled : () -> true;
+    }
+
+    /** Limpa teclas e gatilhos transitórios (chamado ao pausar ou abrir menus). */
+    public void clearInputs() {
+        activeKeys.clear();
+        dx = 0;
+        dy = 0;
+        sprinting = false;
+        attackPressed = false;
+        zoomInRequested = false;
+        zoomOutRequested = false;
+    }
 
     public void attachToScene(Scene scene, Stage stage) {
         this.stage = stage;
         scene.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.F11) {
+                toggleFullScreen();
+                return;
+            }
+            if (!Boolean.TRUE.equals(gameplayInputEnabled.get())) {
+                return;
+            }
+
             activeKeys.add(event.getCode());
             KeyBindings kb = GameSettings.get().getKeyBindings();
 
             if (kb.isActionTriggered(GameAction.DEBUG_OVERLAY, activeKeys)) {
                 debugOverlay = !debugOverlay;
-            }
-            if (event.getCode() == KeyCode.R) {
-                restartRequested = true;
-            }
-            if (event.getCode() == KeyCode.F11) {
-                toggleFullScreen();
             }
             if (kb.isActionTriggered(GameAction.ZOOM_IN, activeKeys)) {
                 zoomInRequested = true;
@@ -67,7 +85,7 @@ public class InputManager {
 
         // Also allow Left Mouse Click to attack!
         scene.setOnMousePressed(event -> {
-            if (event.getButton() == MouseButton.PRIMARY) {
+            if (Boolean.TRUE.equals(gameplayInputEnabled.get()) && event.getButton() == MouseButton.PRIMARY) {
                 attackPressed = true;
             }
         });
@@ -108,12 +126,6 @@ public class InputManager {
     public boolean isSprinting() { return sprinting; }
     public boolean isAttackPressed() { return attackPressed; }
     public boolean isDebugOverlay() { return debugOverlay; }
-    
-    public boolean pollRestartRequested() {
-        boolean req = restartRequested;
-        restartRequested = false;
-        return req;
-    }
 
     public boolean pollZoomInRequested() {
         boolean req = zoomInRequested;

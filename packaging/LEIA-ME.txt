@@ -1,0 +1,19 @@
+INSTINTO SELVAGEM (Wild Instinct) - Guia Rapido de Teste
+============================================================
+
+COMO JOGAR (NAO PRECISA INSTALAR JAVA):
+1. IMPORTANTE: Clique com o botao direito no arquivo .zip e escolha
+   "Extrair Tudo..." antes de abrir o jogo (nao execute direto de dentro do ZIP).
+2. Abra a pasta extraida e clique duas vezes em:
+   InstintoSelvagem.exe
+
+CONTROLES PADRAO:
+- W A S D / Setas : Mover a raposa
+- Shift           : Correr (gasta folego/stamina)
+- Espaco / Clique : Atacar / Morder
+- F11             : Tela cheia (Fullscreen)
+- ESC             : Pausar / Configuracoes (volume, controles e graficos)
+
+ONDE FICAM SEUS SAVES E CONFIGURACOES:
+%LOCALAPPDATA%\InstintoSelvagem
+(Se receber uma versao nova no futuro, seus recordes e conquistas serao mantidos.)

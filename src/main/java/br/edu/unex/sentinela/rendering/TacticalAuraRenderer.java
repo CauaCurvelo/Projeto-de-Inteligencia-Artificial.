@@ -4,6 +4,8 @@ import br.edu.unex.sentinela.ai.AIState;
 import br.edu.unex.sentinela.ai.Node;
 import br.edu.unex.sentinela.entity.Enemy;
 import br.edu.unex.sentinela.entity.Player;
+import br.edu.unex.sentinela.settings.GameSettings;
+import br.edu.unex.sentinela.settings.GraphicsQuality;
 import br.edu.unex.sentinela.world.TileMap;
 import br.edu.unex.sentinela.world.World;
 import javafx.scene.canvas.GraphicsContext;
@@ -156,6 +158,7 @@ public class TacticalAuraRenderer {
 
         boolean isAlert = enemy.getState() == AIState.CHASE ||
                           enemy.getState() == AIState.AIMING ||
+                          enemy.getState() == AIState.ROARING ||
                           enemy.getState() == AIState.FIGHTING_ENEMY;
         boolean isSuspicious = enemy.getState() == AIState.SUSPICIOUS;
 
@@ -165,6 +168,13 @@ public class TacticalAuraRenderer {
         }
 
         // 1. Preenchimento do Cone com Gradiente Radial (Forte na origem -> Transparente na borda externa)
+        GraphicsQuality quality = GameSettings.get().getGraphicsQuality();
+        if (quality == GraphicsQuality.LOW) {
+            gc.setFill(stateColor.deriveColor(0, 1.0, 1.05, baseAlpha * 0.65));
+            gc.fillArc(ex - range, ey - range, range * 2, range * 2, startAngleDeg, fovDeg, ArcType.ROUND);
+            return;
+        }
+
         RadialGradient coneGradient = new RadialGradient(
             0, 0, ex, ey, range,
             false, CycleMethod.NO_CYCLE,
@@ -235,10 +245,14 @@ public class TacticalAuraRenderer {
     public static Color resolveTacticalStateColor(AIState state) {
         if (state == null) return Color.web("#CFD8DC");
         switch (state) {
+            case ROARING:
+                return Color.web("#FF6D00"); // Laranja-Fogo (Rugido de Aviso / Fúria)
             case CHASE:
             case AIMING:
             case FIGHTING_ENEMY:
                 return Color.web("#FF2A55"); // Vermelho Carmesim Tático (Perigo / Combate)
+            case RETREATING:
+                return Color.web("#78909C"); // Azul-Ardósia (Retornando ao Domínio)
             case SUSPICIOUS:
                 return Color.web("#FFB300"); // Âmbar Dourado (Alerta / Investigando)
             case PATROL:

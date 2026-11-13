@@ -1,164 +1,215 @@
 package br.edu.unex.sentinela.ui;
 
 import br.edu.unex.sentinela.progress.Achievement;
-import javafx.animation.*;
+import br.edu.unex.sentinela.ui.AchievementVisualCatalog.BadgeSpec;
+import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.ParallelTransition;
+import javafx.animation.ScaleTransition;
+import javafx.animation.Timeline;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
-import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.paint.RadialGradient;
-import javafx.scene.paint.CycleMethod;
-import javafx.scene.paint.Stop;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.transform.Scale;
 import javafx.util.Duration;
 
-import java.util.ArrayDeque;
+import java.util.LinkedList;
 import java.util.Queue;
 
 /**
- * Notificação de conquista (Toast) elegante em Dark Glassmorphism e ouro antigo,
- * com insígnia vetorial imune a quebras de fonte e animação suave com interpolação de física.
+ * Pop-up moderno de conquista desbloqueada exibido no canto inferior direito durante a partida.
+ * Usa medalhão vetorial exclusivo por conquista, acento categórico e barra de expiração animada.
  */
 public class AchievementToast extends StackPane {
-    private final Queue<Achievement> queue = new ArrayDeque<>();
+    private static final double SLIDE_OFFSET_X = 390.0;
+    private static final double DISPLAY_SECONDS = 3.8;
+
+    private final VBox cardShell = new VBox(0);
+    private final Region leftAccentBar = new Region();
+    private final StackPane medallionSlot = new StackPane();
+    private final Circle headerDot = new Circle(3.2);
+    private final Label headerLabel = new Label("CONQUISTA DESBLOQUEADA");
+    private final Label categoryPill = new Label();
+    private final Label titleLabel = new Label();
+    private final Label descLabel = new Label();
+    private final Rectangle timerTrack = new Rectangle(310, 2.5);
+    private final Rectangle timerFill = new Rectangle(310, 2.5);
+    private final Scale timerFillScale = new Scale(1.0, 1.0, 0.0, 0.0);
+
+    private final Queue<Achievement> queue = new LinkedList<>();
     private boolean isDisplaying = false;
 
-    private final HBox toastBox;
-    private final Canvas iconCanvas;
-    private final Label titleLabel;
-    private final Label descLabel;
-
     public AchievementToast() {
-        setAlignment(Pos.TOP_RIGHT);
-        setPadding(new Insets(20, 24, 0, 0));
-        setMouseTransparent(true);
         setPickOnBounds(false);
+        setMouseTransparent(true);
+        setAlignment(Pos.BOTTOM_RIGHT);
+        setPadding(new Insets(0, 22, 22, 0));
 
-        toastBox = new HBox(14);
-        toastBox.setAlignment(Pos.CENTER_LEFT);
-        toastBox.setPrefWidth(360);
-        toastBox.setMaxWidth(360);
-        toastBox.setPadding(new Insets(10, 16, 10, 14));
-        toastBox.setStyle(
-            "-fx-background-color: linear-gradient(to right, rgba(28, 40, 32, 0.98), rgba(16, 24, 18, 0.95));" +
-            "-fx-background-radius: 10;" +
-            "-fx-border-color: linear-gradient(to right, #F1C40F, #9A7D0A);" +
-            "-fx-border-width: 1.8;" +
-            "-fx-border-radius: 10;"
-        );
+        cardShell.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        cardShell.setPrefWidth(332);
+        cardShell.setOpacity(0.0);
+        cardShell.setTranslateX(SLIDE_OFFSET_X);
 
-        DropShadow glow = new DropShadow(20, Color.rgb(241, 196, 15, 0.5));
-        toastBox.setEffect(glow);
+        leftAccentBar.setMinWidth(4);
+        leftAccentBar.setPrefWidth(4);
+        leftAccentBar.setMaxWidth(4);
 
-        // Insígnia vetorial de ouro desenhada em canvas (sem emojis quebrados)
-        iconCanvas = new Canvas(42, 42);
-        drawTrophyMedallion(iconCanvas.getGraphicsContext2D(), 42);
+        medallionSlot.setMinSize(44, 44);
+        medallionSlot.setPrefSize(44, 44);
 
-        VBox textCol = new VBox(2);
+        headerLabel.setTextFill(Color.web(UiTheme.TEXT_SECONDARY));
+        UiTypography.bind(headerLabel, UiTypography.TypoRole.MICRO);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        categoryPill.setPadding(new Insets(1, 7, 1, 7));
+        UiTypography.bind(categoryPill, UiTypography.TypoRole.MICRO);
+
+        HBox topMeta = new HBox(6, headerDot, headerLabel, spacer, categoryPill);
+        topMeta.setAlignment(Pos.CENTER_LEFT);
+
+        titleLabel.setTextFill(Color.web("#F8FAFC"));
+        UiTypography.bind(titleLabel, UiTypography.TypoRole.LABEL);
+
+        descLabel.setTextFill(Color.web("#CBD5E1"));
+        descLabel.setWrapText(true);
+        descLabel.setMaxWidth(246);
+        UiTypography.bind(descLabel, UiTypography.TypoRole.MICRO);
+
+        VBox textCol = new VBox(3, topMeta, titleLabel, descLabel);
         HBox.setHgrow(textCol, Priority.ALWAYS);
 
-        Label headerLabel = new Label("CONQUISTA DESBLOQUEADA");
-        headerLabel.setFont(Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 10));
-        headerLabel.setTextFill(Color.web("#F1C40F"));
-        headerLabel.setEffect(new DropShadow(4, Color.rgb(0, 0, 0, 0.8)));
+        HBox bodyRow = new HBox(12, leftAccentBar, medallionSlot, textCol);
+        bodyRow.setAlignment(Pos.CENTER_LEFT);
+        bodyRow.setPadding(new Insets(11, 14, 10, 10));
 
-        titleLabel = new Label("Título da Conquista");
-        titleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
-        titleLabel.setTextFill(Color.web("#FFFFFF"));
+        timerTrack.setFill(Color.web("#FFFFFF", 0.08));
+        timerTrack.setArcWidth(2);
+        timerTrack.setArcHeight(2);
+        timerTrack.widthProperty().bind(cardShell.widthProperty().subtract(24));
 
-        descLabel = new Label("Descrição da conquista");
-        descLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 11));
-        descLabel.setTextFill(Color.web("#BDC3C7"));
-        descLabel.setWrapText(true);
+        timerFill.setArcWidth(2);
+        timerFill.setArcHeight(2);
+        timerFill.widthProperty().bind(timerTrack.widthProperty());
+        timerFill.getTransforms().add(timerFillScale);
 
-        textCol.getChildren().addAll(headerLabel, titleLabel, descLabel);
-        toastBox.getChildren().addAll(iconCanvas, textCol);
+        StackPane timerHolder = new StackPane(timerTrack, timerFill);
+        timerHolder.setAlignment(Pos.CENTER_LEFT);
+        timerHolder.setPadding(new Insets(0, 12, 6, 12));
 
-        toastBox.setOpacity(0);
-        toastBox.setTranslateX(420); // Garante que começa 100% fora da tela
-
-        getChildren().add(toastBox);
-    }
-
-    private void drawTrophyMedallion(GraphicsContext gc, double s) {
-        gc.clearRect(0, 0, s, s);
-
-        // Fundo do medalhão dourado com gradiente radial
-        RadialGradient medalBg = new RadialGradient(
-            0, 0, s * 0.4, s * 0.4, s * 0.5, false, CycleMethod.NO_CYCLE,
-            new Stop(0.0, Color.web("#FFF2A1")),
-            new Stop(0.6, Color.web("#F1C40F")),
-            new Stop(1.0, Color.web("#9A7D0A"))
-        );
-        gc.setFill(medalBg);
-        gc.fillOval(2, 2, s - 4, s - 4);
-
-        // Borda dupla em latão escuro
-        gc.setStroke(Color.web("#5B4706"));
-        gc.setLineWidth(1.8);
-        gc.strokeOval(2, 2, s - 4, s - 4);
-        gc.strokeOval(5, 5, s - 10, s - 10);
-
-        // Taça de troféu escura gravada no centro
-        gc.setFill(Color.web("#221A04"));
-        gc.fillRoundRect(s * 0.3, s * 0.25, s * 0.4, s * 0.35, 3, 3);
-        gc.fillRect(s * 0.44, s * 0.58, s * 0.12, s * 0.16);
-        gc.fillRoundRect(s * 0.32, s * 0.72, s * 0.36, s * 0.1, 2, 2);
+        cardShell.getChildren().addAll(bodyRow, timerHolder);
+        getChildren().add(cardShell);
     }
 
     public void showAchievement(Achievement achievement) {
         if (achievement == null) return;
-        Platform.runLater(() -> {
+        Runnable enqueueTask = () -> {
             queue.offer(achievement);
             processQueue();
-        });
+        };
+        if (Platform.isFxApplicationThread()) {
+            enqueueTask.run();
+        } else {
+            Platform.runLater(enqueueTask);
+        }
     }
 
     private void processQueue() {
         if (isDisplaying || queue.isEmpty()) return;
         isDisplaying = true;
 
-        Achievement a = queue.poll();
-        titleLabel.setText(a.getTitle());
-        descLabel.setText(a.getDescription());
+        Achievement achievement = queue.poll();
+        BadgeSpec spec = AchievementVisualCatalog.resolve(achievement);
+        Color accent = Color.web(spec.getAccentHex());
 
-        toastBox.setTranslateX(420);
-        toastBox.setOpacity(0.0);
+        applyThemeForSpec(achievement, spec, accent);
 
-        FadeTransition fadeIn = new FadeTransition(Duration.millis(350), toastBox);
+        cardShell.setTranslateX(SLIDE_OFFSET_X);
+        cardShell.setOpacity(0.0);
+        medallionSlot.setScaleX(0.74);
+        medallionSlot.setScaleY(0.74);
+        timerFillScale.setX(1.0);
+
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(250), cardShell);
         fadeIn.setToValue(1.0);
 
-        TranslateTransition slideIn = new TranslateTransition(Duration.millis(380), toastBox);
+        TranslateTransition slideIn = new TranslateTransition(Duration.millis(300), cardShell);
         slideIn.setToX(0);
         slideIn.setInterpolator(Interpolator.EASE_OUT);
 
-        ParallelTransition enter = new ParallelTransition(fadeIn, slideIn);
+        ScaleTransition badgePop = new ScaleTransition(Duration.millis(340), medallionSlot);
+        badgePop.setToX(1.0);
+        badgePop.setToY(1.0);
+        badgePop.setInterpolator(Interpolator.EASE_OUT);
 
-        PauseTransition pause = new PauseTransition(Duration.millis(4500));
+        ParallelTransition enter = new ParallelTransition(fadeIn, slideIn, badgePop);
 
-        FadeTransition fadeOut = new FadeTransition(Duration.millis(400), toastBox);
+        Timeline countdown = new Timeline(
+            new KeyFrame(Duration.ZERO, new KeyValue(timerFillScale.xProperty(), 1.0)),
+            new KeyFrame(Duration.seconds(DISPLAY_SECONDS), new KeyValue(timerFillScale.xProperty(), 0.0, Interpolator.LINEAR))
+        );
+
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(280), cardShell);
         fadeOut.setToValue(0.0);
 
-        TranslateTransition slideOut = new TranslateTransition(Duration.millis(400), toastBox);
-        slideOut.setToX(420);
+        TranslateTransition slideOut = new TranslateTransition(Duration.millis(280), cardShell);
+        slideOut.setToX(SLIDE_OFFSET_X);
         slideOut.setInterpolator(Interpolator.EASE_IN);
 
         ParallelTransition exit = new ParallelTransition(fadeOut, slideOut);
-
-        SequentialTransition sequence = new SequentialTransition(enter, pause, exit);
-        sequence.setOnFinished(e -> {
+        enter.setOnFinished(e -> countdown.play());
+        countdown.setOnFinished(e -> exit.play());
+        exit.setOnFinished(e -> {
             isDisplaying = false;
             processQueue();
         });
-        sequence.play();
+        enter.play();
+    }
+
+    private void applyThemeForSpec(Achievement a, BadgeSpec spec, Color accent) {
+        String hex = spec.getAccentHex();
+        String softRgba = UiTheme.toRgba(accent, 0.14);
+        String borderRgba = UiTheme.toRgba(accent, 0.48);
+
+        cardShell.setStyle(
+            "-fx-background-color: linear-gradient(to right, rgba(16, 24, 21, 0.96), rgba(9, 13, 12, 0.96));"
+            + "-fx-background-radius: 13;"
+            + "-fx-border-color: " + borderRgba + ";"
+            + "-fx-border-width: 1.1;"
+            + "-fx-border-radius: 13;"
+            + "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.72), 20, 0.25, 0, 6);"
+        );
+
+        leftAccentBar.setStyle("-fx-background-color: " + hex + "; -fx-background-radius: 4;");
+        medallionSlot.getChildren().setAll(UiTrophyEmblem.createMedallion(spec.getEmblem(), 44, accent, true));
+        headerDot.setFill(accent);
+        headerLabel.setTextFill(accent.deriveColor(0, 0.85, 1.12, 1.0));
+
+        categoryPill.setText(a.getCategory().toUpperCase());
+        categoryPill.setTextFill(Color.web(hex));
+        categoryPill.setStyle(
+            "-fx-background-color: " + softRgba + ";"
+            + "-fx-background-radius: 6;"
+            + "-fx-border-color: " + UiTheme.toRgba(accent, 0.30) + ";"
+            + "-fx-border-radius: 6;"
+            + "-fx-border-width: 1;"
+        );
+
+        titleLabel.setText(a.getTitle());
+        descLabel.setText(a.getDescription());
+        timerFill.setFill(accent.deriveColor(0, 1.0, 1.0, 0.85));
     }
 }

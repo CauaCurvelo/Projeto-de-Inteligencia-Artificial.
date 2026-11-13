@@ -18,22 +18,31 @@ final class Voice {
         this.pan = pan;
         this.pitch = pitch;
         this.loop = loop;
+        if (data == null || data.length == 0) {
+            this.finished = true;
+        }
     }
 
-    /** Mistura `frames` quadros estéreo neste voice dentro de mix (intercalado L,R). */
+    /** Mistura `frames` quadros estéreo neste voice dentro de mix (intercalado L,R) com interpolação linear. */
     void render(float[] mix, int frames) {
         if (finished) return;
+        int len = data.length;
         double l = Math.sqrt(0.5 * (1 - pan)), r = Math.sqrt(0.5 * (1 + pan));
         for (int f = 0; f < frames; f++) {
             gain += (targetGain - gain) * 0.0008; // smoothing (~30 ms)
-            int i = (int) pos;
-            if (i >= data.length) {
+            if (pos >= len) {
                 if (!loop) { finished = true; return; }
-                pos -= data.length; i = (int) pos;
+                while (pos >= len) pos -= len;
             }
-            float s = (float) (data[i] * gain);
-            mix[f * 2] += s * l;
-            mix[f * 2 + 1] += s * r;
+            int i0 = (int) pos;
+            double frac = pos - i0;
+            int i1 = i0 + 1;
+            if (i1 >= len) {
+                i1 = loop ? 0 : i0;
+            }
+            float sample = (float) ((data[i0] + frac * (data[i1] - data[i0])) * gain);
+            mix[f * 2] += sample * l;
+            mix[f * 2 + 1] += sample * r;
             pos += pitch;
         }
     }

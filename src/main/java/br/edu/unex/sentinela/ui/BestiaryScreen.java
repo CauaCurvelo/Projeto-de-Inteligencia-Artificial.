@@ -1,213 +1,241 @@
 package br.edu.unex.sentinela.ui;
 
+import br.edu.unex.sentinela.ai.EnemyType;
 import br.edu.unex.sentinela.bestiary.CreatureCatalog;
 import br.edu.unex.sentinela.bestiary.CreatureInfo;
 import br.edu.unex.sentinela.bestiary.CreaturePreviewRenderer;
-import javafx.animation.AnimationTimer;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.canvas.Canvas;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.layout.*;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Tela de Bestiário e Enciclopédia da Fauna com manequim animado 2.5D em tempo real
- * e ficha técnica sem emojis quebrados.
+ * Enciclopédia de fauna com vitrine ampliada, zero truncamento e barras gráficas segmentadas.
  */
 public class BestiaryScreen extends StackPane {
-    private final Canvas previewCanvas = new Canvas(200, 200);
-    private final CreaturePreviewRenderer previewRenderer;
-    private CreatureInfo selectedCreature;
-    private AnimationTimer previewTimer;
-
-    // Campos da ficha técnica
-    private final Label nameLabel = new Label();
-    private final Label titleLabel = new Label();
-    private final Label dietLabel = new Label();
-    private final Label habitatLabel = new Label();
-    private final Label attackLabel = new Label();
-    private final Label statsLabel = new Label();
-    private final Label behaviorLabel = new Label();
-    private final Label tipLabel = new Label();
+    private final CreaturePreviewRenderer previewRenderer = new CreaturePreviewRenderer(178, 178);
+    private final List<Button> listButtons = new ArrayList<>();
+    private final VBox detailCard = new VBox(14);
+    private final HBox showcaseRow = new HBox(18);
+    private final HBox tagStrip = new HBox(10);
+    private final VBox intelContainer = new VBox(10);
 
     public BestiaryScreen(ScreenManager manager) {
-        setAlignment(Pos.CENTER);
-        setStyle("-fx-background-color: rgba(10, 16, 12, 0.88);");
+        VBox panel = UiTheme.createGlassPanel(860, 560, 22, 26);
+        panel.setSpacing(14);
 
-        previewRenderer = new CreaturePreviewRenderer(previewCanvas);
+        List<CreatureInfo> catalog = CreatureCatalog.getAll();
+        Label countChip = new Label(catalog.size() + " Espécies");
+        countChip.setPadding(new Insets(4, 10, 4, 10));
+        countChip.getStyleClass().add("glass-card");
+        countChip.setTextFill(Color.web(UiTheme.TEXT_SECONDARY));
+        UiTypography.bind(countChip, UiTypography.TypoRole.MICRO);
 
-        VBox panel = UiTheme.createStandardPanel(820, 560);
-
-        Label title = UiTheme.createTitle("BESTIÁRIO & FAUNA SELVAGEM");
-        Label subtitle = UiTheme.createSubtitle("Enciclopédia viva de espécies, comportamentos de IA e táticas de sobrevivência.");
-
-        HBox splitView = new HBox(16);
-        VBox.setVgrow(splitView, Priority.ALWAYS);
-
-        VBox listCol = buildCreatureList();
-        VBox detailsCol = buildDetailsPanel();
-        HBox.setHgrow(detailsCol, Priority.ALWAYS);
-
-        splitView.getChildren().addAll(listCol, detailsCol);
-
-        Button btnBack = UiTheme.createPrimaryButton("VOLTAR", null, 200, 38);
-        btnBack.setOnAction(e -> {
-            stopPreview();
+        VBox header = UiTheme.createHeader("BESTIÁRIO", countChip, () -> {
+            previewRenderer.stop();
             manager.navigateBack();
         });
 
-        panel.getChildren().addAll(title, subtitle, splitView, btnBack);
-        getChildren().add(panel);
+        HBox body = new HBox(16);
+        VBox.setVgrow(body, Priority.ALWAYS);
 
-        // Seleciona a primeira criatura por padrão (Raposa)
-        selectCreature(CreatureCatalog.getAll().get(0));
-        startPreview();
+        Node listPane = buildSpeciesList(catalog);
+        buildDetailCard();
+        HBox.setHgrow(detailCard, Priority.ALWAYS);
+
+        body.getChildren().addAll(listPane, detailCard);
+        panel.getChildren().addAll(header, body);
+        getChildren().add(UiTheme.createModalBackdrop(panel));
+
+        if (!catalog.isEmpty()) {
+            selectCreature(catalog.get(0), 0);
+        }
+        previewRenderer.start();
     }
 
-    private VBox buildCreatureList() {
-        VBox box = new VBox(6);
-        box.setPrefWidth(240);
-        box.setPadding(new Insets(4));
+    private Node buildSpeciesList(List<CreatureInfo> catalog) {
+        VBox listBox = new VBox(6);
+        listBox.setPadding(new Insets(2, 6, 2, 2));
 
-        List<CreatureInfo> all = CreatureCatalog.getAll();
-        for (CreatureInfo c : all) {
-            Button btn = new Button(c.getName());
-            btn.setPrefSize(230, 36);
-            btn.setAlignment(Pos.CENTER_LEFT);
-            btn.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 13));
-            btn.setStyle(
-                "-fx-background-color: linear-gradient(to right, rgba(30, 42, 34, 0.85), rgba(18, 26, 20, 0.85));" +
-                "-fx-text-fill: #EAECEE;" +
-                "-fx-border-color: rgba(212, 172, 13, 0.35);" +
-                "-fx-border-width: 1.2;" +
-                "-fx-background-radius: 6;" +
-                "-fx-border-radius: 6;" +
-                "-fx-cursor: hand;"
-            );
+        for (int i = 0; i < catalog.size(); i++) {
+            CreatureInfo info = catalog.get(i);
+            final int index = i;
 
-            btn.setOnAction(e -> selectCreature(c));
-            box.getChildren().add(btn);
+            Button row = new Button(info.getName());
+            row.setMaxWidth(Double.MAX_VALUE);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setGraphic(new Circle(4, roleColor(info)));
+            row.setGraphicTextGap(10);
+            row.getStyleClass().add("species-row");
+            UiTypography.bind(row, UiTypography.TypoRole.LABEL);
+            UiMotion.attachPressFeedback(row, true);
+            row.setOnAction(e -> selectCreature(info, index));
+
+            listButtons.add(row);
+            listBox.getChildren().add(row);
         }
 
-        ScrollPane sp = new ScrollPane(box);
-        sp.setFitToWidth(true);
-        sp.setPrefWidth(240);
-        sp.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
-        return new VBox(sp);
+        ScrollPane scroll = new ScrollPane(listBox);
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        UiTypography.bindScaledWidth(scroll, 226);
+        return scroll;
     }
 
-    private VBox buildDetailsPanel() {
-        VBox box = new VBox(10);
-        box.setPadding(new Insets(14));
-        box.setStyle(UiTheme.CARD_MODERN);
-        box.setAlignment(Pos.TOP_LEFT);
+    private void buildDetailCard() {
+        detailCard.getStyleClass().add("glass-card");
+        detailCard.setPadding(new Insets(18, 20, 18, 20));
+        showcaseRow.setAlignment(Pos.CENTER_LEFT);
+        tagStrip.setAlignment(Pos.CENTER_LEFT);
+        detailCard.getChildren().addAll(showcaseRow, UiTheme.createDivider(), tagStrip, UiTheme.createDivider(), intelContainer);
+    }
 
-        HBox topRow = new HBox(16);
-        topRow.setAlignment(Pos.CENTER_LEFT);
+    private void selectCreature(CreatureInfo info, int activeIdx) {
+        for (int i = 0; i < listButtons.size(); i++) {
+            Button btn = listButtons.get(i);
+            btn.getStyleClass().remove("species-row-active");
+            if (!btn.getStyleClass().contains("species-row")) {
+                btn.getStyleClass().add("species-row");
+            }
+            if (i == activeIdx) {
+                btn.getStyleClass().remove("species-row");
+                btn.getStyleClass().add("species-row-active");
+            }
+        }
+        previewRenderer.setCreature(info);
+        populateDetails(info);
+    }
 
-        VBox titleCol = new VBox(4);
-        nameLabel.setFont(Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 22));
-        nameLabel.setTextFill(Color.web("#F1C40F"));
+    private void populateDetails(CreatureInfo info) {
+        Color accent = roleColor(info);
 
-        titleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
-        titleLabel.setTextFill(Color.web("#2ECC71"));
+        Label nameLbl = new Label(info.getName());
+        nameLbl.setTextFill(Color.web(UiTheme.TEXT_PRIMARY));
+        UiTypography.bind(nameLbl, UiTypography.TypoRole.TITLE);
 
-        statsLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        statsLabel.setTextFill(Color.web("#E67E22"));
+        Label rolePill = new Label(roleBadge(info));
+        rolePill.setPadding(new Insets(3, 9, 3, 9));
+        rolePill.setTextFill(accent);
+        rolePill.setStyle("-fx-background-color: rgba(255,255,255,0.06); -fx-background-radius: 99;");
+        UiTypography.bind(rolePill, UiTypography.TypoRole.MICRO);
 
-        titleCol.getChildren().addAll(nameLabel, titleLabel, statsLabel);
-        topRow.getChildren().addAll(previewCanvas, titleCol);
+        HBox titleRow = new HBox(10, nameLbl, rolePill);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
 
-        VBox dataRows = new VBox(6);
-        dataRows.getChildren().addAll(
-            createDataRow("Dieta:", dietLabel),
-            createDataRow("Habitat:", habitatLabel),
-            createDataRow("Tipo de Ataque:", attackLabel)
+        Label hpBadge = new Label("♥  " + info.getHealthPoints() + " HP");
+        hpBadge.setTextFill(Color.web(UiTheme.ACCENT_CRIMSON));
+        UiTypography.bind(hpBadge, UiTypography.TypoRole.NUMERIC);
+
+        VBox statsColumn = new VBox(9,
+                titleRow,
+                createMetricRow("Velocidade", info.getSpeedStars(), 5, UiTheme.ACCENT_SKY),
+                createMetricRow("Ameaça", info.getDangerStars(), 5, info.getDangerStars() >= 4 ? UiTheme.ACCENT_CRIMSON : UiTheme.ACCENT_AMBER),
+                hpBadge
+        );
+        HBox.setHgrow(statsColumn, Priority.ALWAYS);
+        showcaseRow.getChildren().setAll(previewRenderer, statsColumn);
+
+        tagStrip.getChildren().setAll(
+                attributeChip("DIETA", info.getDiet()),
+                attributeChip("HABITAT", info.getHabitat()),
+                attributeChip("ATAQUE", info.getAttackType())
         );
 
-        Label lblBehTitle = new Label("Comportamento e Inteligência Artificial:");
-        lblBehTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        lblBehTitle.setTextFill(Color.web("#F1C40F"));
-
-        behaviorLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 12));
-        behaviorLabel.setTextFill(Color.web("#BDC3C7"));
-        behaviorLabel.setWrapText(true);
-
-        Label lblTipTitle = new Label("Dica Tática de Sobrevivência:");
-        lblTipTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        lblTipTitle.setTextFill(Color.web("#3498DB"));
-
-        tipLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 12));
-        tipLabel.setTextFill(Color.web("#EAECEE"));
-        tipLabel.setWrapText(true);
-
-        box.getChildren().addAll(topRow, dataRows, lblBehTitle, behaviorLabel, lblTipTitle, tipLabel);
-        return box;
+        intelContainer.getChildren().setAll(
+                intelBlock("COMPORTAMENTO", info.getBehaviorDescription(), UiTheme.ACCENT_AMBER),
+                intelBlock("TÁTICA", info.getSurvivalTip(), UiTheme.ACCENT_EMERALD)
+        );
     }
 
-    private HBox createDataRow(String prefix, Label valueLabel) {
-        HBox row = new HBox(8);
+    private HBox createMetricRow(String labelText, int value, int max, String colorHex) {
+        Label lbl = new Label(labelText);
+        lbl.setPrefWidth(82);
+        lbl.setTextFill(Color.web(UiTheme.TEXT_SECONDARY));
+        UiTypography.bind(lbl, UiTypography.TypoRole.LABEL);
+
+        HBox segments = new HBox(5);
+        segments.setAlignment(Pos.CENTER_LEFT);
+        for (int i = 0; i < max; i++) {
+            Rectangle seg = new Rectangle(24, 6);
+            seg.setArcWidth(4);
+            seg.setArcHeight(4);
+            seg.setFill(i < value ? Color.web(colorHex) : Color.web("#FFFFFF", 0.10));
+            segments.getChildren().add(seg);
+        }
+
+        HBox row = new HBox(10, lbl, segments);
         row.setAlignment(Pos.CENTER_LEFT);
-
-        Label p = new Label(prefix);
-        p.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        p.setTextFill(Color.web("#EAECEE"));
-        p.setPrefWidth(110);
-
-        valueLabel.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 12));
-        valueLabel.setTextFill(Color.web("#BDC3C7"));
-
-        row.getChildren().addAll(p, valueLabel);
         return row;
     }
 
-    private void selectCreature(CreatureInfo c) {
-        this.selectedCreature = c;
-        nameLabel.setText(c.getName());
-        titleLabel.setText(c.getTitle());
-        dietLabel.setText(c.getDiet());
-        habitatLabel.setText(c.getHabitat());
-        attackLabel.setText(c.getAttackType());
+    private VBox attributeChip(String title, String val) {
+        Label key = new Label(title);
+        key.setTextFill(Color.web(UiTheme.TEXT_MUTED));
+        UiTypography.bind(key, UiTypography.TypoRole.MICRO);
 
-        // Barras de status segmentadas estilo PIP bar
-        String speedBars = formatPipBar(c.getSpeedStars(), 5);
-        String dangerBars = formatPipBar(c.getDangerStars(), 5);
-        statsLabel.setText(String.format("Velocidade: %s   |   Ameaça: %s   |   Vida: %d HP", speedBars, dangerBars, c.getHealthPoints()));
+        Label value = new Label(val);
+        value.setTextFill(Color.web(UiTheme.TEXT_PRIMARY));
+        value.setWrapText(true);
+        value.setMinHeight(Region.USE_PREF_SIZE);
+        UiTypography.bind(value, UiTypography.TypoRole.LABEL);
 
-        behaviorLabel.setText(c.getBehaviorDescription());
-        tipLabel.setText(c.getSurvivalTip());
+        VBox chip = new VBox(3, key, value);
+        chip.getStyleClass().add("glass-card");
+        chip.setPadding(new Insets(9, 12, 9, 12));
+        HBox.setHgrow(chip, Priority.ALWAYS);
+        chip.setMaxWidth(Double.MAX_VALUE);
+        return chip;
     }
 
-    private String formatPipBar(int filled, int total) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < filled; i++) sb.append("█");
-        for (int i = filled; i < total; i++) sb.append("░");
-        return sb.toString();
+    private VBox intelBlock(String heading, String body, String accentHex) {
+        Label h = new Label(heading);
+        h.setTextFill(Color.web(accentHex));
+        UiTypography.bind(h, UiTypography.TypoRole.MICRO);
+
+        Label b = new Label(body);
+        b.setTextFill(Color.web(UiTheme.TEXT_PRIMARY));
+        b.setWrapText(true);
+        b.setMinHeight(Region.USE_PREF_SIZE);
+        UiTypography.bind(b, UiTypography.TypoRole.BODY);
+
+        VBox box = new VBox(4, h, b);
+        box.getStyleClass().add("glass-card");
+        box.setPadding(new Insets(10, 14, 10, 14));
+        return box;
     }
 
-    public void startPreview() {
-        if (previewTimer != null) previewTimer.stop();
-        previewTimer = new AnimationTimer() {
-            @Override
-            public void handle(long now) {
-                double time = now / 1_000_000_000.0;
-                previewRenderer.render(selectedCreature, time);
-            }
-        };
-        previewTimer.start();
+    private static Color roleColor(CreatureInfo info) {
+        if (info.getType() == null) return Color.web(UiTheme.ACCENT_EMERALD);
+        if (info.getType() == EnemyType.BEAR_BOSS) return Color.web(UiTheme.ACCENT_CRIMSON);
+        if (info.getType() == EnemyType.HUNTER) return Color.web(UiTheme.ACCENT_AMBER);
+        return Color.web(UiTheme.ACCENT_SKY);
+    }
+
+    private static String roleBadge(CreatureInfo info) {
+        if (info.getType() == null) return "SENTINELA · VOCÊ";
+        if (info.getType() == EnemyType.BEAR_BOSS) return "CHEFE ALFA";
+        if (info.getType() == EnemyType.HUNTER) return "PATRULHEIRO";
+        return "FAUNA HOSTIL";
     }
 
     public void stopPreview() {
-        if (previewTimer != null) {
-            previewTimer.stop();
-            previewTimer = null;
-        }
+        previewRenderer.stop();
+    }
+
+    public void startPreview() {
+        previewRenderer.start();
     }
 }

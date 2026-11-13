@@ -1,42 +1,61 @@
 package br.edu.unex.sentinela.ui;
 
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 
 /**
- * Menu de Pausa exibido quando o jogador pressiona ESC durante a gameplay.
+ * Overlay compacto de Pausa acessível via ESC durante a partida.
  */
 public class PauseMenuScreen extends StackPane {
-
     public PauseMenuScreen(ScreenManager manager) {
-        setAlignment(Pos.CENTER);
-        setStyle("-fx-background-color: rgba(6, 10, 8, 0.78);");
+        VBox panel = UiTheme.createGlassPanel(340, Region.USE_PREF_SIZE, 26, 26);
+        panel.setSpacing(14);
+        panel.setAlignment(Pos.TOP_CENTER);
 
-        VBox panel = UiTheme.createStandardPanel(320, 360);
-        panel.setAlignment(Pos.CENTER);
+        HBox headerRow = new HBox(10);
+        headerRow.setAlignment(Pos.CENTER_LEFT);
+        Label title = new Label("PAUSA");
+        title.setTextFill(Color.web(UiTheme.TEXT_PRIMARY));
+        UiTypography.bind(title, UiTypography.TypoRole.TITLE);
 
-        Label title = UiTheme.createTitle("JOGO PAUSADO");
-        Label subtitle = UiTheme.createSubtitle("O mundo natural aguarda suas decisões.");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        headerRow.getChildren().addAll(title, spacer, UiTheme.createKeycapBadge("ESC"));
 
-        Button btnResume = UiTheme.createPrimaryButton("RETOMAR", "PLAY", 250, 42);
+        Button btnResume = UiTheme.createPrimaryButton("CONTINUAR", UiBadge.Icon.PLAY);
+        btnResume.setMaxWidth(Double.MAX_VALUE);
+        btnResume.setPrefHeight(42);
         btnResume.setOnAction(e -> manager.resumeGame());
 
-        Button btnSettings = UiTheme.createSecondaryButton("CONFIGURAÇÕES", "GEAR", 250, 40);
+        Button btnSettings = UiTheme.createSecondaryButton("CONFIGURAÇÕES", UiBadge.Icon.GEAR);
+        btnSettings.setMaxWidth(Double.MAX_VALUE);
+        btnSettings.setPrefHeight(38);
         btnSettings.setOnAction(e -> manager.navigate(ScreenState.SETTINGS));
 
-        Button btnRestart = UiTheme.createSecondaryButton("REINICIAR PARTIDA", "CLOCK", 250, 40);
+        Button btnRestart = UiTheme.createSecondaryButton("REINICIAR", UiBadge.Icon.CLOCK);
+        btnRestart.setMaxWidth(Double.MAX_VALUE);
+        btnRestart.setPrefHeight(38);
         btnRestart.setOnAction(e -> manager.restartGame());
 
-        Button btnMainMenu = UiTheme.createSecondaryButton("MENU PRINCIPAL", "DOOR", 250, 40);
+        Button btnMainMenu = UiTheme.createDangerGhostButton("MENU PRINCIPAL", UiBadge.Icon.DOOR);
+        btnMainMenu.setMaxWidth(Double.MAX_VALUE);
+        btnMainMenu.setPrefHeight(36);
         btnMainMenu.setOnAction(e -> manager.returnToMainMenu());
+        VBox.setMargin(btnMainMenu, new Insets(4, 0, 0, 0));
 
-        VBox buttons = new VBox(10, btnResume, btnSettings, btnRestart, btnMainMenu);
-        buttons.setAlignment(Pos.CENTER);
+        HBox footer = new HBox(UiTheme.createKeyHint("ESC", "Retomar"));
+        footer.setAlignment(Pos.CENTER);
+        footer.setPadding(new Insets(4, 0, 0, 0));
 
-        panel.getChildren().addAll(title, subtitle, buttons);
-        getChildren().add(panel);
+        panel.getChildren().addAll(headerRow, UiTheme.createDivider(), btnResume, btnSettings, btnRestart, btnMainMenu, footer);
+        getChildren().add(UiTheme.createModalBackdrop(panel));
     }
 }

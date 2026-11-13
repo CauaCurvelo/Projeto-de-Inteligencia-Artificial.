@@ -3,6 +3,7 @@ package br.edu.unex.sentinela.progress;
 import br.edu.unex.sentinela.ai.EnemySkin;
 import br.edu.unex.sentinela.audio.AudioEngine;
 import br.edu.unex.sentinela.audio.SoundId;
+import br.edu.unex.sentinela.core.SaveStorage;
 
 import java.io.*;
 import java.time.LocalDateTime;
@@ -146,7 +147,7 @@ public final class AchievementTracker {
     }
 
     public void load() {
-        File f = new File(FILE_NAME);
+        File f = SaveStorage.resolveFileForRead(FILE_NAME);
         if (!f.exists()) return;
         Properties p = new Properties();
         try (FileInputStream in = new FileInputStream(f)) {
@@ -174,7 +175,8 @@ public final class AchievementTracker {
         for (EnemySkin skin : spottedSpecies) {
             p.setProperty("seen." + skin.name(), "true");
         }
-        try (FileOutputStream out = new FileOutputStream(FILE_NAME)) {
+        File outFile = SaveStorage.resolveFileForWrite(FILE_NAME);
+        try (FileOutputStream out = new FileOutputStream(outFile)) {
             p.store(out, "Instinto Selvagem - Conquistas");
         } catch (Exception ignored) {}
     }

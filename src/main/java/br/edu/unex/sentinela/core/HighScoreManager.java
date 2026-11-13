@@ -4,30 +4,47 @@ import java.io.*;
 
 public class HighScoreManager {
     private static final String FILE_NAME = "highscore.dat";
+    private static final long SAVE_DEBOUNCE_NS = 5_000_000_000L;
     private int bestScore = 0;
     private double bestSurvivalTime = 0.0;
+    private boolean dirty = false;
+    private long lastSaveNs = 0;
 
     public HighScoreManager() {
         loadHighScore();
     }
 
     public void checkAndSave(int currentScore, double currentSurvivalTime) {
-        boolean changed = false;
         if (currentScore > bestScore) {
             bestScore = currentScore;
-            changed = true;
+            dirty = true;
         }
         if (currentSurvivalTime > bestSurvivalTime) {
             bestSurvivalTime = currentSurvivalTime;
-            changed = true;
+            dirty = true;
         }
-        if (changed) {
+        flushIfNeeded();
+    }
+
+    public void flushIfNeeded() {
+        if (!dirty) return;
+        long now = System.nanoTime();
+        if (now - lastSaveNs >= SAVE_DEBOUNCE_NS) {
             saveHighScore();
+            dirty = false;
+            lastSaveNs = now;
         }
     }
 
+    public void flushNow() {
+        if (!dirty) return;
+        saveHighScore();
+        dirty = false;
+        lastSaveNs = System.nanoTime();
+    }
+
     private void loadHighScore() {
-        File file = new File(FILE_NAME);
+        File file = SaveStorage.resolveFileForRead(FILE_NAME);
         if (!file.exists()) return;
 
         try (DataInputStream in = new DataInputStream(new FileInputStream(file))) {
@@ -39,7 +56,8 @@ public class HighScoreManager {
     }
 
     private void saveHighScore() {
-        try (DataOutputStream out = new DataOutputStream(new FileOutputStream(FILE_NAME))) {
+        File file = SaveStorage.resolveFileForWrite(FILE_NAME);
+        try (DataOutputStream out = new DataOutputStream(new FileOutputStream(file))) {
             out.writeInt(bestScore);
             out.writeDouble(bestSurvivalTime);
         } catch (IOException e) {

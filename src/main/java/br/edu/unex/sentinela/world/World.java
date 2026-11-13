@@ -1,5 +1,6 @@
 package br.edu.unex.sentinela.world;
 
+import br.edu.unex.sentinela.ai.BossCombatExecutor;
 import br.edu.unex.sentinela.ai.EnemySkin;
 import br.edu.unex.sentinela.ai.EnemyType;
 import br.edu.unex.sentinela.core.HighScoreManager;
@@ -12,6 +13,7 @@ import br.edu.unex.sentinela.progress.GameEventBus;
 import br.edu.unex.sentinela.progress.MatchHistoryRepository;
 import br.edu.unex.sentinela.progress.MatchRecord;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -43,12 +45,15 @@ public class World {
     private double survivalTime = 0.0;
     private int score = 0;
     private int applesEaten = 0;
+    private int meatsEaten = 0;
     private int enemiesDefeated = 0;
     private int dayCycleNumber = 1;
     private double cycleProgressTimer = 0.0;
     private final double cycleDuration = 90.0;
 
     // Boss & Reinforcement spawning
+    private static final SecureRandom SEED_GENERATOR = new SecureRandom();
+    private long currentWorldSeed = generateRandomSeed();
     private double foodRespawnTimer = 0.0;
     private double enemyReinforcementTimer = 0.0;
     private double bossSpawnTimer = 0.0;
@@ -60,6 +65,20 @@ public class World {
     public World() {
         initRainDrops(90);
         initWorld();
+    }
+
+    public World(long fixedWorldSeed) {
+        this.currentWorldSeed = fixedWorldSeed;
+        initRainDrops(90);
+        initWorld();
+    }
+
+    private static long generateRandomSeed() {
+        return SEED_GENERATOR.nextLong() ^ System.nanoTime();
+    }
+
+    public long getWorldSeed() {
+        return currentWorldSeed;
     }
 
     private void initRainDrops(int count) {
@@ -76,6 +95,7 @@ public class World {
     }
 
     public void reset() {
+        highScoreManager.flushNow();
         enemies.clear();
         foodItems.clear();
         meatItems.clear();
@@ -86,6 +106,7 @@ public class World {
         survivalTime = 0.0;
         score = 0;
         applesEaten = 0;
+        meatsEaten = 0;
         enemiesDefeated = 0;
         dayCycleNumber = 1;
         cycleProgressTimer = 0.0;
@@ -94,13 +115,14 @@ public class World {
         bossSpawnTimer = 0.0;
         currentWeather = WeatherType.CLEAR;
         weatherTimer = 0.0;
+        currentWorldSeed = generateRandomSeed();
         gameOver = false;
         gameOverReason = "";
         initWorld();
     }
 
     private void initWorld() {
-        this.tileMap = new TileMap();
+        this.tileMap = new TileMap(currentWorldSeed);
         this.player = new Player(0, 0, 3);
         double vpW = (camera != null) ? camera.getViewportWidth() : 960;
         double vpH = (camera != null) ? camera.getViewportHeight() : 640;
@@ -119,11 +141,6 @@ public class World {
     }
 
     public void update(double deltaTime, InputManager inputManager) {
-        if (inputManager.pollRestartRequested()) {
-            reset();
-            return;
-        }
-
         if (inputManager.pollZoomInRequested()) {
             camera.zoomIn();
         }
@@ -168,7 +185,7 @@ public class World {
         if (foodRespawnTimer >= 5.0) {
             foodRespawnTimer = 0.0;
             cleanupDistantEntities();
-            while (foodItems.size() < 14) {
+            while (foodItems.size() < 18) {
                 spawnFoodNearPlayer();
             }
         }
@@ -203,9 +220,18 @@ public class World {
                 double dist = Math.hypot(player.getX() - food.getX(), player.getY() - food.getY());
                 if (dist < 20.0) {
                     food.setEaten(true);
-                    player.feed(30.0);
+                    player.feed(food.getNutritionGain());
+                    player.restoreStamina(food.getStaminaGain());
                     applesEaten++;
-                    score += 100;
+                    score += food.getScoreBonus();
+                    for (int p = 0; p < 5; p++) {
+                        particles.add(new Particle(
+                            food.getX(), food.getY(),
+                            (rand.nextDouble() - 0.5) * 70.0,
+                            -18.0 - rand.nextDouble() * 42.0,
+                            0.40, food.getVariant().getBerryColorHex(), 3.2
+                        ));
+                    }
                     highScoreManager.checkAndSave(score, survivalTime);
                     GameEventBus.get().post(new GameEvent(GameEvent.Type.APPLE_EATEN));
                 }
@@ -218,9 +244,12 @@ public class World {
                 double dist = Math.hypot(player.getX() - meat.getX(), player.getY() - meat.getY());
                 if (dist < 22.0) {
                     meat.setEaten(true);
-                    player.feed(50.0);
-                    player.healLife(1);
-                    score += 250;
+                    MeatTier tier = meat.getTier();
+                    player.feed(tier.getNutritionGain());
+                    player.healLife(tier.getHealHearts());
+                    meatsEaten++;
+                    score += tier.getEatScoreBonus();
+                    highScoreManager.checkAndSave(score, survivalTime);
                     GameEventBus.get().post(new GameEvent(GameEvent.Type.MEAT_EATEN));
                 }
             }
@@ -284,6 +313,11 @@ public class World {
         Iterator<Enemy> enemyIt = enemies.iterator();
         while (enemyIt.hasNext()) {
             Enemy enemy = enemyIt.next();
+            if (enemy.getHp() <= 0) {
+                meatItems.add(createMeatDrop(enemy));
+                enemyIt.remove();
+                continue;
+            }
             enemy.update(deltaTime, player, foodItems, scentTrail, projectiles, enemies, tileMap, timeProgress, currentWeather);
 
             double distToPlayer = Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY());
@@ -313,7 +347,7 @@ public class World {
                     if (defeated) {
                         enemiesDefeated++;
                         score += enemy.getType().getDefeatScore();
-                        meatItems.add(new MeatItem(enemy.getX(), enemy.getY()));
+                        meatItems.add(createMeatDrop(enemy));
                         if (enemy.getType() == EnemyType.BEAR_BOSS) {
                             GameEventBus.get().post(new GameEvent(GameEvent.Type.BOSS_DEFEATED, enemy.getSkin(), 1, "Chefe Derrotado"));
                         } else {
@@ -323,6 +357,16 @@ public class World {
                         continue;
                     }
                 }
+            }
+
+            // Boss Combat: ataques primário e especial com hitbox própria, partículas e tremor de câmera
+            if (enemy.getType() == EnemyType.BEAR_BOSS) {
+                String bossDeathReason = BossCombatExecutor.processBossCombat(enemy, player, particles, camera, tileMap, distToPlayer);
+                if (bossDeathReason != null) {
+                    triggerGameOver(bossDeathReason);
+                    return;
+                }
+                continue;
             }
 
             // Enemy Attack Preparation & Strike against Player (Zelda-style Wind-up Telegraph & Physical Impact)
@@ -339,8 +383,9 @@ public class World {
                     String particleColor = "#E74C3C";
                     int particleCount = 7;
                     if (enemy.getType() == EnemyType.BEAR_BOSS) {
-                        particleColor = enemy.getSkin() == EnemySkin.CROCODILE ? "#00E676" : 
-                                       (enemy.getSkin() == EnemySkin.PANTHER ? "#FFD700" : "#E67E22");
+                        particleColor = enemy.getSkin() == EnemySkin.CROCODILE ? "#00E676"
+                                      : (enemy.getSkin() == EnemySkin.PANTHER ? "#FFD700"
+                                      : (enemy.getSkin() == EnemySkin.POLAR_BEAR ? "#38BDF8" : "#E67E22"));
                         particleCount = 12;
                     } else if (enemy.getType() == EnemyType.HOUND) {
                         particleColor = "#9B59B6";
@@ -368,6 +413,7 @@ public class World {
             }
         }
 
+        camera.updateShake(deltaTime);
         camera.update(player.getX(), player.getY());
     }
 
@@ -375,6 +421,7 @@ public class World {
         this.gameOver = true;
         this.gameOverReason = reason;
         highScoreManager.checkAndSave(score, survivalTime);
+        highScoreManager.flushNow();
         if (survivalTime >= 3.0) {
             MatchRecord record = new MatchRecord(survivalTime, score, applesEaten, enemiesDefeated, dayCycleNumber, reason);
             MatchHistoryRepository.get().recordMatch(record);
@@ -388,8 +435,15 @@ public class World {
         meatItems.removeIf(m -> Math.hypot(m.getX() - player.getX(), m.getY() - player.getY()) > 1800.0 || m.isEaten());
         burrows.removeIf(b -> Math.hypot(b.getX() - player.getX(), b.getY() - player.getY()) > 2200.0);
 
-        // Despawn enemies that got left too far behind (so new ones spawn close to player)
-        enemies.removeIf(e -> Math.hypot(e.getX() - player.getX(), e.getY() - player.getY()) > 1700.0);
+        // Despawn enemies that got left too far behind (preserva bosses próximos à sua arena territorial)
+        enemies.removeIf(e -> {
+            double distEntity = Math.hypot(e.getX() - player.getX(), e.getY() - player.getY());
+            if (e.getType() == EnemyType.BEAR_BOSS && e.getBossController() != null) {
+                double distHome = Math.hypot(e.getBossController().getHomeX() - player.getX(), e.getBossController().getHomeY() - player.getY());
+                return distEntity > 1950.0 && distHome > 1950.0;
+            }
+            return distEntity > 1700.0;
+        });
 
         int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
         int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
@@ -403,6 +457,15 @@ public class World {
         if (burrows.size() < 7) {
             ecosystemSpawner.spawnBurrowInSector(tileMap, burrows, pCol, pRow, rand.nextDouble() * Math.PI * 2.0, 12, 32);
         }
+    }
+
+    private MeatItem createMeatDrop(Enemy enemy) {
+        return new MeatItem(
+                enemy.getX(),
+                enemy.getY(),
+                MeatTier.fromEnemy(enemy.getType()),
+                enemy.getSkin()
+        );
     }
 
     public TileMap getTileMap() { return tileMap; }
@@ -421,6 +484,7 @@ public class World {
     public double getSurvivalTime() { return survivalTime; }
     public int getScore() { return score; }
     public int getApplesEaten() { return applesEaten; }
+    public int getMeatsEaten() { return meatsEaten; }
     public int getEnemiesDefeated() { return enemiesDefeated; }
     public int getDayCycleNumber() { return dayCycleNumber; }
     public double getCycleProgressTimer() { return cycleProgressTimer; }

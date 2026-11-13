@@ -18,7 +18,7 @@ public enum Achievement {
     ),
     APEX_SLAYER(
         "Matador de Gigantes",
-        "Derrote um predador alfa (Urso, Pantera ou Crocodilo).",
+        "Derrote qualquer predador alfa dos biomas.",
         "👑",
         "Combate"
     ),
@@ -30,7 +30,7 @@ public enum Achievement {
     ),
     FORAGER(
         "Fruticultor da Selva",
-        "Devore 10 maçãs silvestres em uma única corrida.",
+        "Colha 10 frutas silvestres em uma única corrida.",
         "🍎",
         "Nutrição"
     ),

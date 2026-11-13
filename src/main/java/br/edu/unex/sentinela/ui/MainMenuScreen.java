@@ -1,105 +1,150 @@
 package br.edu.unex.sentinela.ui;
 
+import br.edu.unex.sentinela.progress.Achievement;
 import br.edu.unex.sentinela.progress.AchievementTracker;
 import br.edu.unex.sentinela.progress.MatchHistoryRepository;
 import br.edu.unex.sentinela.progress.PersonalRecords;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.canvas.Canvas;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.effect.DropShadow;
-import javafx.scene.layout.*;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
+import javafx.scene.shape.Rectangle;
 
 /**
- * Menu Principal estilizado em Dark Fantasy e estética selvagem de jogo de aventura,
- * com ícones vetoriais imunes a quebras de fonte e resumo de carreira em tempo real.
+ * Menu Principal assimétrico sobre vidro fosco com atmosfera animada e tipografia dinâmica.
  */
 public class MainMenuScreen extends StackPane {
-
     public MainMenuScreen(ScreenManager manager) {
-        setAlignment(Pos.CENTER);
-        setStyle("-fx-background-color: radial-gradient(center 50% 45%, radius 65%, rgba(14, 22, 16, 0.82), rgba(6, 10, 8, 0.96));");
+        setPickOnBounds(true);
+        setStyle("-fx-background-color: linear-gradient(to right, rgba(6,10,9,0.86) 0%, rgba(7,12,10,0.42) 55%, rgba(5,9,8,0.22) 100%);");
 
-        VBox contentBox = new VBox(20);
-        contentBox.setAlignment(Pos.CENTER);
-        contentBox.setMaxWidth(680);
+        Canvas fireflies = UiMotion.createFireflyBackdrop();
+        Pane fireflyLayer = new Pane(fireflies);
+        fireflyLayer.setMinSize(0, 0);
+        fireflyLayer.setMouseTransparent(true);
+        fireflies.widthProperty().bind(fireflyLayer.widthProperty());
+        fireflies.heightProperty().bind(fireflyLayer.heightProperty());
 
-        // Brasão de Título
-        VBox titleBox = new VBox(6);
-        titleBox.setAlignment(Pos.CENTER);
+        VBox leftRail = buildLeftRail(manager);
+        HBox keyHints = buildBottomKeyHints();
 
-        Label title = new Label("INSTINTO SELVAGEM");
-        title.setFont(Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 48));
-        title.setTextFill(Color.web("#F1C40F"));
-        title.setEffect(new DropShadow(24, Color.rgb(241, 196, 15, 0.65)));
+        StackPane.setAlignment(leftRail, Pos.CENTER_LEFT);
+        StackPane.setAlignment(keyHints, Pos.BOTTOM_RIGHT);
+        StackPane.setMargin(keyHints, new Insets(0, 28, 22, 0));
 
-        Label subtitle = new Label("—  SENTINELA DA FLORESTA  •  SOBREVIVÊNCIA & FURTIVIDADE  —");
-        subtitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        subtitle.setTextFill(Color.web("#BDC3C7"));
-        subtitle.setEffect(new DropShadow(8, Color.rgb(0, 0, 0, 0.9)));
-
-        titleBox.getChildren().addAll(title, subtitle);
-
-        // Menu com Botões Chanfrados e Ícones Vetoriais Garantidos
-        Button btnPlay = UiTheme.createPrimaryButton("INICIAR JOGO", "PLAY", 300, 48);
-        btnPlay.setOnAction(e -> manager.startGame());
-
-        Button btnBestiary = UiTheme.createSecondaryButton("BESTIÁRIO & FAUNA", "BOOK", 300, 42);
-        btnBestiary.setOnAction(e -> manager.navigate(ScreenState.BESTIARY));
-
-        Button btnAchievements = UiTheme.createSecondaryButton("CONQUISTAS", "TROPHY", 300, 42);
-        btnAchievements.setOnAction(e -> manager.navigate(ScreenState.ACHIEVEMENTS));
-
-        Button btnHistory = UiTheme.createSecondaryButton("HISTÓRICO & RECORDES", "CHART", 300, 42);
-        btnHistory.setOnAction(e -> manager.navigate(ScreenState.HISTORY));
-
-        Button btnSettings = UiTheme.createSecondaryButton("CONFIGURAÇÕES", "GEAR", 300, 42);
-        btnSettings.setOnAction(e -> manager.navigate(ScreenState.SETTINGS));
-
-        Button btnExit = UiTheme.createSecondaryButton("SAIR DO JOGO", "DOOR", 300, 38);
-        btnExit.setOnAction(e -> Platform.exit());
-
-        VBox btnBox = new VBox(10, btnPlay, btnBestiary, btnAchievements, btnHistory, btnSettings, btnExit);
-        btnBox.setAlignment(Pos.CENTER);
-
-        // Resumo de Carreira Rápido no rodapé do menu
-        HBox summaryBadge = buildQuickStatsBadge();
-
-        Label footer = new Label("Controles: WASD para Mover  •  Shift Correr  •  Espaço Atacar  •  ESC Pausa");
-        footer.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 12));
-        footer.setTextFill(Color.web("#7F8C8D"));
-
-        contentBox.getChildren().addAll(titleBox, btnBox, summaryBadge, footer);
-        getChildren().add(contentBox);
+        getChildren().addAll(fireflyLayer, leftRail, keyHints);
+        UiMotion.animateEntrance(leftRail);
     }
 
-    private HBox buildQuickStatsBadge() {
-        HBox badge = new HBox(20);
-        badge.setAlignment(Pos.CENTER);
-        badge.setPadding(new Insets(8, 18, 8, 18));
-        badge.setMaxWidth(480);
-        badge.setStyle(UiTheme.CARD_MODERN);
+    private VBox buildLeftRail(ScreenManager manager) {
+        VBox rail = new VBox(18);
+        rail.setAlignment(Pos.CENTER_LEFT);
+        rail.setPadding(new Insets(36, 48, 32, 44));
+        UiTypography.bindScaledWidth(rail, 410);
+        rail.prefHeightProperty().bind(heightProperty());
+        rail.getStyleClass().add("glass-rail");
 
-        PersonalRecords pr = MatchHistoryRepository.get().getPersonalRecords();
-        int achievementsCount = AchievementTracker.get().getUnlockedCount();
+        VBox brandBlock = buildBrandBlock();
+        VBox navList = buildNavigationList(manager);
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+        HBox statsStrip = buildCareerStatsStrip();
 
-        Label l1 = new Label("Recorde: " + String.format("%,d", pr.getBestScore()) + " pts");
-        l1.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        l1.setTextFill(Color.web("#F1C40F"));
+        rail.getChildren().addAll(brandBlock, navList, spacer, statsStrip);
+        return rail;
+    }
 
-        Label l2 = new Label("Conquistas: " + achievementsCount + " / 14");
-        l2.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        l2.setTextFill(Color.web("#2ECC71"));
+    private VBox buildBrandBlock() {
+        Rectangle bar = new Rectangle(3, 14, Color.web(UiTheme.ACCENT_AMBER));
+        bar.setArcWidth(3);
+        bar.setArcHeight(3);
 
-        Label l3 = new Label("Sobrevivência: " + pr.getFormattedBestTime());
-        l3.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        l3.setTextFill(Color.web("#3498DB"));
+        Label eyebrow = new Label("INSTINTO SELVAGEM");
+        eyebrow.setTextFill(Color.web(UiTheme.ACCENT_AMBER));
+        UiTypography.bind(eyebrow, UiTypography.TypoRole.SUBHERO);
 
-        badge.getChildren().addAll(l1, l2, l3);
-        return badge;
+        HBox eyebrowRow = new HBox(8, bar, eyebrow);
+        eyebrowRow.setAlignment(Pos.CENTER_LEFT);
+
+        Label heroTitle = new Label("SENTINELA");
+        heroTitle.setTextFill(Color.web(UiTheme.TEXT_PRIMARY));
+        heroTitle.setStyle("-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.72), 18, 0.25, 0, 4);");
+        UiTypography.bind(heroTitle, UiTypography.TypoRole.HERO);
+
+        VBox block = new VBox(4, eyebrowRow, heroTitle);
+        block.setPadding(new Insets(8, 0, 8, 0));
+        return block;
+    }
+
+    private VBox buildNavigationList(ScreenManager manager) {
+        Button btnPlay = UiTheme.createPrimaryButton("JOGAR", UiBadge.Icon.PLAY);
+        btnPlay.setMaxWidth(Double.MAX_VALUE);
+        btnPlay.setPrefHeight(44);
+        btnPlay.setOnAction(e -> manager.startGame());
+
+        Button btnBestiary = navItem("BESTIÁRIO", UiBadge.Icon.BOOK, () -> manager.navigate(ScreenState.BESTIARY));
+        Button btnAchievements = navItem("CONQUISTAS", UiBadge.Icon.TROPHY, () -> manager.navigate(ScreenState.ACHIEVEMENTS));
+        Button btnHistory = navItem("HISTÓRICO", UiBadge.Icon.CHART, () -> manager.navigate(ScreenState.HISTORY));
+        Button btnSettings = navItem("CONFIGURAÇÕES", UiBadge.Icon.GEAR, () -> manager.navigate(ScreenState.SETTINGS));
+
+        Button btnExit = UiTheme.createDangerGhostButton("SAIR", UiBadge.Icon.DOOR);
+        btnExit.setMaxWidth(Double.MAX_VALUE);
+        btnExit.setPrefHeight(36);
+        btnExit.setAlignment(Pos.CENTER_LEFT);
+        btnExit.setPadding(new Insets(7, 16, 7, 16));
+        btnExit.setOnAction(e -> Platform.exit());
+        VBox.setMargin(btnExit, new Insets(8, 0, 0, 0));
+
+        VBox nav = new VBox(8, btnPlay, btnBestiary, btnAchievements, btnHistory, btnSettings, btnExit);
+        UiTypography.bindScaledWidth(nav, 272);
+        return nav;
+    }
+
+    private Button navItem(String text, UiBadge.Icon icon, Runnable action) {
+        Button btn = UiTheme.createNavButton(text, icon);
+        btn.setMaxWidth(Double.MAX_VALUE);
+        btn.setPrefHeight(38);
+        btn.setOnAction(e -> action.run());
+        return btn;
+    }
+
+    private HBox buildCareerStatsStrip() {
+        PersonalRecords rec = MatchHistoryRepository.get().getPersonalRecords();
+        int unlocked = AchievementTracker.get().getUnlockedCount();
+        int total = Achievement.values().length;
+
+        HBox scoreChip = UiTheme.createCompactStatChip(
+                UiBadge.Icon.TROPHY, String.format("%,d", rec.getBestScore()).replace(',', '.'), UiTheme.ACCENT_AMBER);
+        HBox achChip = UiTheme.createCompactStatChip(
+                UiBadge.Icon.STAR, unlocked + "/" + total, UiTheme.ACCENT_EMERALD);
+        HBox timeChip = UiTheme.createCompactStatChip(
+                UiBadge.Icon.CLOCK, rec.getFormattedBestTime(), UiTheme.ACCENT_SKY);
+
+        HBox row = new HBox(8, scoreChip, achChip, timeChip);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
+    }
+
+    private HBox buildBottomKeyHints() {
+        HBox box = new HBox(16,
+                UiTheme.createKeyHint("WASD", "Mover"),
+                UiTheme.createKeyHint("SHIFT", "Correr"),
+                UiTheme.createKeyHint("ESPAÇO", "Atacar"),
+                UiTheme.createKeyHint("ESC", "Pausa")
+        );
+        box.setAlignment(Pos.CENTER_RIGHT);
+        box.setPadding(new Insets(8, 14, 8, 14));
+        box.getStyleClass().add("glass-card");
+        box.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        return box;
     }
 }

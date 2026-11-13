@@ -30,6 +30,20 @@ public class Player {
     private double hunger = 100.0;
     private double maxHunger = 100.0;
 
+    // Sprint / Stamina mechanics
+    public static final double STAMINA_DRAIN_PER_SEC = 32.0;
+    public static final double STAMINA_REGEN_IDLE_PER_SEC = 24.0;
+    public static final double STAMINA_REGEN_WALK_PER_SEC = 15.0;
+    public static final double STAMINA_EXHAUSTION_RECOVERY_THRESHOLD = 30.0;
+    public static final double ATTACK_STAMINA_COST_PCT = 0.15;
+    public static final double LOW_HUNGER_SPRINT_THRESHOLD = 25.0;
+    public static final double LOW_LIFE_SPEED_MULTIPLIER = 0.78;
+
+    private double stamina = 100.0;
+    private double maxStamina = 100.0;
+    private boolean isSprintExhausted = false;
+    private double attackStaminaAlertTimer = 0.0;
+
     // Status flags
     private boolean isSprinting = false;
     private boolean isHiddenInGrass = false;
@@ -71,6 +85,9 @@ public class Player {
         if (adrenalineTimer > 0) adrenalineTimer -= deltaTime;
         if (burrowCooldown > 0) burrowCooldown -= deltaTime;
         if (attackCooldown > 0) attackCooldown -= deltaTime;
+        if (attackStaminaAlertTimer > 0) {
+            attackStaminaAlertTimer = Math.max(0.0, attackStaminaAlertTimer - deltaTime);
+        }
 
         // Apply physical knockback when struck
         if (Math.abs(knockbackVx) > 0.1 || Math.abs(knockbackVy) > 0.1) {
@@ -93,19 +110,12 @@ public class Player {
             }
         }
 
-        // Trigger Attack (Spacebar or Left-Click)
-        if (attackPressed && attackCooldown <= 0 && !isBurrowed && !isSwimming) {
-            isAttacking = true;
-            attackHitProcessed = false;
-            attackTimer = 0.22;
-            attackCooldown = 0.40;
-            noiseRadius = 180.0;
-            hunger -= 0.8;
-        }
+        tryTriggerPrimaryAttack(attackPressed);
 
         checkBurrowInteraction(dx, dy, deltaTime, burrows);
 
-        this.isSprinting = sprint && (hunger > 10.0) && !isBurrowed;
+        this.moving = (dx != 0 || dy != 0) && !isBurrowed;
+        updateSprintAndStamina(sprint, this.moving, deltaTime);
 
         if (dx != 0 || dy != 0) {
             faceDx = dx;
@@ -130,11 +140,13 @@ public class Player {
             speedMultiplier = 1.15;
         }
 
+        if (isLowLife()) {
+            speedMultiplier *= LOW_LIFE_SPEED_MULTIPLIER;
+        }
+
         if (adrenalineTimer > 0) {
             speedMultiplier *= 1.25;
         }
-
-        this.moving = (dx != 0 || dy != 0) && !isBurrowed;
 
         if (isSprinting && moving) {
             currentSpeed = baseSpeed * 1.55 * speedMultiplier;
@@ -266,6 +278,10 @@ public class Player {
     }
 
     public boolean takeDamage(double fromX, double fromY) {
+        return takeDamage(fromX, fromY, 280.0);
+    }
+
+    public boolean takeDamage(double fromX, double fromY, double knockbackForce) {
         if (invulnerabilityTimer > 0 || isBurrowed) {
             return false;
         }
@@ -278,8 +294,8 @@ public class Player {
         double dy = y - fromY;
         double dist = Math.hypot(dx, dy);
         if (dist > 0.001) {
-            this.knockbackVx = (dx / dist) * 280.0;
-            this.knockbackVy = (dy / dist) * 280.0;
+            this.knockbackVx = (dx / dist) * knockbackForce;
+            this.knockbackVy = (dy / dist) * knockbackForce;
         }
         return true;
     }
@@ -308,6 +324,14 @@ public class Player {
         this.hunger = Math.min(maxHunger, this.hunger + amount);
     }
 
+    public void restoreStamina(double amount) {
+        if (amount <= 0) return;
+        this.stamina = Math.min(maxStamina, this.stamina + amount);
+        if (isSprintExhausted && stamina >= STAMINA_EXHAUSTION_RECOVERY_THRESHOLD) {
+            isSprintExhausted = false;
+        }
+    }
+
     public double getX() { return x; }
     public double getY() { return y; }
     public double getFaceDx() { return faceDx; }
@@ -320,7 +344,59 @@ public class Player {
     public void setBreathTimer(double breathTimer) { this.breathTimer = breathTimer; }
     public boolean isMoving() { return moving; }
     public void setMoving(boolean moving) { this.moving = moving; }
+    private void tryTriggerPrimaryAttack(boolean attackPressed) {
+        if (!attackPressed || attackCooldown > 0 || isBurrowed || isSwimming) {
+            return;
+        }
+
+        double staminaCost = getAttackStaminaCost();
+        if (isSprintExhausted || stamina < staminaCost) {
+            attackStaminaAlertTimer = 0.30;
+            return;
+        }
+
+        stamina = Math.max(0.0, stamina - staminaCost);
+        if (stamina <= 0.0) {
+            stamina = 0.0;
+            isSprintExhausted = true;
+        }
+
+        isAttacking = true;
+        attackHitProcessed = false;
+        attackTimer = 0.22;
+        attackCooldown = 0.40;
+        noiseRadius = 180.0;
+        hunger = Math.max(0.0, hunger - 0.8);
+    }
+
+    private void updateSprintAndStamina(boolean wantSprint, boolean isActivelyMoving, double deltaTime) {
+        boolean canSprint = !isBurrowed && !isSprintExhausted && !isSprintBlockedByHunger() && stamina > 0.0;
+        this.isSprinting = wantSprint && isActivelyMoving && canSprint;
+
+        if (this.isSprinting) {
+            stamina -= STAMINA_DRAIN_PER_SEC * deltaTime;
+            if (stamina <= 0.0) {
+                stamina = 0.0;
+                isSprintExhausted = true;
+                this.isSprinting = false;
+            }
+        } else if (!this.isAttacking) {
+            double regenRate = isActivelyMoving ? STAMINA_REGEN_WALK_PER_SEC : STAMINA_REGEN_IDLE_PER_SEC;
+            stamina = Math.min(maxStamina, stamina + regenRate * deltaTime);
+            if (isSprintExhausted && stamina >= STAMINA_EXHAUSTION_RECOVERY_THRESHOLD) {
+                isSprintExhausted = false;
+            }
+        }
+    }
+
     public boolean isSprinting() { return isSprinting; }
+    public double getStamina() { return stamina; }
+    public double getMaxStamina() { return maxStamina; }
+    public double getAttackStaminaCost() { return maxStamina * ATTACK_STAMINA_COST_PCT; }
+    public boolean isAttackBlockedByStaminaAlert() { return attackStaminaAlertTimer > 0; }
+    public boolean isSprintExhausted() { return isSprintExhausted; }
+    public boolean isSprintBlockedByHunger() { return hunger <= LOW_HUNGER_SPRINT_THRESHOLD; }
+    public boolean isLowLife() { return lives > 0 && lives <= 1; }
     public int getLives() { return lives; }
     public int getMaxLives() { return maxLives; }
     public double getHunger() { return hunger; }

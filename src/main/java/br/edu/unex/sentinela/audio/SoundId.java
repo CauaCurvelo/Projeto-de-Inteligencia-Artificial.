@@ -9,6 +9,7 @@ public enum SoundId {
     STEP_MUD(AudioChannel.STEPS),
     STEP_WATER(AudioChannel.STEPS),
     STEP_STONE(AudioChannel.STEPS),
+    STEP_SNOW(AudioChannel.STEPS),
 
     // Passos de inimigos
     STEP_BOOT(AudioChannel.STEPS),
@@ -70,7 +71,12 @@ public enum SoundId {
     LOOP_NIGHT(AudioChannel.AMBIENCE),
     LOOP_RIVER(AudioChannel.AMBIENCE),
     LOOP_RAIN(AudioChannel.WEATHER),
-    LOOP_STORM_WIND(AudioChannel.WEATHER);
+    LOOP_STORM_WIND(AudioChannel.WEATHER),
+
+    // Música (Trilha Sonora procedural)
+    MUSIC_CLEARING(AudioChannel.MUSIC),
+    MUSIC_MEADOW(AudioChannel.MUSIC),
+    MUSIC_WALTZ(AudioChannel.MUSIC);
 
     private final AudioChannel channel;
 

@@ -9,7 +9,15 @@ import javafx.scene.paint.Color;
  * para garantir 100% de consistência visual sem caracteres unicode/emojis quebrados.
  */
 public final class UiBadge {
+    public enum Icon {
+        PLAY, TROPHY, GEAR, BOOK, CHART, LOCK, SWORD, DOOR, STAR, CLOCK, APPLE
+    }
+
     private UiBadge() {}
+
+    public static Canvas create(Icon icon, double size, Color color) {
+        return createBadge(icon.name(), size, color);
+    }
 
     public static Canvas createBadge(String type, double size, Color color) {
         Canvas canvas = new Canvas(size, size);

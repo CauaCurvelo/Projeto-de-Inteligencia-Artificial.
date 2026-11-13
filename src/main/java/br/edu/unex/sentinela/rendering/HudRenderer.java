@@ -2,6 +2,7 @@ package br.edu.unex.sentinela.rendering;
 
 import br.edu.unex.sentinela.entity.Player;
 import br.edu.unex.sentinela.input.InputManager;
+import br.edu.unex.sentinela.world.BiomeType;
 import br.edu.unex.sentinela.world.World;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
@@ -32,8 +33,27 @@ public class HudRenderer {
     private final Font statValueFont = Font.font("Trebuchet MS", FontWeight.EXTRA_BOLD, 14.5);
     private final Font keycapFont = Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 10.0);
     private final Font hintTextFont = Font.font("Segoe UI", FontWeight.BOLD, 11.0);
-    private final Font gameOverTitleFont = Font.font("Impact", FontWeight.NORMAL, 46.0);
-    private final Font gameOverBodyFont = Font.font("Trebuchet MS", FontWeight.BOLD, 16.0);
+
+    private static final Font HUNGER_BAR_FONT = Font.font("Trebuchet MS", FontWeight.EXTRA_BOLD, 10.5);
+
+    private static final LinearGradient HUNGER_GREEN_GRAD = new LinearGradient(
+        0.0, 0.0, 0.0, 1.0, true, CycleMethod.NO_CYCLE,
+        new Stop(0.0, Color.web("#69F0AE")),
+        new Stop(0.5, Color.web("#00C853")),
+        new Stop(1.0, Color.web("#1B5E20"))
+    );
+    private static final LinearGradient HUNGER_AMBER_GRAD = new LinearGradient(
+        0.0, 0.0, 0.0, 1.0, true, CycleMethod.NO_CYCLE,
+        new Stop(0.0, Color.web("#FFD54F")),
+        new Stop(0.5, Color.web("#FF8F00")),
+        new Stop(1.0, Color.web("#E65100"))
+    );
+    private static final LinearGradient HUNGER_RED_GRAD = new LinearGradient(
+        0.0, 0.0, 0.0, 1.0, true, CycleMethod.NO_CYCLE,
+        new Stop(0.0, Color.web("#FF5252")),
+        new Stop(0.5, Color.web("#D50000")),
+        new Stop(1.0, Color.web("#7F0000"))
+    );
 
     public HudRenderer(GraphicsContext gc) {
         this.gc = gc;
@@ -58,10 +78,11 @@ public class HudRenderer {
         double panelX = 20;
         double panelY = 16;
         double panelW = 315;
-        double panelH = 92;
+        double panelH = 112;
 
         Color leftBorderColor = player.isInvulnerable() ? Color.web("#FF5252") :
-                                (player.isHiddenInGrass() ? Color.web("#69F0AE") : Color.web("#D4AC0D", 0.85));
+                                (player.isLowLife() ? Color.web("#FF1744", 0.65 + 0.35 * Math.sin(animTime * 8.0)) :
+                                (player.isHiddenInGrass() ? Color.web("#69F0AE") : Color.web("#D4AC0D", 0.85)));
         iconDrawer.drawGamePanel(panelX + 26, panelY, panelW - 26, panelH, 16, leftBorderColor);
 
         // Medalhão Ilustrado da Raposa à esquerda sobrepondo a borda do painel
@@ -71,11 +92,11 @@ public class HudRenderer {
 
         // Linha 1: Corações de Vida 3D + Badge do Dia/Ciclo Solar
         double contentStartX = panelX + 78;
-        boolean lowLife = player.getLives() <= 1;
+        boolean lowLife = player.isLowLife();
 
         for (int i = 0; i < player.getMaxLives(); i++) {
             double hx = contentStartX + 11 + i * 25;
-            double hy = panelY + 23;
+            double hy = panelY + 22;
             iconDrawer.drawStylizedHeart(hx, hy, 21, i < player.getLives(), lowLife, animTime);
         }
 
@@ -94,9 +115,9 @@ public class HudRenderer {
 
         // Linha 2: Barra de Fome / Energia com Ícone de Coxa de Carne Assada
         double barX = contentStartX + 24;
-        double barY = panelY + 44;
+        double barY = panelY + 40;
         double barW = 200;
-        double barH = 15;
+        double barH = 14;
         double hungerPct = Math.max(0.0, Math.min(1.0, player.getHunger() / player.getMaxHunger()));
 
         iconDrawer.drawMeatHaunchIcon(contentStartX + 10, barY + barH * 0.5, 20);
@@ -108,20 +129,11 @@ public class HudRenderer {
         // Gradiente dinâmico de fome
         LinearGradient hungerGrad;
         if (hungerPct > 0.45) {
-            hungerGrad = new LinearGradient(barX, barY, barX, barY + barH, false, CycleMethod.NO_CYCLE,
-                new Stop(0.0, Color.web("#69F0AE")),
-                new Stop(0.5, Color.web("#00C853")),
-                new Stop(1.0, Color.web("#1B5E20")));
+            hungerGrad = HUNGER_GREEN_GRAD;
         } else if (hungerPct > 0.22) {
-            hungerGrad = new LinearGradient(barX, barY, barX, barY + barH, false, CycleMethod.NO_CYCLE,
-                new Stop(0.0, Color.web("#FFD54F")),
-                new Stop(0.5, Color.web("#FF8F00")),
-                new Stop(1.0, Color.web("#E65100")));
+            hungerGrad = HUNGER_AMBER_GRAD;
         } else {
-            hungerGrad = new LinearGradient(barX, barY, barX, barY + barH, false, CycleMethod.NO_CYCLE,
-                new Stop(0.0, Color.web("#FF5252")),
-                new Stop(0.5, Color.web("#D50000")),
-                new Stop(1.0, Color.web("#7F0000")));
+            hungerGrad = HUNGER_RED_GRAD;
         }
 
         gc.setFill(hungerGrad);
@@ -147,10 +159,15 @@ public class HudRenderer {
         // Texto percentual centralizado na barra de fome
         int hungerInt = (int) Math.ceil(player.getHunger());
         iconDrawer.drawStyledText("NUTRIÇÃO " + hungerInt + "%", barX + barW * 0.5, barY + barH * 0.5,
-                Font.font("Trebuchet MS", FontWeight.EXTRA_BOLD, 10.5), Color.WHITE, Color.BLACK, 2.4, TextAlignment.CENTER);
+                HUNGER_BAR_FONT, Color.WHITE, Color.BLACK, 2.4, TextAlignment.CENTER);
 
-        // Linha 3: Badges de Status Furtivo & Clima Ilustrado
-        double statusY = panelY + 75;
+        // Linha 3: Barra de Sprint / Stamina com Ícone de Raio
+        double sprintY = panelY + 60;
+        double sprintH = 14;
+        iconDrawer.drawPlayerSprintBar(player, contentStartX, barX, sprintY, barW, sprintH, animTime);
+
+        // Linha 4: Badges de Status Furtivo & Clima Ilustrado
+        double statusY = panelY + 93;
         String stealthStatus;
         Color stealthColor;
         if (player.isBurrowed()) {
@@ -230,6 +247,8 @@ public class HudRenderer {
             TextAlignment.CENTER
         );
 
+        renderBiomeBadgePill(world.getTileMap().getBiomeAtWorld(player.getX(), player.getY()), bannerY + 72);
+
         gc.restore();
 
         // ====================================================================
@@ -269,7 +288,7 @@ public class HudRenderer {
         gc.fillRoundRect(rightX + 120, rightY + 9, 105, 25, 8, 8);
         iconDrawer.drawSkullIcon(rightX + 135, statRowY, 16, Color.web("#FF5252"));
         iconDrawer.drawStyledText(world.getEnemiesDefeated() + " ABATES", rightX + 182, statRowY,
-                 Font.font("Trebuchet MS", FontWeight.EXTRA_BOLD, 12.5), Color.web("#FF8A80"), Color.BLACK, 2.6, TextAlignment.CENTER);
+                 labelFont, Color.web("#FF8A80"), Color.BLACK, 2.6, TextAlignment.CENTER);
 
         // Bloco 2: Teclas de Comando Desenhadas (Keycaps)
         double keyRow1Y = rightY + 42;
@@ -287,114 +306,32 @@ public class HudRenderer {
                 hintTextFont, Color.web("#B0BEC5"), Color.BLACK, 2.2, TextAlignment.LEFT);
 
         gc.restore();
-
-        // ====================================================================
-        // 4. TELA DE FIM DE JOGO (MODAL CENTRAL ESTILIZADO)
-        // ====================================================================
-        if (world.isGameOver()) {
-            renderGameOverModal(world, width, height, uiScale);
-        }
     }
 
-    private void renderGameOverModal(World world, double width, double height, double uiScale) {
-        gc.setFill(Color.color(0.02, 0.03, 0.05, 0.86));
-        gc.fillRect(0, 0, width, height);
+    private void renderBiomeBadgePill(BiomeType biome, double y) {
+        BiomeType current = (biome != null) ? biome : BiomeType.MEADOW;
+        Color accent = Color.web(current.getAccentColorHex());
+        double pillW = 186;
+        double pillH = 22;
+        double pillX = -pillW * 0.5;
 
-        gc.save();
-        gc.translate(width * 0.5, height * 0.5);
-        gc.scale(uiScale, uiScale);
+        gc.setFill(Color.web("#080D12", 0.78));
+        gc.fillRoundRect(pillX, y, pillW, pillH, 11, 11);
+        gc.setStroke(accent.deriveColor(0, 1.0, 1.0, 0.55));
+        gc.setLineWidth(1.1);
+        gc.strokeRoundRect(pillX, y, pillW, pillH, 11, 11);
 
-        double cardW = 480;
-        double cardH = 300;
-        double cardX = -cardW * 0.5;
-        double cardY = -cardH * 0.5;
-
-        iconDrawer.drawGamePanel(cardX, cardY, cardW, cardH, 22, Color.web("#FF2A55", 0.90));
-
-        // Ícone de Caveira Grande no Topo do Modal
-        iconDrawer.drawSkullIcon(0, cardY + 38, 36, Color.web("#FF5252"));
-
+        gc.setFill(accent);
+        gc.fillOval(pillX + 12, y + 7, 8, 8);
         iconDrawer.drawStyledText(
-            "INSTINTO INTERROMPIDO",
-            0,
-            cardY + 80,
-            gameOverTitleFont,
-            Color.web("#FF5252"),
+            current.getHudBadgeLabel(),
+            6,
+            y + 11.2,
+            statusBadgeFont,
+            accent.brighter(),
             Color.BLACK,
-            4.5,
+            2.2,
             TextAlignment.CENTER
         );
-
-        iconDrawer.drawStyledText(
-            world.getGameOverReason(),
-            0,
-            cardY + 118,
-            gameOverBodyFont,
-            Color.web("#ECEFF1"),
-            Color.BLACK,
-            2.8,
-            TextAlignment.CENTER
-        );
-
-        // Caixa interna de resumo da partida
-        gc.setFill(Color.web("#070A0F", 0.80));
-        gc.fillRoundRect(cardX + 36, cardY + 142, cardW - 72, 86, 14, 14);
-        gc.setStroke(Color.web("#FFD54F", 0.45));
-        gc.setLineWidth(1.4);
-        gc.strokeRoundRect(cardX + 36, cardY + 142, cardW - 72, 86, 14, 14);
-
-        iconDrawer.drawCrownTrophyIcon(-135, cardY + 166, 22, Color.web("#FFD54F"));
-        iconDrawer.drawStyledText(
-            "PONTUAÇÃO FINAL: " + world.getScore() + "   |   RECORDE: " + world.getHighScoreManager().getBestScore(),
-            12,
-            cardY + 166,
-            Font.font("Trebuchet MS", FontWeight.EXTRA_BOLD, 15.5),
-            Color.web("#FFD54F"),
-            Color.BLACK,
-            2.8,
-            TextAlignment.CENTER
-        );
-
-        int mins = (int) world.getSurvivalTime() / 60;
-        int secs = (int) world.getSurvivalTime() % 60;
-        String statsSummary = String.format("Sobreviveu %02d:%02d (Dia %d)  •  %d Frutas  •  %d Predadores Abatidos",
-                mins, secs, world.getDayCycleNumber(), world.getApplesEaten(), world.getEnemiesDefeated());
-
-        iconDrawer.drawStyledText(
-            statsSummary,
-            0,
-            cardY + 202,
-            Font.font("Segoe UI", FontWeight.BOLD, 13.5),
-            Color.web("#B0BEC5"),
-            Color.BLACK,
-            2.4,
-            TextAlignment.CENTER
-        );
-
-        // Botão Pulsante de Reiniciar
-        double pulse = 1.0 + Math.sin(System.currentTimeMillis() * 0.008) * 0.04;
-        gc.save();
-        gc.translate(0, cardY + 258);
-        gc.scale(pulse, pulse);
-
-        gc.setFill(Color.web("#00C853", 0.25));
-        gc.fillRoundRect(-155, -18, 310, 36, 18, 18);
-        gc.setStroke(Color.web("#69F0AE"));
-        gc.setLineWidth(2.0);
-        gc.strokeRoundRect(-155, -18, 310, 36, 18, 18);
-
-        iconDrawer.drawStyledText(
-            "PRESSIONE [R] PARA RENASCER NA FLORESTA",
-            0,
-            0,
-            Font.font("Trebuchet MS", FontWeight.EXTRA_BOLD, 14.0),
-            Color.web("#69F0AE"),
-            Color.BLACK,
-            2.8,
-            TextAlignment.CENTER
-        );
-        gc.restore();
-
-        gc.restore();
     }
 }

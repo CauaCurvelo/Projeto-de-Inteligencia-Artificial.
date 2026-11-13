@@ -4,10 +4,12 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.SourceDataLine;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Motor de áudio: sintetiza o banco de sons em background, mixa vozes numa thread
@@ -16,9 +18,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public final class AudioEngine {
     private static final AudioEngine INSTANCE = new AudioEngine();
     private static final int FRAMES = 512;
-    private static final int MAX_VOICES = 28;
+    private static final int MAX_VOICES = 32;
 
-    private final Map<SoundId, float[]> bank = new EnumMap<>(SoundId.class);
+    private final Map<SoundId, float[][]> bank = new EnumMap<>(SoundId.class);
+    private final int[] lastVariantIndex = new int[SoundId.values().length];
     private final Map<AudioChannel, Double> channelVolumes = new EnumMap<>(AudioChannel.class);
     private final ConcurrentLinkedQueue<Voice> pending = new ConcurrentLinkedQueue<>();
     private final List<Voice> active = new ArrayList<>();
@@ -28,6 +31,7 @@ public final class AudioEngine {
     private volatile double masterVolume = 0.8;
 
     private AudioEngine() {
+        Arrays.fill(lastVariantIndex, -1);
         for (AudioChannel ch : AudioChannel.values()) {
             channelVolumes.put(ch, 1.0);
         }
@@ -48,26 +52,52 @@ public final class AudioEngine {
 
     private void synthesizeBank() {
         for (SoundId id : SoundId.values()) {
-            bank.put(id, id.name().startsWith("LOOP_") ? AmbienceSynthesizer.create(id) : SfxSynthesizer.create(id));
+            float[][] variants;
+            if (id.name().startsWith("MUSIC_")) {
+                variants = new float[][] { MusicTrackCatalog.create(id) };
+            } else if (id.name().startsWith("LOOP_")) {
+                variants = new float[][] { AmbienceSynthesizer.create(id) };
+            } else {
+                variants = SfxSynthesizer.createVariants(id);
+            }
+            bank.put(id, variants);
         }
         ready = true;
     }
 
-    /** Toca um efeito one-shot. Retorna silenciosamente se o banco ainda não estiver pronto. */
+    /** Toca um efeito one-shot escolhendo uma variante orgânica sem repetição imediata. */
     public void play(SoundId id, double gain, double pan, double pitch) {
-        if (!ready || muted) return;
+        if (!ready || muted || id == null) return;
         double chVol = getChannelVolume(id.getChannel());
         double finalGain = gain * chVol;
         if (finalGain < 0.01) return;
-        pending.add(new Voice(bank.get(id), finalGain, clamp(pan), pitch, false));
+        float[] sample = pickVariant(id);
+        if (sample == null) return;
+        pending.add(new Voice(sample, finalGain, clamp(pan), pitch, false));
     }
 
     /** Inicia um loop e devolve o handle (ou null se ainda não estiver pronto). */
     public Voice loop(SoundId id) {
-        if (!ready) return null;
-        Voice v = new Voice(bank.get(id), 0.0, 0.0, 1.0, true);
+        if (!ready || id == null) return null;
+        float[][] variants = bank.get(id);
+        float[] sample = (variants != null && variants.length > 0) ? variants[0] : null;
+        Voice v = new Voice(sample, 0.0, 0.0, 1.0, true);
         pending.add(v);
         return v;
+    }
+
+    private float[] pickVariant(SoundId id) {
+        float[][] variants = bank.get(id);
+        if (variants == null || variants.length == 0) return null;
+        if (variants.length == 1) return variants[0];
+        int ord = id.ordinal();
+        int last = lastVariantIndex[ord];
+        int idx = ThreadLocalRandom.current().nextInt(variants.length);
+        if (idx == last) {
+            idx = (idx + 1 + ThreadLocalRandom.current().nextInt(variants.length - 1)) % variants.length;
+        }
+        lastVariantIndex[ord] = idx;
+        return variants[idx];
     }
 
     public boolean isReady() { return ready; }

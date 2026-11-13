@@ -2,6 +2,8 @@ package br.edu.unex.sentinela.rendering;
 
 import br.edu.unex.sentinela.ai.EnemyType;
 import br.edu.unex.sentinela.entity.Player;
+import br.edu.unex.sentinela.settings.GameSettings;
+import br.edu.unex.sentinela.settings.GraphicsQuality;
 import br.edu.unex.sentinela.world.WeatherType;
 import javafx.geometry.VPos;
 import javafx.scene.canvas.GraphicsContext;
@@ -31,23 +33,39 @@ public class UiIconDrawer {
      * Desenha texto estilo jogo moderno com sombra projetada e contorno escuro espesso (Stroke + Fill),
      * garantindo máxima legibilidade sobre qualquer fundo.
      */
+    private static final Color TEXT_SHADOW_COLOR = Color.color(0, 0, 0, 0.65);
+    private static final Color PANEL_SHADOW_COLOR = Color.color(0, 0, 0, 0.55);
+    private static final LinearGradient PANEL_BG_GRAD = new LinearGradient(
+        0.0, 0.0, 0.0, 1.0, true, CycleMethod.NO_CYCLE,
+        new Stop(0.0, Color.web("#1A222D", 0.92)),
+        new Stop(0.5, Color.web("#111720", 0.94)),
+        new Stop(1.0, Color.web("#0A0E14", 0.96))
+    );
+
     public void drawStyledText(String text, double x, double y, Font font, Color fill, Color outline, double outlineWidth, TextAlignment align) {
         gc.save();
         gc.setFont(font);
         gc.setTextAlign(align);
         gc.setTextBaseline(VPos.CENTER);
-        gc.setLineJoin(StrokeLineJoin.ROUND);
-        gc.setLineCap(StrokeLineCap.ROUND);
 
-        // Sombra projetada inferior
-        gc.setFill(Color.color(0, 0, 0, 0.65));
+        // Sombra projetada inferior via atlas de glifos (fillText)
+        gc.setFill(TEXT_SHADOW_COLOR);
         gc.fillText(text, x + 1.5, y + 2.0);
 
-        // Contorno escuro (Stroke)
-        if (outlineWidth > 0) {
-            gc.setStroke(outline);
-            gc.setLineWidth(outlineWidth);
-            gc.strokeText(text, x, y);
+        // Contorno em múltiplas passagens fillText (evita tesselação cara de strokeText no Prism Canvas)
+        GraphicsQuality quality = GameSettings.get().getGraphicsQuality();
+        if (outlineWidth > 0 && quality != GraphicsQuality.LOW) {
+            double d = Math.max(1.0, Math.min(2.0, outlineWidth * 0.45));
+            gc.setFill(outline);
+            if (quality == GraphicsQuality.HIGH) {
+                gc.fillText(text, x - d, y);
+                gc.fillText(text, x + d, y);
+                gc.fillText(text, x, y - d);
+                gc.fillText(text, x, y + d);
+            } else {
+                gc.fillText(text, x - d, y - d);
+                gc.fillText(text, x + d, y + d);
+            }
         }
 
         // Preenchimento principal
@@ -61,17 +79,11 @@ public class UiIconDrawer {
      */
     public void drawGamePanel(double x, double y, double w, double h, double radius, Color borderAccent) {
         // Sombra externa profunda
-        gc.setFill(Color.color(0, 0, 0, 0.55));
+        gc.setFill(PANEL_SHADOW_COLOR);
         gc.fillRoundRect(x + 3, y + 4, w, h, radius, radius);
 
         // Fundo em gradiente escuro rico
-        LinearGradient bgGrad = new LinearGradient(
-            x, y, x, y + h, false, CycleMethod.NO_CYCLE,
-            new Stop(0.0, Color.web("#1A222D", 0.92)),
-            new Stop(0.5, Color.web("#111720", 0.94)),
-            new Stop(1.0, Color.web("#0A0E14", 0.96))
-        );
-        gc.setFill(bgGrad);
+        gc.setFill(PANEL_BG_GRAD);
         gc.fillRoundRect(x, y, w, h, radius, radius);
 
         // Brilho interno superior (Bevel)
@@ -173,6 +185,13 @@ public class UiIconDrawer {
         }
 
         gc.restore();
+
+        if (player.isLowLife()) {
+            double pulse = 0.5 + 0.5 * Math.sin(animTime * 8.0);
+            gc.setStroke(Color.web("#FF1744", 0.35 + pulse * 0.45));
+            gc.setLineWidth(5.5 + pulse * 2.5);
+            gc.strokeOval(cx - radius - 2, cy - radius - 2, (radius + 2) * 2, (radius + 2) * 2);
+        }
 
         // Aro metálico duplo do Medalhão
         gc.setStroke(Color.web("#000000", 0.65));
@@ -453,5 +472,193 @@ public class UiIconDrawer {
         gc.strokeRoundRect(x, y, w, h, 6, 6);
 
         drawStyledText(keyLabel, x + w * 0.5, y + h * 0.5, font, Color.web("#FFD54F"), Color.BLACK, 2.0, TextAlignment.CENTER);
+    }
+
+    /**
+     * Desenha um ícone estilizado de raio para a barra de Sprint/Stamina.
+     */
+    public void drawSprintBoltIcon(double cx, double cy, double size, boolean sprinting,
+                                   boolean exhausted, boolean hungerBlocked, double animTime) {
+        gc.save();
+        gc.translate(cx, cy);
+        double pulse = sprinting ? (1.0 + 0.12 * Math.sin(animTime * 16.0)) : 1.0;
+        double s = (size / 20.0) * pulse;
+        gc.scale(s, s);
+
+        double[] bx = {2.5, -6.0, 0.2, -3.0, 6.8, 0.8};
+        double[] by = {-9.0, 1.0, 1.0, 9.0, -2.0, -2.0};
+
+        gc.setFill(Color.color(0, 0, 0, 0.6));
+        gc.fillPolygon(new double[]{3.5, -5.0, 1.2, -2.0, 7.8, 1.8},
+                       new double[]{-7.5, 2.5, 2.5, 10.5, -0.5, -0.5}, 6);
+
+        Color topColor;
+        Color bottomColor;
+        if (hungerBlocked) {
+            topColor = Color.web("#FF8A65");
+            bottomColor = Color.web("#B71C1C");
+        } else if (exhausted) {
+            double warn = 0.5 + 0.5 * Math.sin(animTime * 10.0);
+            topColor = Color.web("#CFD8DC").interpolate(Color.web("#FF5252"), warn);
+            bottomColor = Color.web("#546E7A");
+        } else if (sprinting) {
+            topColor = Color.web("#E0F7FA");
+            bottomColor = Color.web("#00E5FF");
+        } else {
+            topColor = Color.web("#81D4FA");
+            bottomColor = Color.web("#0288D1");
+        }
+
+        gc.setFill(new LinearGradient(0, -9, 0, 9, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, topColor), new Stop(1.0, bottomColor)));
+        gc.fillPolygon(bx, by, 6);
+
+        gc.setStroke(Color.web("#0A1018"));
+        gc.setLineWidth(1.8);
+        gc.strokePolygon(bx, by, 6);
+
+        gc.restore();
+    }
+
+    /**
+     * Desenha uma barra de medição estilizada 3D no HUD com gradiente, brilho e marcador opcional de limiar.
+     */
+    public void drawHudStatBar(
+            double x, double y, double w, double h,
+            double pct,
+            Color gradTop, Color gradBottom,
+            Color borderColor,
+            Double thresholdMarkerPct,
+            String label,
+            Font labelFont,
+            Color labelColor
+    ) {
+        double clampedPct = Math.max(0.0, Math.min(1.0, pct));
+
+        gc.setFill(Color.web("#0A0F14", 0.92));
+        gc.fillRoundRect(x, y, w, h, h, h);
+
+        if (clampedPct > 0.0) {
+            gc.save();
+            gc.beginPath();
+            gc.rect(x, y, w * clampedPct, h);
+            gc.clip();
+
+            gc.setFill(new LinearGradient(0, y, 0, y + h, false, CycleMethod.NO_CYCLE,
+                    new Stop(0.0, gradTop), new Stop(1.0, gradBottom)));
+            gc.fillRoundRect(x, y, w, h, h, h);
+
+            gc.setFill(Color.web("#FFFFFF", 0.22));
+            gc.fillRoundRect(x + 2, y + 1.5, Math.max(0, w - 4), h * 0.35, h * 0.5, h * 0.5);
+            gc.restore();
+        }
+
+        if (thresholdMarkerPct != null && thresholdMarkerPct > 0.0 && thresholdMarkerPct < 1.0) {
+            double mx = x + w * thresholdMarkerPct;
+            gc.setStroke(Color.web("#FFF59D", 0.9));
+            gc.setLineWidth(1.6);
+            gc.strokeLine(mx, y + 2, mx, y + h - 2);
+        }
+
+        gc.setStroke(borderColor);
+        gc.setLineWidth(1.4);
+        gc.strokeRoundRect(x, y, w, h, h, h);
+
+        drawStyledText(label, x + w * 0.5, y + h * 0.5,
+                labelFont, labelColor, Color.BLACK, 2.0, TextAlignment.CENTER);
+    }
+
+    /**
+     * Desenha uma vinheta carmesim sutil e pulsante nas bordas da tela durante estado de vida crítica.
+     */
+    public void drawLowLifeEdgeVignette(double width, double height, double animTime) {
+        double pulse = 0.5 + 0.5 * Math.sin(animTime * 7.5);
+        double alpha = 0.14 + pulse * 0.16;
+        Color edge = Color.web("#D50000", alpha);
+        Color clear = Color.web("#D50000", 0.0);
+        double bandH = Math.min(72.0, height * 0.09);
+        double bandW = Math.min(72.0, width * 0.07);
+
+        gc.setFill(new LinearGradient(0, 0, 0, bandH, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, edge), new Stop(1.0, clear)));
+        gc.fillRect(0, 0, width, bandH);
+
+        gc.setFill(new LinearGradient(0, height, 0, height - bandH, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, edge), new Stop(1.0, clear)));
+        gc.fillRect(0, height - bandH, width, bandH);
+
+        gc.setFill(new LinearGradient(0, 0, bandW, 0, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, edge), new Stop(1.0, clear)));
+        gc.fillRect(0, 0, bandW, height);
+
+        gc.setFill(new LinearGradient(width, 0, width - bandW, 0, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, edge), new Stop(1.0, clear)));
+        gc.fillRect(width - bandW, 0, bandW, height);
+    }
+
+    private static final Font METER_BAR_FONT = Font.font("Segoe UI", javafx.scene.text.FontWeight.BOLD, 9.5);
+
+    /**
+     * Desenha a barra completa de Sprint/Stamina no HUD, refletindo corrida, exaustão e bloqueio por fome.
+     */
+    public void drawPlayerSprintBar(Player player, double contentStartX, double barX, double y, double w, double h, double animTime) {
+        double maxStam = Math.max(1.0, player.getMaxStamina());
+        double pct = Math.max(0.0, Math.min(1.0, player.getStamina() / maxStam));
+        boolean sprinting = player.isSprinting();
+        boolean exhausted = player.isSprintExhausted();
+        boolean hungerBlocked = player.isSprintBlockedByHunger();
+        boolean attackAlert = player.isAttackBlockedByStaminaAlert();
+
+        drawSprintBoltIcon(contentStartX + 10, y + h * 0.5, 18, sprinting,
+                exhausted || attackAlert, hungerBlocked && !attackAlert, animTime);
+
+        Color gradTop;
+        Color gradBottom;
+        Color borderColor;
+        Color textColor;
+        Double thresholdMarker = null;
+        String label;
+
+        int pctInt = (int) Math.round(pct * 100);
+        if (attackAlert) {
+            double flash = 0.5 + 0.5 * Math.sin(animTime * 28.0);
+            gradTop = Color.web("#FF7043");
+            gradBottom = Color.web("#8E0000");
+            borderColor = Color.web("#FF1744").interpolate(Color.web("#FFD54F"), flash);
+            textColor = Color.web("#FFF8E1");
+            thresholdMarker = exhausted
+                    ? (Player.STAMINA_EXHAUSTION_RECOVERY_THRESHOLD / maxStam)
+                    : (player.getAttackStaminaCost() / maxStam);
+            label = exhausted ? ("EXAUSTO " + pctInt + "%") : "SEM STAMINA!";
+        } else if (hungerBlocked) {
+            gradTop = Color.web("#D84315");
+            gradBottom = Color.web("#5D1B09");
+            borderColor = Color.web("#FF7043", 0.9);
+            textColor = Color.web("#FFCCBC");
+            label = "FOME • SPRINT BLOQ.";
+        } else if (exhausted) {
+            double warnPulse = 0.5 + 0.5 * Math.sin(animTime * 10.0);
+            gradTop = Color.web("#EF5350");
+            gradBottom = Color.web("#7F1D1D");
+            borderColor = Color.web("#FF5252", 0.55 + warnPulse * 0.45);
+            textColor = Color.web("#FFCDD2");
+            thresholdMarker = Player.STAMINA_EXHAUSTION_RECOVERY_THRESHOLD / maxStam;
+            label = "EXAUSTO " + pctInt + "%";
+        } else if (sprinting) {
+            gradTop = Color.web("#80F3FF");
+            gradBottom = Color.web("#0091EA");
+            borderColor = Color.web("#84FFFF", 0.95);
+            textColor = Color.WHITE;
+            label = "CORRENDO " + pctInt + "%";
+        } else {
+            gradTop = Color.web("#29B6F6");
+            gradBottom = Color.web("#0277BD");
+            borderColor = Color.web("#4FC3F7", 0.7);
+            textColor = Color.web("#E1F5FE");
+            label = "SPRINT " + pctInt + "%";
+        }
+
+        drawHudStatBar(barX, y, w, h, pct, gradTop, gradBottom, borderColor,
+                thresholdMarker, label, METER_BAR_FONT, textColor);
     }
 }

@@ -1,180 +1,349 @@
-/* ==========================================================================
-   INSTINTO SELVAGEM - TEMA VISUAL GLOBAL (DARK RPG & SURVIVAL)
-   Elimina qualquer traço nativo de controles padrão do sistema operacional
-   ========================================================================== */
+/* ============================================================================
+ * SENTINELA — DESIGN SYSTEM: BOTANICAL OBSIDIAN GLASS + WARM AMBER
+ * Folha CSS modular focada apenas em superfícies, bordas, estados e espaçamento.
+ * Tipografia e escala responsiva são controladas dinamicamente por UiTypography.
+ * ============================================================================ */
 
 .root {
-    -fx-font-family: 'Segoe UI', 'DejaVu Sans', 'Arial', sans-serif;
-    -fx-base: #121814;
-    -fx-background: transparent;
-    -fx-focus-color: transparent;
-    -fx-faint-focus: transparent;
-}
-
-/* ==========================================================================
-   TAB PANE (Elimina cabeçalho cinza nativo)
-   ========================================================================== */
-.tab-pane {
-    -fx-tab-min-height: 38px;
-    -fx-tab-max-height: 38px;
     -fx-background-color: transparent;
 }
 
-.tab-pane .tab-header-area {
-    -fx-padding: 0 0 10 0;
-    -fx-background-color: transparent;
+/* ---------- Superfícies & Painéis ---------- */
+.glass-panel {
+    -fx-background-color: linear-gradient(to bottom, rgba(13, 19, 17, 0.93), rgba(8, 12, 11, 0.96));
+    -fx-background-radius: 18;
+    -fx-border-color: rgba(255, 255, 255, 0.09);
+    -fx-border-width: 1;
+    -fx-border-radius: 18;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.72), 36, 0.25, 0, 12);
 }
 
-.tab-pane .tab-header-background {
-    -fx-background-color: rgba(14, 20, 16, 0.7);
-    -fx-background-radius: 8 8 0 0;
-    -fx-border-color: rgba(212, 172, 13, 0.25);
-    -fx-border-width: 0 0 2 0;
+.glass-rail {
+    -fx-background-color: linear-gradient(to right,
+        rgba(7, 11, 10, 0.95) 0%,
+        rgba(9, 14, 12, 0.88) 72%,
+        rgba(9, 14, 12, 0.0) 100%);
 }
 
-.tab-pane .headers-region {
-    -fx-background-color: transparent;
+.glass-card {
+    -fx-background-color: rgba(255, 255, 255, 0.035);
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(255, 255, 255, 0.075);
+    -fx-border-width: 1;
+    -fx-border-radius: 12;
 }
 
-.tab-pane .tab {
-    -fx-background-color: rgba(24, 32, 26, 0.75);
-    -fx-background-radius: 6 6 0 0;
-    -fx-border-color: rgba(212, 172, 13, 0.35);
-    -fx-border-width: 1 1 0 1;
-    -fx-border-radius: 6 6 0 0;
-    -fx-padding: 0 18 0 18;
+.glass-card-unlocked {
+    -fx-background-color: linear-gradient(to bottom right, rgba(232, 185, 72, 0.09), rgba(52, 211, 153, 0.05));
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(232, 185, 72, 0.34);
+    -fx-border-width: 1;
+    -fx-border-radius: 12;
+}
+
+.glass-card-locked {
+    -fx-background-color: rgba(255, 255, 255, 0.02);
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(255, 255, 255, 0.05);
+    -fx-border-width: 1;
+    -fx-border-radius: 12;
+}
+
+.divider-line {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+    -fx-pref-height: 1;
+    -fx-min-height: 1;
+    -fx-max-height: 1;
+}
+
+/* ---------- Botões Modernos ---------- */
+.primary-cta-btn {
+    -fx-background-color: linear-gradient(to bottom, #F0C65A, #DDA934);
+    -fx-background-radius: 10;
+    -fx-border-color: rgba(255, 245, 214, 0.35);
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+    -fx-text-fill: #0B0F0D;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(232, 185, 72, 0.24), 14, 0.1, 0, 3);
+}
+
+.primary-cta-btn:hover {
+    -fx-background-color: linear-gradient(to bottom, #F7D472, #E8B948);
+    -fx-effect: dropshadow(gaussian, rgba(232, 185, 72, 0.42), 18, 0.2, 0, 4);
+}
+
+.primary-cta-btn:pressed {
+    -fx-background-color: #C99626;
+}
+
+.nav-rail-btn {
+    -fx-background-color: rgba(255, 255, 255, 0.025);
+    -fx-background-radius: 9;
+    -fx-border-color: transparent transparent transparent rgba(255, 255, 255, 0.08);
+    -fx-border-width: 0 0 0 2.5;
+    -fx-border-radius: 9;
+    -fx-text-fill: #CBD5E1;
+    -fx-cursor: hand;
+    -fx-alignment: CENTER_LEFT;
+    -fx-padding: 9 16 9 14;
+}
+
+.nav-rail-btn:hover {
+    -fx-background-color: rgba(232, 185, 72, 0.11);
+    -fx-border-color: transparent transparent transparent #E8B948;
+    -fx-text-fill: #F8FAFC;
+}
+
+.secondary-btn {
+    -fx-background-color: rgba(255, 255, 255, 0.055);
+    -fx-background-radius: 9;
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-border-width: 1;
+    -fx-border-radius: 9;
+    -fx-text-fill: #E2E8F0;
     -fx-cursor: hand;
 }
 
-.tab-pane .tab:hover {
-    -fx-background-color: rgba(40, 56, 44, 0.9);
-    -fx-border-color: rgba(241, 196, 15, 0.7);
+.secondary-btn:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+    -fx-border-color: rgba(232, 185, 72, 0.48);
+    -fx-text-fill: #FFFFFF;
 }
 
-.tab-pane .tab:selected {
-    -fx-background-color: linear-gradient(to bottom, rgba(55, 75, 60, 0.95), rgba(28, 38, 30, 0.98));
-    -fx-border-color: #F1C40F #F1C40F transparent #F1C40F;
-    -fx-border-width: 2 2 0 2;
-    -fx-border-radius: 6 6 0 0;
+.ghost-btn {
+    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-text-fill: #CBD5E1;
+    -fx-cursor: hand;
+    -fx-padding: 6 14 6 14;
 }
 
-.tab-pane .tab .tab-label {
-    -fx-text-fill: #A6ACAF;
-    -fx-font-weight: bold;
-    -fx-font-size: 13px;
+.ghost-btn:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+    -fx-border-color: rgba(255, 255, 255, 0.22);
+    -fx-text-fill: #F8FAFC;
 }
 
-.tab-pane .tab:selected .tab-label {
-    -fx-text-fill: #F1C40F;
-    -fx-effect: dropshadow(gaussian, rgba(241, 196, 15, 0.5), 6, 0.3, 0, 0);
+.danger-ghost-btn {
+    -fx-background-color: transparent;
+    -fx-background-radius: 9;
+    -fx-border-color: rgba(255, 255, 255, 0.05);
+    -fx-border-width: 1;
+    -fx-border-radius: 9;
+    -fx-text-fill: #94A3B8;
+    -fx-cursor: hand;
 }
 
-/* ==========================================================================
-   COMBO BOX (Elimina retângulo branco nativo de formulário)
-   ========================================================================== */
-.combo-box {
-    -fx-background-color: linear-gradient(to bottom, #1E2822, #141C16);
-    -fx-background-radius: 6;
-    -fx-border-color: rgba(212, 172, 13, 0.6);
+.danger-ghost-btn:hover {
+    -fx-background-color: rgba(248, 113, 113, 0.12);
+    -fx-border-color: rgba(248, 113, 113, 0.35);
+    -fx-text-fill: #FCA5A5;
+}
+
+/* ---------- Segmented Pill Switcher (Configurações) ---------- */
+.pill-switcher {
+    -fx-background-color: rgba(0, 0, 0, 0.40);
+    -fx-background-radius: 11;
+    -fx-border-color: rgba(255, 255, 255, 0.07);
+    -fx-border-width: 1;
+    -fx-border-radius: 11;
+    -fx-padding: 4;
+}
+
+.pill-tab {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+    -fx-border-radius: 8;
+    -fx-text-fill: #94A3B8;
+    -fx-cursor: hand;
+    -fx-padding: 7 18 7 18;
+}
+
+.pill-tab:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-text-fill: #E2E8F0;
+}
+
+.pill-tab-active {
+    -fx-background-color: rgba(232, 185, 72, 0.16);
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(232, 185, 72, 0.42);
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-text-fill: #FCD34D;
+    -fx-cursor: hand;
+    -fx-padding: 7 18 7 18;
+}
+
+/* ---------- Bestiário: Lista de Espécies ---------- */
+.species-row {
+    -fx-background-color: rgba(255, 255, 255, 0.025);
+    -fx-background-radius: 9;
+    -fx-border-color: rgba(255, 255, 255, 0.05);
+    -fx-border-width: 1;
+    -fx-border-radius: 9;
+    -fx-text-fill: #CBD5E1;
+    -fx-cursor: hand;
+    -fx-padding: 8 12 8 12;
+}
+
+.species-row:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.065);
+    -fx-text-fill: #F8FAFC;
+}
+
+.species-row-active {
+    -fx-background-color: rgba(232, 185, 72, 0.14);
+    -fx-background-radius: 9;
+    -fx-border-color: rgba(232, 185, 72, 0.45);
+    -fx-border-width: 1;
+    -fx-border-radius: 9;
+    -fx-text-fill: #FDE68A;
+    -fx-cursor: hand;
+    -fx-padding: 8 12 8 12;
+}
+
+/* ---------- Keycaps (Teclas & Remapeamento) ---------- */
+.keycap-btn {
+    -fx-background-color: linear-gradient(to bottom, #202A26, #141B18);
+    -fx-background-radius: 7;
+    -fx-border-color: rgba(255, 255, 255, 0.18);
+    -fx-border-width: 1 1 2 1;
+    -fx-border-radius: 7;
+    -fx-text-fill: #F1F5F9;
+    -fx-cursor: hand;
+    -fx-padding: 5 10 5 10;
+}
+
+.keycap-btn:hover {
+    -fx-border-color: rgba(232, 185, 72, 0.65);
+    -fx-text-fill: #FCD34D;
+}
+
+.keycap-btn-listening {
+    -fx-background-color: rgba(232, 185, 72, 0.20);
+    -fx-background-radius: 7;
+    -fx-border-color: #E8B948;
     -fx-border-width: 1.5;
-    -fx-border-radius: 6;
-    -fx-padding: 2 6 2 8;
+    -fx-border-radius: 7;
+    -fx-text-fill: #FDE68A;
     -fx-cursor: hand;
+    -fx-padding: 5 10 5 10;
 }
 
-.combo-box:hover {
-    -fx-background-color: linear-gradient(to bottom, #28362D, #1A241D);
-    -fx-border-color: #F1C40F;
-    -fx-effect: dropshadow(gaussian, rgba(241, 196, 15, 0.35), 8, 0.2, 0, 0);
+.keycap-badge {
+    -fx-background-color: rgba(255, 255, 255, 0.07);
+    -fx-background-radius: 5;
+    -fx-border-color: rgba(255, 255, 255, 0.16);
+    -fx-border-width: 1 1 2 1;
+    -fx-border-radius: 5;
+    -fx-text-fill: #E8B948;
+    -fx-padding: 2 7 2 7;
 }
 
-.combo-box .cell {
-    -fx-text-fill: #F4D03F;
-    -fx-font-weight: bold;
-    -fx-font-size: 13px;
+/* ---------- ComboBox Dark Glass ---------- */
+.combo-box {
+    -fx-background-color: rgba(255, 255, 255, 0.055);
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(255, 255, 255, 0.12);
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-cursor: hand;
+    -fx-padding: 2 8 2 10;
+}
+
+.combo-box:hover, .combo-box:showing {
+    -fx-background-color: rgba(255, 255, 255, 0.09);
+    -fx-border-color: rgba(232, 185, 72, 0.55);
+}
+
+.combo-box .list-cell {
     -fx-background-color: transparent;
+    -fx-text-fill: #F1F5F9;
 }
 
-.combo-box .arrow-button {
-    -fx-background-color: transparent;
+.combo-box .arrow-button .arrow {
+    -fx-background-color: #94A3B8;
 }
 
-.combo-box .arrow {
-    -fx-background-color: #F1C40F;
-    -fx-padding: 3.5;
+.combo-box:hover .arrow-button .arrow {
+    -fx-background-color: #E8B948;
 }
 
 .combo-box-popup .list-view {
-    -fx-background-color: #141C16;
-    -fx-background-radius: 6;
-    -fx-border-color: #F1C40F;
-    -fx-border-width: 1.5;
-    -fx-border-radius: 6;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.85), 16, 0.4, 0, 4);
+    -fx-background-color: #101714;
+    -fx-background-radius: 9;
+    -fx-border-color: rgba(255, 255, 255, 0.14);
+    -fx-border-width: 1;
+    -fx-border-radius: 9;
+    -fx-padding: 4;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.8), 20, 0.3, 0, 6);
 }
 
 .combo-box-popup .list-cell {
     -fx-background-color: transparent;
-    -fx-text-fill: #EAECEE;
-    -fx-font-size: 13px;
-    -fx-padding: 6 12 6 12;
+    -fx-background-radius: 6;
+    -fx-text-fill: #CBD5E1;
+    -fx-padding: 7 12 7 12;
 }
 
-.combo-box-popup .list-cell:hover, .combo-box-popup .list-cell:filled:selected {
-    -fx-background-color: #2C3E30;
-    -fx-text-fill: #F1C40F;
-    -fx-font-weight: bold;
+.combo-box-popup .list-cell:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+    -fx-text-fill: #FFFFFF;
 }
 
-/* ==========================================================================
-   CHECK BOX (Elimina quadrado branco clássico)
-   ========================================================================== */
-.check-box {
+.combo-box-popup .list-cell:selected {
+    -fx-background-color: rgba(232, 185, 72, 0.18);
+    -fx-text-fill: #FCD34D;
+}
+
+/* ---------- Slider Minimalista ---------- */
+.slider .track {
+    -fx-background-color: rgba(255, 255, 255, 0.14);
+    -fx-background-radius: 2;
+    -fx-padding: 2;
+    -fx-pref-height: 4;
+}
+
+.slider .thumb {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 8;
+    -fx-border-color: #E8B948;
+    -fx-border-width: 2;
+    -fx-border-radius: 8;
+    -fx-pref-width: 14;
+    -fx-pref-height: 14;
     -fx-cursor: hand;
-    -fx-font-size: 13px;
-    -fx-text-fill: #EAECEE;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.55), 6, 0, 0, 2);
 }
 
-.check-box:hover .text {
-    -fx-fill: #F1C40F;
+.slider .thumb:hover, .slider:focused .thumb {
+    -fx-background-color: #E8B948;
+    -fx-border-color: #FFFBEB;
+    -fx-scale-x: 1.12;
+    -fx-scale-y: 1.12;
 }
 
-.check-box .box {
-    -fx-background-color: linear-gradient(to bottom, #1E2822, #101612);
-    -fx-background-radius: 4;
-    -fx-border-color: rgba(212, 172, 13, 0.65);
-    -fx-border-width: 1.5;
-    -fx-border-radius: 4;
-    -fx-padding: 3;
+/* ---------- ProgressBar Slim ---------- */
+.progress-bar .track {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+    -fx-background-radius: 3;
+    -fx-pref-height: 6;
 }
 
-.check-box:hover .box {
-    -fx-border-color: #F1C40F;
-    -fx-effect: dropshadow(gaussian, rgba(241, 196, 15, 0.4), 6, 0.2, 0, 0);
+.progress-bar .bar {
+    -fx-background-color: linear-gradient(to right, #34D399, #E8B948);
+    -fx-background-radius: 3;
+    -fx-background-insets: 0;
 }
 
-.check-box:selected .box {
-    -fx-background-color: linear-gradient(to bottom, #2E4032, #18221B);
-    -fx-border-color: #F1C40F;
-}
-
-.check-box .mark {
-    -fx-background-color: transparent;
-}
-
-.check-box:selected .mark {
-    -fx-background-color: #2ECC71;
-    -fx-shape: "M 0 4 L 3 7 L 8 0 L 7 -1 L 3 5 L 1 3 Z";
-    -fx-scale-x: 1.2;
-    -fx-scale-y: 1.2;
-    -fx-effect: dropshadow(gaussian, rgba(46, 204, 113, 0.8), 4, 0.5, 0, 0);
-}
-
-/* ==========================================================================
-   SCROLL BAR (Elimina a barra de rolagem branca feia)
-   ========================================================================== */
+/* ---------- ScrollPane & Slim ScrollBar ---------- */
 .scroll-pane {
-    -fx-background: transparent;
     -fx-background-color: transparent;
     -fx-border-color: transparent;
     -fx-padding: 0;
@@ -186,89 +355,32 @@
 
 .scroll-bar:vertical, .scroll-bar:horizontal {
     -fx-background-color: transparent;
-    -fx-pref-width: 8px;
-    -fx-pref-height: 8px;
+    -fx-padding: 2;
+}
+
+.scroll-bar:vertical {
+    -fx-pref-width: 7;
+}
+
+.scroll-bar:horizontal {
+    -fx-pref-height: 7;
 }
 
 .scroll-bar .track {
-    -fx-background-color: rgba(20, 28, 22, 0.4);
-    -fx-background-radius: 4;
+    -fx-background-color: transparent;
 }
 
 .scroll-bar .thumb {
-    -fx-background-color: rgba(212, 172, 13, 0.45);
-    -fx-background-radius: 4;
-    -fx-cursor: hand;
+    -fx-background-color: rgba(255, 255, 255, 0.16);
+    -fx-background-radius: 3;
 }
 
 .scroll-bar .thumb:hover {
-    -fx-background-color: #F1C40F;
-    -fx-effect: dropshadow(gaussian, rgba(241, 196, 15, 0.6), 6, 0.3, 0, 0);
+    -fx-background-color: rgba(232, 185, 72, 0.55);
 }
 
-.scroll-bar .increment-button, .scroll-bar .decrement-button {
-    -fx-padding: 0;
-    -fx-background-color: transparent;
-    -fx-pref-width: 0;
-    -fx-pref-height: 0;
-}
-
+.scroll-bar .increment-button, .scroll-bar .decrement-button,
 .scroll-bar .increment-arrow, .scroll-bar .decrement-arrow {
-    -fx-shape: " ";
     -fx-padding: 0;
-}
-
-/* ==========================================================================
-   SLIDER (Estilo de mesa de mixagem de áudio RPG)
-   ========================================================================== */
-.slider {
-    -fx-cursor: hand;
-}
-
-.slider .track {
-    -fx-background-color: #101612;
-    -fx-background-radius: 4;
-    -fx-pref-height: 6px;
-    -fx-border-color: rgba(212, 172, 13, 0.4);
-    -fx-border-width: 1;
-    -fx-border-radius: 4;
-}
-
-.slider .thumb {
-    -fx-background-color: linear-gradient(to bottom, #F4D03F, #B7950B);
-    -fx-background-radius: 10;
-    -fx-border-color: #FFFFFF;
-    -fx-border-width: 1.5;
-    -fx-border-radius: 10;
-    -fx-pref-width: 16px;
-    -fx-pref-height: 16px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.7), 4, 0.3, 0, 1);
-}
-
-.slider .thumb:hover {
-    -fx-background-color: linear-gradient(to bottom, #FFF, #F1C40F);
-    -fx-effect: dropshadow(gaussian, rgba(241, 196, 15, 0.7), 8, 0.4, 0, 0);
-    -fx-scale-x: 1.15;
-    -fx-scale-y: 1.15;
-}
-
-/* ==========================================================================
-   PROGRESS BAR (Conquistas e Estatísticas)
-   ========================================================================== */
-.progress-bar {
-    -fx-pref-height: 14px;
-}
-
-.progress-bar .track {
-    -fx-background-color: #101612;
-    -fx-background-radius: 7;
-    -fx-border-color: rgba(212, 172, 13, 0.5);
-    -fx-border-width: 1.2;
-    -fx-border-radius: 7;
-}
-
-.progress-bar .bar {
-    -fx-background-color: linear-gradient(to right, #B7950B, #F1C40F, #2ECC71);
-    -fx-background-radius: 6;
-    -fx-effect: dropshadow(gaussian, rgba(241, 196, 15, 0.5), 8, 0.3, 0, 0);
+    -fx-shape: "";
 }

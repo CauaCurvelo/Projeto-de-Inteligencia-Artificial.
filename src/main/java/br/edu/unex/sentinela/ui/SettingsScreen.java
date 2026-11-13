@@ -2,197 +2,257 @@ package br.edu.unex.sentinela.ui;
 
 import br.edu.unex.sentinela.audio.AudioChannel;
 import br.edu.unex.sentinela.audio.AudioEngine;
-import br.edu.unex.sentinela.audio.SoundId;
 import br.edu.unex.sentinela.settings.GameAction;
 import br.edu.unex.sentinela.settings.GameSettings;
 import br.edu.unex.sentinela.settings.GraphicsQuality;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Slider;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
- * Tela de Configurações completa com abas de Gráficos, Controles (Rebinding) e Áudio Multicanal.
+ * Tela de Configurações modular com switcher segmentado (VÍDEO | TECLAS | ÁUDIO),
+ * toggle switches modernos e rótulos enxutos.
  */
 public class SettingsScreen extends StackPane {
+    private final StackPane tabContent = new StackPane();
+    private final List<Button> pillButtons = new ArrayList<>();
+    private final List<KeyRebindButton> rebindButtons = new ArrayList<>();
 
     public SettingsScreen(ScreenManager manager) {
-        setAlignment(Pos.CENTER);
-        setStyle("-fx-background-color: rgba(10, 16, 12, 0.88);");
+        VBox panel = UiTheme.createGlassPanel(740, 505, 22, 28);
+        panel.setSpacing(14);
 
-        VBox panel = UiTheme.createStandardPanel(720, 530);
+        VBox header = UiTheme.createHeader("CONFIGURAÇÕES", null, manager::navigateBack);
 
-        Label title = UiTheme.createTitle("CONFIGURAÇÕES");
-        Label subtitle = UiTheme.createSubtitle("Ajuste a fidelidade visual, comandos e canais de áudio.");
+        Node videoPane = buildGraphicsPane();
+        Node controlsPane = buildControlsPane();
+        Node audioPane = buildAudioPane();
 
-        TabPane tabPane = new TabPane();
-        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabPane.setStyle("-fx-background-color: transparent;");
+        HBox switcher = new HBox(4);
+        switcher.getStyleClass().add("pill-switcher");
+        switcher.setMaxWidth(Region.USE_PREF_SIZE);
 
-        Tab tabGfx = new Tab("Gráficos", buildGraphicsTab());
-        Tab tabCtrls = new Tab("Controles", buildControlsTab());
-        Tab tabAudio = new Tab("Áudio Multicanal", buildAudioTab());
+        Button tabVideo = createPillTab("VÍDEO", videoPane);
+        Button tabControls = createPillTab("TECLAS", controlsPane);
+        Button tabAudio = createPillTab("ÁUDIO", audioPane);
+        switcher.getChildren().addAll(tabVideo, tabControls, tabAudio);
 
-        tabPane.getTabs().addAll(tabGfx, tabCtrls, tabAudio);
-        VBox.setVgrow(tabPane, Priority.ALWAYS);
+        VBox.setVgrow(tabContent, Priority.ALWAYS);
+        selectTab(tabVideo, videoPane);
 
-        Button btnBack = UiTheme.createPrimaryButton("VOLTAR", null, 200, 38);
-        btnBack.setOnAction(e -> manager.navigateBack());
-
-        panel.getChildren().addAll(title, subtitle, tabPane, btnBack);
-        getChildren().add(panel);
+        panel.getChildren().addAll(header, switcher, tabContent);
+        getChildren().add(UiTheme.createModalBackdrop(panel));
     }
 
-    private VBox buildGraphicsTab() {
-        VBox box = new VBox(14);
-        box.setPadding(new Insets(16));
-        box.setAlignment(Pos.TOP_LEFT);
+    private Button createPillTab(String label, Node pane) {
+        Button btn = new Button(label);
+        btn.getStyleClass().add("pill-tab");
+        UiTypography.bind(btn, UiTypography.TypoRole.ACTION);
+        btn.setOnAction(e -> selectTab(btn, pane));
+        UiMotion.attachPressFeedback(btn, true);
+        pillButtons.add(btn);
+        return btn;
+    }
 
+    private void selectTab(Button activeBtn, Node content) {
+        for (Button b : pillButtons) {
+            b.getStyleClass().remove("pill-tab-active");
+            if (!b.getStyleClass().contains("pill-tab")) {
+                b.getStyleClass().add("pill-tab");
+            }
+        }
+        activeBtn.getStyleClass().remove("pill-tab");
+        activeBtn.getStyleClass().add("pill-tab-active");
+        tabContent.getChildren().setAll(content);
+        UiMotion.animateEntrance(content);
+    }
+
+    private Node buildGraphicsPane() {
         GameSettings s = GameSettings.get();
 
-        HBox qualityRow = new HBox(16);
-        qualityRow.setAlignment(Pos.CENTER_LEFT);
-        Label lblQ = createFieldLabel("Qualidade Visual:");
-        ComboBox<GraphicsQuality> cbQ = new ComboBox<>();
-        cbQ.getItems().addAll(GraphicsQuality.values());
-        cbQ.setValue(s.getGraphicsQuality());
-        cbQ.setOnAction(e -> s.setGraphicsQuality(cbQ.getValue()));
-        qualityRow.getChildren().addAll(lblQ, cbQ);
+        ComboBox<GraphicsQuality> cbQuality = new ComboBox<>();
+        cbQuality.getItems().addAll(GraphicsQuality.values());
+        cbQuality.setValue(s.getGraphicsQuality());
+        cbQuality.setPrefWidth(160);
+        UiTypography.bindComboBox(cbQuality, UiTypography.TypoRole.LABEL, SettingsScreen::qualityShortName);
+        cbQuality.setOnAction(e -> s.setGraphicsQuality(cbQuality.getValue()));
 
-        HBox fpsRow = new HBox(16);
-        fpsRow.setAlignment(Pos.CENTER_LEFT);
-        Label lblFps = createFieldLabel("Limite de FPS:");
         ComboBox<Integer> cbFps = new ComboBox<>();
         cbFps.getItems().addAll(30, 60, 120, 0);
         cbFps.setValue(s.getTargetFps());
+        cbFps.setPrefWidth(160);
+        UiTypography.bindComboBox(cbFps, UiTypography.TypoRole.LABEL, fps -> fps == 0 ? "Ilimitado" : fps + " FPS");
         cbFps.setOnAction(e -> s.setTargetFps(cbFps.getValue()));
-        fpsRow.getChildren().addAll(lblFps, cbFps);
 
-        CheckBox chkCones = createCheckBox("Exibir Cones de Visão Táticos dos Predadores", s.isShowVisionCones());
-        chkCones.setOnAction(e -> s.setShowVisionCones(chkCones.isSelected()));
+        VBox performanceCard = createSectionCard(
+                settingRow("Qualidade Visual", cbQuality),
+                settingRow("Limite de FPS", cbFps)
+        );
 
-        CheckBox chkTrails = createCheckBox("Exibir Trilhas e Rastros de Perseguição no Solo", s.isShowPathTrails());
-        chkTrails.setOnAction(e -> s.setShowPathTrails(chkTrails.isSelected()));
+        VBox visualCard = createSectionCard(
+                switchRow("Cones de Visão", s.isShowVisionCones(), s::setShowVisionCones),
+                switchRow("Trilhas no Solo", s.isShowPathTrails(), s::setShowPathTrails),
+                switchRow("Barras de Vida", s.isShowNameplates(), s::setShowNameplates),
+                switchRow("Tremor de Tela", s.isScreenShake(), s::setScreenShake)
+        );
 
-        CheckBox chkNames = createCheckBox("Exibir Barras de Vida e Nomes dos Inimigos", s.isShowNameplates());
-        chkNames.setOnAction(e -> s.setShowNameplates(chkNames.isSelected()));
-
-        CheckBox chkShake = createCheckBox("Efeito de Tremor de Tela em Golpes Pesados", s.isScreenShake());
-        chkShake.setOnAction(e -> s.setScreenShake(chkShake.isSelected()));
-
-        box.getChildren().addAll(qualityRow, fpsRow, chkCones, chkTrails, chkNames, chkShake);
-        return box;
+        VBox layout = new VBox(12, performanceCard, visualCard);
+        layout.setPadding(new Insets(4, 0, 0, 0));
+        return layout;
     }
 
-    private ScrollPane buildControlsTab() {
-        VBox list = new VBox(10);
-        list.setPadding(new Insets(12));
-        list.setAlignment(Pos.TOP_LEFT);
+    private Node buildControlsPane() {
+        GridPane grid = new GridPane();
+        grid.setHgap(12);
+        grid.setVgap(8);
 
-        for (GameAction action : GameAction.values()) {
-            HBox row = new HBox(16);
-            row.setAlignment(Pos.CENTER_LEFT);
+        ColumnConstraints col = new ColumnConstraints();
+        col.setPercentWidth(50);
+        grid.getColumnConstraints().addAll(col, col);
 
-            Label name = new Label(action.getDisplayName());
-            name.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 13));
-            name.setTextFill(Color.web("#EAECEE"));
-            name.setPrefWidth(240);
+        GameAction[] actions = GameAction.values();
+        int half = (actions.length + 1) / 2;
+        for (int i = 0; i < actions.length; i++) {
+            GameAction act = actions[i];
+            KeyRebindButton btn = new KeyRebindButton(act, this::refreshAllKeyButtons);
+            rebindButtons.add(btn);
 
-            KeyRebindButton btn = new KeyRebindButton(action, null);
-            row.getChildren().addAll(name, btn);
-            list.getChildren().add(row);
+            HBox row = settingRow(act.getDisplayName(), btn);
+            row.getStyleClass().add("glass-card");
+            row.setPadding(new Insets(8, 12, 8, 14));
+            GridPane.setHgrow(row, Priority.ALWAYS);
+
+            grid.add(row, i / half, i % half);
         }
 
-        Button btnReset = UiTheme.createSecondaryButton("Restaurar Controles Padrão", 200, 32);
+        Button btnReset = UiTheme.createGhostButton("Restaurar Padrão");
         btnReset.setOnAction(e -> {
             GameSettings.get().getKeyBindings().resetToDefaults();
             GameSettings.get().save();
-            list.getChildren().stream()
-                .filter(node -> node instanceof HBox)
-                .map(node -> (HBox) node)
-                .forEach(row -> row.getChildren().stream()
-                    .filter(c -> c instanceof KeyRebindButton)
-                    .forEach(c -> ((KeyRebindButton) c).updateLabel()));
+            refreshAllKeyButtons();
         });
-        list.getChildren().add(btnReset);
 
-        ScrollPane sp = new ScrollPane(list);
-        sp.setFitToWidth(true);
-        sp.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
-        return sp;
+        HBox footer = new HBox(btnReset);
+        footer.setAlignment(Pos.CENTER_RIGHT);
+
+        VBox layout = new VBox(14, grid, footer);
+        layout.setPadding(new Insets(4, 0, 0, 0));
+        return layout;
     }
 
-    private VBox buildAudioTab() {
-        VBox box = new VBox(12);
-        box.setPadding(new Insets(14));
-        box.setAlignment(Pos.TOP_LEFT);
-
+    private Node buildAudioPane() {
         GameSettings s = GameSettings.get();
 
-        CheckBox chkMute = createCheckBox("Silenciar Todo o Áudio (Mudo)", AudioEngine.get().isMuted());
-        chkMute.setOnAction(e -> AudioEngine.get().toggleMute());
-        box.getChildren().add(chkMute);
+        ToggleButton muteToggle = UiTheme.createToggleSwitch(AudioEngine.get().isMuted(), m -> AudioEngine.get().toggleMute());
+        VBox muteCard = createSectionCard(settingRow("Silenciar Áudio", muteToggle));
 
-        box.getChildren().add(buildVolumeSlider("Volume Geral (Master)", AudioChannel.MASTER, s.getMasterVolume(), SoundId.UI_CLICK));
-        box.getChildren().add(buildVolumeSlider("Efeitos Sonoros (Combate)", AudioChannel.SFX, s.getChannelVolume(AudioChannel.SFX), SoundId.BITE_WHOOSH));
-        box.getChildren().add(buildVolumeSlider("Passos e Movimento", AudioChannel.STEPS, s.getChannelVolume(AudioChannel.STEPS), SoundId.STEP_GRASS));
-        box.getChildren().add(buildVolumeSlider("Vozes e Animais", AudioChannel.CREATURES, s.getChannelVolume(AudioChannel.CREATURES), SoundId.DOG_BARK));
-        box.getChildren().add(buildVolumeSlider("Ambiente da Natureza", AudioChannel.AMBIENCE, s.getChannelVolume(AudioChannel.AMBIENCE), SoundId.BIRD_CHIRP));
-        box.getChildren().add(buildVolumeSlider("Clima e Chuva", AudioChannel.WEATHER, s.getChannelVolume(AudioChannel.WEATHER), SoundId.THUNDER));
-        box.getChildren().add(buildVolumeSlider("Interface e Menus", AudioChannel.UI, s.getChannelVolume(AudioChannel.UI), SoundId.UI_CLICK));
+        VBox slidersCard = new VBox(10);
+        slidersCard.getStyleClass().add("glass-card");
+        slidersCard.setPadding(new Insets(14, 18, 14, 18));
+        slidersCard.getChildren().addAll(
+                channelSlider("Geral", AudioChannel.MASTER, s.getMasterVolume()),
+                channelSlider("Trilha Sonora", AudioChannel.MUSIC, s.getChannelVolume(AudioChannel.MUSIC)),
+                channelSlider("Combate", AudioChannel.SFX, s.getChannelVolume(AudioChannel.SFX)),
+                channelSlider("Passos", AudioChannel.STEPS, s.getChannelVolume(AudioChannel.STEPS)),
+                channelSlider("Criaturas", AudioChannel.CREATURES, s.getChannelVolume(AudioChannel.CREATURES)),
+                channelSlider("Ambiente", AudioChannel.AMBIENCE, s.getChannelVolume(AudioChannel.AMBIENCE)),
+                channelSlider("Clima", AudioChannel.WEATHER, s.getChannelVolume(AudioChannel.WEATHER)),
+                channelSlider("Interface", AudioChannel.UI, s.getChannelVolume(AudioChannel.UI))
+        );
 
-        return box;
+        ScrollPane scroll = new ScrollPane(slidersCard);
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+
+        VBox layout = new VBox(10, muteCard, scroll);
+        layout.setPadding(new Insets(4, 0, 0, 0));
+        return layout;
     }
 
-    private HBox buildVolumeSlider(String label, AudioChannel ch, double initialVal, SoundId sampleSound) {
-        HBox row = new HBox(12);
+    private VBox createSectionCard(Node... rows) {
+        VBox card = new VBox(10);
+        card.getStyleClass().add("glass-card");
+        card.setPadding(new Insets(12, 18, 12, 18));
+        for (int i = 0; i < rows.length; i++) {
+            card.getChildren().add(rows[i]);
+            if (i < rows.length - 1) card.getChildren().add(UiTheme.createDivider());
+        }
+        return card;
+    }
+
+    private HBox switchRow(String title, boolean initial, Consumer<Boolean> onToggle) {
+        return settingRow(title, UiTheme.createToggleSwitch(initial, onToggle));
+    }
+
+    private HBox settingRow(String title, Node control) {
+        Label lbl = new Label(title);
+        lbl.setTextFill(Color.web(UiTheme.TEXT_PRIMARY));
+        UiTypography.bind(lbl, UiTypography.TypoRole.BODY);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox row = new HBox(12, lbl, spacer, control);
         row.setAlignment(Pos.CENTER_LEFT);
-
-        Label lbl = new Label(label);
-        lbl.setPrefWidth(190);
-        lbl.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        lbl.setTextFill(Color.web("#EAECEE"));
-
-        Slider slider = new Slider(0.0, 1.0, initialVal);
-        slider.setPrefWidth(220);
-
-        Label pct = new Label((int) (initialVal * 100) + "%");
-        pct.setPrefWidth(45);
-        pct.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        pct.setTextFill(Color.web("#F1C40F"));
-
-        slider.valueProperty().addListener((obs, oldV, newV) -> {
-            pct.setText((int) (newV.doubleValue() * 100) + "%");
-            GameSettings.get().setChannelVolume(ch, newV.doubleValue());
-        });
-
-        // Ao soltar o mouse no slider, toca prévia do som
-        slider.valueChangingProperty().addListener((obs, wasChanging, isChanging) -> {
-            if (!isChanging && sampleSound != null) {
-                AudioEngine.get().play(sampleSound, 0.7, 0.0, 1.0);
-            }
-        });
-
-        row.getChildren().addAll(lbl, slider, pct);
         return row;
     }
 
-    private Label createFieldLabel(String text) {
-        Label l = new Label(text);
-        l.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
-        l.setTextFill(Color.web("#EAECEE"));
-        l.setPrefWidth(160);
-        return l;
+    private HBox channelSlider(String label, AudioChannel ch, double initial) {
+        Label lbl = new Label(label);
+        lbl.setPrefWidth(120);
+        lbl.setTextFill(Color.web(UiTheme.TEXT_PRIMARY));
+        UiTypography.bind(lbl, UiTypography.TypoRole.LABEL);
+
+        Slider slider = new Slider(0.0, 1.0, initial);
+        HBox.setHgrow(slider, Priority.ALWAYS);
+
+        Label pct = new Label(Math.round(initial * 100) + "%");
+        pct.setMinWidth(46);
+        pct.setAlignment(Pos.CENTER_RIGHT);
+        pct.setTextFill(Color.web(UiTheme.ACCENT_AMBER));
+        UiTypography.bind(pct, UiTypography.TypoRole.NUMERIC);
+
+        slider.valueProperty().addListener((obs, o, v) -> {
+            double val = v.doubleValue();
+            pct.setText(Math.round(val * 100) + "%");
+            GameSettings.get().setChannelVolume(ch, val);
+        });
+
+        HBox row = new HBox(14, lbl, slider, pct);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
     }
 
-    private CheckBox createCheckBox(String text, boolean initial) {
-        CheckBox chk = new CheckBox(text);
-        chk.setSelected(initial);
-        chk.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 13));
-        chk.setTextFill(Color.web("#EAECEE"));
-        return chk;
+    private void refreshAllKeyButtons() {
+        for (KeyRebindButton btn : rebindButtons) {
+            btn.refreshText();
+        }
+    }
+
+    private static String qualityShortName(GraphicsQuality q) {
+        return switch (q) {
+            case LOW -> "Baixa";
+            case MEDIUM -> "Média";
+            case HIGH -> "Alta";
+        };
     }
 }

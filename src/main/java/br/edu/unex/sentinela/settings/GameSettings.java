@@ -2,6 +2,7 @@ package br.edu.unex.sentinela.settings;
 
 import br.edu.unex.sentinela.audio.AudioChannel;
 import br.edu.unex.sentinela.audio.AudioEngine;
+import br.edu.unex.sentinela.core.SaveStorage;
 
 import java.io.*;
 import java.util.Properties;
@@ -30,8 +31,9 @@ public final class GameSettings {
     private double sfxVolume = 1.0;
     private double stepsVolume = 0.8;
     private double creaturesVolume = 0.9;
-    private double ambienceVolume = 0.7;
-    private double weatherVolume = 0.8;
+    private double ambienceVolume = 0.45;
+    private double weatherVolume = 0.55;
+    private double musicVolume = 0.50;
     private double uiVolume = 0.9;
 
     private GameSettings() {
@@ -83,6 +85,7 @@ public final class GameSettings {
             case CREATURES: return creaturesVolume;
             case AMBIENCE: return ambienceVolume;
             case WEATHER: return weatherVolume;
+            case MUSIC: return musicVolume;
             case UI: return uiVolume;
             default: return 1.0;
         }
@@ -97,6 +100,7 @@ public final class GameSettings {
             case CREATURES: creaturesVolume = v; break;
             case AMBIENCE: ambienceVolume = v; break;
             case WEATHER: weatherVolume = v; break;
+            case MUSIC: musicVolume = v; break;
             case UI: uiVolume = v; break;
         }
         AudioEngine.get().setChannelVolume(ch, v);
@@ -111,11 +115,12 @@ public final class GameSettings {
         engine.setChannelVolume(AudioChannel.CREATURES, creaturesVolume);
         engine.setChannelVolume(AudioChannel.AMBIENCE, ambienceVolume);
         engine.setChannelVolume(AudioChannel.WEATHER, weatherVolume);
+        engine.setChannelVolume(AudioChannel.MUSIC, musicVolume);
         engine.setChannelVolume(AudioChannel.UI, uiVolume);
     }
 
     public void load() {
-        File f = new File(SETTINGS_FILE);
+        File f = SaveStorage.resolveFileForRead(SETTINGS_FILE);
         if (!f.exists()) return;
         Properties props = new Properties();
         try (FileInputStream in = new FileInputStream(f)) {
@@ -133,8 +138,9 @@ public final class GameSettings {
             sfxVolume = Double.parseDouble(props.getProperty("audio.sfx", "1.0"));
             stepsVolume = Double.parseDouble(props.getProperty("audio.steps", "0.8"));
             creaturesVolume = Double.parseDouble(props.getProperty("audio.creatures", "0.9"));
-            ambienceVolume = Double.parseDouble(props.getProperty("audio.ambience", "0.7"));
-            weatherVolume = Double.parseDouble(props.getProperty("audio.weather", "0.8"));
+            ambienceVolume = Double.parseDouble(props.getProperty("audio.ambience", "0.45"));
+            weatherVolume = Double.parseDouble(props.getProperty("audio.weather", "0.55"));
+            musicVolume = Double.parseDouble(props.getProperty("audio.music", "0.50"));
             uiVolume = Double.parseDouble(props.getProperty("audio.ui", "0.9"));
         } catch (Exception ignored) {}
     }
@@ -156,9 +162,11 @@ public final class GameSettings {
         props.setProperty("audio.creatures", String.valueOf(creaturesVolume));
         props.setProperty("audio.ambience", String.valueOf(ambienceVolume));
         props.setProperty("audio.weather", String.valueOf(weatherVolume));
+        props.setProperty("audio.music", String.valueOf(musicVolume));
         props.setProperty("audio.ui", String.valueOf(uiVolume));
 
-        try (FileOutputStream out = new FileOutputStream(SETTINGS_FILE)) {
+        File outFile = SaveStorage.resolveFileForWrite(SETTINGS_FILE);
+        try (FileOutputStream out = new FileOutputStream(outFile)) {
             props.store(out, "Instinto Selvagem - Preferencias do Jogador");
         } catch (IOException ignored) {}
     }

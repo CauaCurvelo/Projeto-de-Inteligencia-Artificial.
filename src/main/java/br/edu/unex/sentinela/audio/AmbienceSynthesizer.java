@@ -4,14 +4,15 @@ import static br.edu.unex.sentinela.audio.DspToolkit.*;
 
 /** Receitas dos loops de ambiente (vento, floresta, noite, rio, chuva, tempestade). */
 final class AmbienceSynthesizer {
-    private static final double LOOP_SEC = 6.0;
+    private static final double LOOP_SEC = 10.0;
+    private static final double FADE_SEC = 1.5;
 
     private AmbienceSynthesizer() {}
 
     static float[] create(SoundId id) {
         switch (id) {
-            case LOOP_WIND:       return wind(500, 0.35, 0.12);
-            case LOOP_STORM_WIND: return wind(1100, 0.6, 0.3);
+            case LOOP_WIND:       return wind(260, 0.022, 0.16, 0.10);
+            case LOOP_STORM_WIND: return wind(380, 0.032, 0.22, 0.30);
             case LOOP_FOREST:     return forest();
             case LOOP_NIGHT:      return night();
             case LOOP_RIVER:      return river();
@@ -20,55 +21,56 @@ final class AmbienceSynthesizer {
         }
     }
 
-    /** Vento: ruído filtrado com modulação lenta de amplitude (rajadas). */
-    private static float[] wind(double cutoff, double peak, double gustRate) {
-        float[] n = lowPass(lowPass(whiteNoise(LOOP_SEC + 1), cutoff), cutoff * 1.4);
+    /** Vento: ruído rosa profundamente filtrado com rajadas orgânicas lentas. */
+    private static float[] wind(double cutoff, double targetRms, double maxPeak, double gustRate) {
+        float[] n = smoothLowPass(pinkNoise(LOOP_SEC + FADE_SEC), cutoff, 3);
         for (int i = 0; i < n.length; i++) {
             double t = (double) i / SAMPLE_RATE;
-            n[i] *= (float) (0.55 + 0.45 * Math.sin(2 * Math.PI * gustRate * t + Math.sin(t * 0.7)));
+            n[i] *= (float) (0.60 + 0.40 * Math.sin(2 * Math.PI * gustRate * t + Math.sin(t * 0.55)));
         }
-        return normalize(loopFade(n, 1.0), peak);
+        return normalizeRms(loopFade(n, FADE_SEC), targetRms, maxPeak);
     }
 
-    /** Floresta de dia: folhagem suave contínua. */
+    /** Floresta de dia: folhagem suave em médio-grave sem estática aguda. */
     private static float[] forest() {
-        float[] leaves = bandPass(whiteNoise(LOOP_SEC + 1), 1800, 6000);
+        float[] leaves = smoothBandPass(pinkNoise(LOOP_SEC + FADE_SEC), 220, 1050, 3);
         for (int i = 0; i < leaves.length; i++) {
             double t = (double) i / SAMPLE_RATE;
-            leaves[i] *= (float) (0.3 + 0.7 * Math.pow(Math.abs(Math.sin(t * 0.9) * Math.sin(t * 0.37)), 2));
+            double swell = Math.sin(Math.PI * 0.20 * t) * Math.sin(t * 0.37);
+            leaves[i] *= (float) (0.45 + 0.55 * swell * swell);
         }
-        return normalize(loopFade(leaves, 1.0), 0.18);
+        return normalizeRms(loopFade(leaves, FADE_SEC), 0.020, 0.15);
     }
 
-    /** Noite: cama grave + coro denso de grilos. */
+    /** Noite: cama grave acolhedora com grilos esparsos suaves. */
     private static float[] night() {
-        float[] b = normalize(lowPass(whiteNoise(LOOP_SEC + 1), 250), 0.25);
-        for (double t = 0; t < LOOP_SEC; t += 0.35 + Math.abs(rand()) * 0.4) {
-            float[] c = DspToolkit.sweep(0.04, 4300 + rand() * 400, 4400);
-            envelope(c, 0.004, 1);
-            mixInto(b, c, t, 0.12);
+        float[] b = normalizeRms(smoothLowPass(pinkNoise(LOOP_SEC + FADE_SEC), 180, 3), 0.018, 0.10);
+        for (double t = 0.2; t < LOOP_SEC + FADE_SEC - 0.1; t += 0.45 + Math.abs(rand()) * 0.55) {
+            float[] c = envelope(DspToolkit.sweep(0.038, 2900 + rand() * 200, 3100), 0.010, 1.4);
+            mixInto(b, c, t, 0.032);
         }
-        return normalize(loopFade(b, 1.0), 0.3);
+        return normalizeRms(loopFade(b, FADE_SEC), 0.020, 0.16);
     }
 
-    /** Rio: ruído marrom + borbulhas aleatórias. */
+    /** Rio: fluxo grave-médio quente com micro-borbulhas naturais. */
     private static float[] river() {
-        float[] b = normalize(bandPass(brownNoise(LOOP_SEC + 1), 150, 1600), 1);
-        mixInto(b, normalize(bandPass(whiteNoise(LOOP_SEC + 1), 1500, 4500), 0.25), 0, 1);
-        for (double t = 0; t < LOOP_SEC; t += 0.05 + Math.abs(rand()) * 0.15) {
-            double f = 500 + Math.abs(rand()) * 1200;
-            mixInto(b, envelope(DspToolkit.sweep(0.03, f, f * 1.6), 0.002, 2), t, 0.15);
+        float[] deep = normalizeRms(smoothBandPass(brownNoise(LOOP_SEC + FADE_SEC), 110, 800, 3), 0.030, 0.20);
+        float[] shimmer = normalizeRms(smoothBandPass(pinkNoise(LOOP_SEC + FADE_SEC), 260, 900, 3), 0.012, 0.08);
+        mixInto(deep, shimmer, 0, 1.0);
+        for (double t = 0.05; t < LOOP_SEC + FADE_SEC - 0.05; t += 0.08 + Math.abs(rand()) * 0.18) {
+            double f = 350 + Math.abs(rand()) * 420;
+            mixInto(deep, envelope(DspToolkit.sweep(0.028, f, f * 1.4), 0.005, 2), t, 0.042);
         }
-        return normalize(loopFade(b, 1.0), 0.4);
+        return normalizeRms(loopFade(deep, FADE_SEC), 0.034, 0.24);
     }
 
-    /** Chuva: chiado + gotas granulares. */
+    /** Chuva: ruído rosa quente sem agudos metálicos + gotas suavizadas. */
     private static float[] rain() {
-        float[] b = normalize(bandPass(whiteNoise(LOOP_SEC + 1), 600, 9000), 0.6);
-        for (double t = 0; t < LOOP_SEC; t += 0.004 + Math.abs(rand()) * 0.02) {
-            float[] drop = envelope(bandPass(whiteNoise(0.015), 2000, 8000), 0.0005, 3);
-            mixInto(b, drop, t, 0.4 * Math.abs(rand()));
+        float[] b = normalizeRms(smoothBandPass(pinkNoise(LOOP_SEC + FADE_SEC), 180, 1900, 3), 0.036, 0.24);
+        for (double t = 0.02; t < LOOP_SEC + FADE_SEC - 0.03; t += 0.012 + Math.abs(rand()) * 0.032) {
+            float[] drop = envelope(smoothBandPass(pinkNoise(0.020), 650, 1900, 3), 0.002, 2.5);
+            mixInto(b, drop, t, 0.09 * Math.abs(rand()));
         }
-        return normalize(loopFade(b, 1.0), 0.45);
+        return normalizeRms(loopFade(b, FADE_SEC), 0.040, 0.28);
     }
 }

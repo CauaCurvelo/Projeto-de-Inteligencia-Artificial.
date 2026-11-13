@@ -2,87 +2,80 @@ package br.edu.unex.sentinela.ui;
 
 import br.edu.unex.sentinela.settings.GameAction;
 import br.edu.unex.sentinela.settings.GameSettings;
-import javafx.event.EventHandler;
 import javafx.scene.control.Button;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 
 /**
- * Botão interativo para captura e remapeamento de teclas nas configurações.
+ * Botão keycap interativo que captura uma tecla do jogador para remapeamento.
  */
 public class KeyRebindButton extends Button {
     private final GameAction action;
     private boolean listening = false;
-    private EventHandler<KeyEvent> keyListener;
-    private final Runnable onReboundCallback;
+    private Runnable onChanged;
 
-    public KeyRebindButton(GameAction action, Runnable onReboundCallback) {
+    public KeyRebindButton(GameAction action, Runnable onChanged) {
         this.action = action;
-        this.onReboundCallback = onReboundCallback;
-        setPrefSize(140, 32);
-        setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        updateLabel();
-        applyNormalStyle();
+        this.onChanged = onChanged;
+        setPrefSize(112, 30);
+        getStyleClass().add("keycap-btn");
+        UiTypography.bind(this, UiTypography.TypoRole.KEYCAP);
+        refreshText();
 
         setOnAction(e -> startListening());
-    }
 
-    public void updateLabel() {
-        KeyCode code = GameSettings.get().getKeyBindings().getKey(action);
-        setText(code != null ? code.getName() : "Nenhuma");
-    }
-
-    private void startListening() {
-        if (listening) return;
-        listening = true;
-        setText("[Pressione...]");
-        setStyle(
-            "-fx-background-color: #E67E22;" +
-            "-fx-text-fill: #FFFFFF;" +
-            "-fx-background-radius: 6;" +
-            "-fx-border-color: #F39C12;" +
-            "-fx-border-width: 2;" +
-            "-fx-border-radius: 6;"
-        );
-
-        keyListener = event -> {
-            KeyCode newKey = event.getCode();
-            event.consume();
-            if (newKey != KeyCode.ESCAPE) {
-                GameSettings.get().getKeyBindings().rebind(action, newKey);
+        addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            if (!listening) return;
+            e.consume();
+            KeyCode code = e.getCode();
+            if (code == KeyCode.ESCAPE) {
+                stopListening();
+                return;
+            }
+            if (code != KeyCode.UNDEFINED) {
+                GameSettings.get().getKeyBindings().rebind(this.action, code);
                 GameSettings.get().save();
+                stopListening();
+                if (this.onChanged != null) this.onChanged.run();
             }
-            stopListening();
-            if (onReboundCallback != null) {
-                onReboundCallback.run();
-            }
-        };
+        });
 
-        if (getScene() != null) {
-            getScene().addEventFilter(KeyEvent.KEY_PRESSED, keyListener);
-        }
+        focusedProperty().addListener((obs, was, now) -> {
+            if (!now && listening) stopListening();
+        });
     }
 
-    private void stopListening() {
+    public void startListening() {
+        listening = true;
+        setText("[TECLA...]");
+        getStyleClass().remove("keycap-btn");
+        if (!getStyleClass().contains("keycap-btn-listening")) {
+            getStyleClass().add("keycap-btn-listening");
+        }
+        requestFocus();
+    }
+
+    public void stopListening() {
         listening = false;
-        if (getScene() != null && keyListener != null) {
-            getScene().removeEventFilter(KeyEvent.KEY_PRESSED, keyListener);
+        getStyleClass().remove("keycap-btn-listening");
+        if (!getStyleClass().contains("keycap-btn")) {
+            getStyleClass().add("keycap-btn");
         }
-        updateLabel();
-        applyNormalStyle();
+        refreshText();
     }
 
-    private void applyNormalStyle() {
-        setStyle(
-            "-fx-background-color: rgba(50, 65, 55, 0.9);" +
-            "-fx-text-fill: #F1C40F;" +
-            "-fx-background-radius: 6;" +
-            "-fx-border-color: rgba(212, 172, 13, 0.6);" +
-            "-fx-border-width: 1.2;" +
-            "-fx-border-radius: 6;" +
-            "-fx-cursor: hand;"
-        );
+    public void refreshText() {
+        KeyCode key = GameSettings.get().getKeyBindings().getKey(action);
+        setText(key != null ? formatKeyName(key) : "—");
+    }
+
+    private static String formatKeyName(KeyCode key) {
+        return switch (key) {
+            case SPACE -> "ESPAÇO";
+            case SHIFT -> "SHIFT";
+            case EQUALS -> "+";
+            case MINUS -> "-";
+            default -> key.getName().toUpperCase();
+        };
     }
 }

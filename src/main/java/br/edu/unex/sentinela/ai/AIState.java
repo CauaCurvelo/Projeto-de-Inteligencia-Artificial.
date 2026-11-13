@@ -11,7 +11,9 @@ public enum AIState {
     FIGHTING_ENEMY("Lutando com Predador"),
     SEARCHING_FOOD("Buscando Alimento"),
     EATING("Alimentando-se"),
-    TERRITORIAL_ATTACK("Ataque Territorial");
+    TERRITORIAL_ATTACK("Ataque Territorial"),
+    ROARING("Rugido de Fúria"),
+    RETREATING("Recuando ao Domínio");
 
     private final String description;
 

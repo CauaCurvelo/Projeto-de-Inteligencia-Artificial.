@@ -1,16 +1,22 @@
 package br.edu.unex.sentinela.rendering;
 
 import br.edu.unex.sentinela.ai.AIState;
+import br.edu.unex.sentinela.ai.BossBehaviorController;
 import br.edu.unex.sentinela.ai.EnemySkin;
 import br.edu.unex.sentinela.ai.EnemyType;
 import br.edu.unex.sentinela.entity.Enemy;
 import br.edu.unex.sentinela.entity.Player;
+import br.edu.unex.sentinela.settings.GameSettings;
+import br.edu.unex.sentinela.settings.GraphicsQuality;
 import br.edu.unex.sentinela.world.Burrow;
+import br.edu.unex.sentinela.world.FoodItem;
 import br.edu.unex.sentinela.world.Footprint;
+import br.edu.unex.sentinela.world.MeatItem;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
+import javafx.scene.paint.RadialGradient;
 import javafx.scene.paint.Stop;
 import javafx.scene.shape.ArcType;
 import javafx.scene.text.Font;
@@ -25,17 +31,40 @@ import javafx.scene.text.TextAlignment;
 public class EntityRenderer {
     private final GraphicsContext gc;
     private final CharacterSpriteRenderer spriteRenderer;
+    private final GroundItemRenderer groundItemRenderer;
     private final UiIconDrawer iconDrawer;
+    private final BossAuraAndTelegraphRenderer bossTelegraphRenderer;
 
     private final Font nameFontNormal = Font.font("Trebuchet MS", FontWeight.EXTRA_BOLD, 12.5);
     private final Font nameFontBoss = Font.font("Trebuchet MS", FontWeight.EXTRA_BOLD, 14.5);
     private final Font stateSubFont = Font.font("Segoe UI", FontWeight.BOLD, 10.0);
     private final Font alertBadgeFont = Font.font("Impact", FontWeight.BOLD, 15.0);
 
+    private static final LinearGradient HP_BOSS_GRAD = new LinearGradient(
+        0.0, 0.0, 0.0, 1.0, true, CycleMethod.NO_CYCLE,
+        new Stop(0.0, Color.web("#E040FB")),
+        new Stop(0.5, Color.web("#9C27B0")),
+        new Stop(1.0, Color.web("#4A148C"))
+    );
+    private static final LinearGradient HP_ENEMY_GRAD = new LinearGradient(
+        0.0, 0.0, 0.0, 1.0, true, CycleMethod.NO_CYCLE,
+        new Stop(0.0, Color.web("#FF5252")),
+        new Stop(0.5, Color.web("#D50000")),
+        new Stop(1.0, Color.web("#7F0000"))
+    );
+    private static final RadialGradient LOW_LIFE_AURA_GRAD = new RadialGradient(
+        0.0, 0.0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
+        new Stop(0.0, Color.web("#FF1744", 0.45)),
+        new Stop(0.55, Color.web("#D50000", 0.25)),
+        new Stop(1.0, Color.web("#B71C1C", 0.0))
+    );
+
     public EntityRenderer(GraphicsContext gc) {
         this.gc = gc;
         this.spriteRenderer = new CharacterSpriteRenderer(gc);
+        this.groundItemRenderer = new GroundItemRenderer(gc);
         this.iconDrawer = new UiIconDrawer(gc);
+        this.bossTelegraphRenderer = new BossAuraAndTelegraphRenderer(gc);
     }
 
     public void renderFootprint(Footprint fp, double fx, double fy, boolean debugOverlay) {
@@ -75,73 +104,23 @@ public class EntityRenderer {
     }
 
     public void renderBurrow(Burrow b, double bx, double by) {
-        gc.setFill(Color.color(0.02, 0.04, 0.01, 0.55));
-        gc.fillOval(bx - 16, by - 12, 34, 30);
-
-        gc.setFill(Color.web("#5C3D22"));
-        gc.fillOval(bx - 15, by - 14, 30, 28);
-        gc.setFill(Color.web("#785230"));
-        gc.fillOval(bx - 14, by - 15, 26, 23);
-
-        gc.setFill(Color.web("#2E1D0E"));
-        gc.fillOval(bx - 10, by - 10, 20, 20);
-
-        gc.setFill(Color.web("#0D0804"));
-        gc.fillOval(bx - 8, by - 8, 16, 16);
+        groundItemRenderer.renderBurrow(b, bx, by);
     }
 
     public void drawBerryBush(double fx, double fy, double sunOffsetX, double sunOffsetY) {
-        gc.setFill(Color.color(0.02, 0.06, 0.02, 0.45));
-        gc.fillOval(fx - 14 + sunOffsetX * 0.45, fy - 6 + sunOffsetY * 0.45, 30, 20);
-
-        gc.setFill(Color.color(0.01, 0.04, 0.01, 0.65));
-        gc.fillOval(fx - 12, fy, 24, 12);
-
-        gc.setFill(Color.web("#143D14"));
-        gc.fillOval(fx - 14, fy - 13, 28, 25);
-
-        gc.setFill(Color.web("#235E23"));
-        gc.fillOval(fx - 12, fy - 14, 23, 21);
-        gc.fillOval(fx - 7, fy - 11, 20, 19);
-
-        gc.setFill(Color.web("#388E3C"));
-        gc.fillOval(fx - 10, fy - 13, 16, 15);
-        gc.setFill(Color.web("#4CAF50", 0.75));
-        gc.fillOval(fx - 8, fy - 12, 10, 9);
-
-        drawSingleBerry(fx - 6, fy - 5);
-        drawSingleBerry(fx + 3, fy - 4);
-        drawSingleBerry(fx - 1, fy + 2);
+        groundItemRenderer.drawBerryBush(fx, fy, sunOffsetX, sunOffsetY);
     }
 
-    private void drawSingleBerry(double bx, double by) {
-        gc.setFill(Color.color(0.05, 0.12, 0.05, 0.65));
-        gc.fillOval(bx - 2.5, by - 1.5, 6.5, 6.5);
-        gc.setFill(Color.web("#B71C1C"));
-        gc.fillOval(bx - 3, by - 3, 6, 6);
-        gc.setFill(Color.web("#E53935"));
-        gc.fillOval(bx - 2.5, by - 2.8, 4.8, 4.8);
-        gc.setFill(Color.web("#FFFFFF", 0.90));
-        gc.fillOval(bx - 1.5, by - 2.0, 1.8, 1.8);
+    public void drawBerryBush(FoodItem food, double fx, double fy, double sunOffsetX, double sunOffsetY) {
+        groundItemRenderer.drawBerryBush(food, fx, fy, sunOffsetX, sunOffsetY);
     }
 
     public void drawMeatDrop(double mx, double my) {
-        gc.setFill(Color.color(0.0, 0.0, 0.0, 0.48));
-        gc.fillOval(mx - 10, my - 3, 21, 12);
+        groundItemRenderer.drawMeatDrop(null, mx, my, 0.0);
+    }
 
-        gc.setFill(Color.web("#CFD8DC"));
-        gc.fillOval(mx - 11, my - 3, 5, 6);
-        gc.fillOval(mx + 6, my - 3, 5, 6);
-        gc.setFill(Color.web("#FFFFFF"));
-        gc.fillOval(mx - 10.5, my - 2.5, 3.5, 4);
-        gc.fillOval(mx + 6.5, my - 2.5, 3.5, 4);
-
-        gc.setFill(Color.web("#6E1200"));
-        gc.fillOval(mx - 8, my - 6, 16, 12);
-        gc.setFill(Color.web("#C62828"));
-        gc.fillOval(mx - 7, my - 6, 14, 10);
-        gc.setFill(Color.web("#EF5350", 0.75));
-        gc.fillOval(mx - 5, my - 5, 9, 5);
+    public void drawMeatDrop(MeatItem meat, double mx, double my, double animTime) {
+        groundItemRenderer.drawMeatDrop(meat, mx, my, animTime);
     }
 
     public void drawPlayerFox(Player player, double px, double py) {
@@ -152,6 +131,10 @@ public class EntityRenderer {
             gc.setLineWidth(1.5);
             gc.strokeOval(px - 11, py - 11, 22, 22);
             return;
+        }
+
+        if (player.isLowLife()) {
+            drawLowLifeAura(px, py, player.isHiddenInGrass() ? 0.65 : 1.0);
         }
 
         if (player.isInvulnerable()) {
@@ -180,6 +163,38 @@ public class EntityRenderer {
         spriteRenderer.renderFox(player, px, py);
     }
 
+    /**
+     * Renderiza uma aura carmesim pulsante ao redor da raposa quando estiver com vida crítica.
+     */
+    private void drawLowLifeAura(double px, double py, double intensity) {
+        double t = System.currentTimeMillis() * 0.001;
+        double wave = 0.5 + 0.5 * Math.sin(t * 7.5);
+        double radius = 29.0 + wave * 7.0;
+
+        gc.save();
+        gc.setGlobalAlpha((0.68 + wave * 0.32) * intensity);
+        gc.setFill(LOW_LIFE_AURA_GRAD);
+        gc.fillOval(px - radius, py - radius * 0.85, radius * 2, radius * 1.7);
+        gc.restore();
+
+        double ringR = 22.0 + wave * 3.5;
+        double rotDeg = (t * 55.0) % 360.0;
+        gc.setStroke(Color.web("#FF5252", (0.48 + wave * 0.34) * intensity));
+        gc.setLineWidth(1.8);
+        gc.strokeArc(px - ringR, py - ringR * 0.82, ringR * 2, ringR * 1.64, rotDeg, 95, ArcType.OPEN);
+        gc.strokeArc(px - ringR, py - ringR * 0.82, ringR * 2, ringR * 1.64, rotDeg + 180, 95, ArcType.OPEN);
+
+        for (int i = 0; i < 4; i++) {
+            double phase = (t * 1.15 + i * 0.25) % 1.0;
+            double angle = t * 1.8 + i * (Math.PI * 0.5);
+            double mx = px + Math.cos(angle) * (15.0 + wave * 4.0);
+            double my = py + 8.0 - phase * 26.0;
+            double alpha = (1.0 - phase) * 0.72 * intensity;
+            gc.setFill(Color.web("#FF8A80", alpha));
+            gc.fillOval(mx - 1.8, my - 1.8, 3.6, 3.6);
+        }
+    }
+
     public void drawClawSlash(Player player, double px, double py) {
         double angle = player.getVisualAngle();
         double slashX = px + Math.cos(angle) * 20;
@@ -202,7 +217,9 @@ public class EntityRenderer {
             gc.fillOval(ex - 20, ey - 20, 40, 40);
         }
 
-        if (enemy.isWindup() || enemy.isLunging() || enemy.getState() == AIState.AIMING) {
+        if (enemy.isBoss() && (enemy.isWindup() || enemy.isLunging() || enemy.getState() == AIState.ROARING)) {
+            bossTelegraphRenderer.renderBossCombatTelegraph(enemy, ex, ey);
+        } else if (enemy.isWindup() || enemy.isLunging() || enemy.getState() == AIState.AIMING) {
             renderUniqueAttackTelegraph(enemy, ex, ey, angle);
         }
 
@@ -224,12 +241,22 @@ public class EntityRenderer {
         AIState state = enemy.getState();
         Color stateAccent = TacticalAuraRenderer.resolveTacticalStateColor(state);
         boolean isBoss = enemy.getType() == EnemyType.BEAR_BOSS;
-        boolean isAlert = state == AIState.CHASE || state == AIState.AIMING ||
+        BossBehaviorController bossCtrl = enemy.getBossController();
+        boolean bossEnraged = isBoss && bossCtrl != null && bossCtrl.isEnraged();
+        boolean bossRetreating = state == AIState.RETREATING;
+        boolean isAlert = state == AIState.CHASE || state == AIState.AIMING || state == AIState.ROARING ||
                           state == AIState.FIGHTING_ENEMY || state == AIState.TERRITORIAL_ATTACK;
         boolean isSuspicious = state == AIState.SUSPICIOUS || state == AIState.ALERT || state == AIState.SNIFFING_TRACK;
 
-        String skinName = enemy.getSkin() != null ? enemy.getSkin().getDisplayName() : enemy.getType().name();
+        String skinName = enemy.getDisplayName();
         String stateDesc = state.getDescription().toUpperCase();
+        if (isBoss && bossCtrl != null) {
+            if (enemy.isWindup() || enemy.isLunging()) {
+                stateDesc = bossCtrl.getActiveAttack().getDisplayName().toUpperCase();
+            } else if (bossEnraged && state == AIState.CHASE) {
+                stateDesc = "FÚRIA ALFA";
+            }
+        }
 
         // Posicionamento vertical acima do sprite
         double baseOffsetY = isBoss ? 36.0 : 28.0;
@@ -247,15 +274,7 @@ public class EntityRenderer {
 
         // 2. Preenchimento em Gradiente da Barra de HP
         double hpPct = Math.max(0.0, Math.min(1.0, (double) enemy.getHp() / enemy.getMaxHp()));
-        LinearGradient hpGrad = isBoss
-            ? new LinearGradient(barX, barY, barX, barY + barH, false, CycleMethod.NO_CYCLE,
-                new Stop(0.0, Color.web("#E040FB")),
-                new Stop(0.5, Color.web("#9C27B0")),
-                new Stop(1.0, Color.web("#4A148C")))
-            : new LinearGradient(barX, barY, barX, barY + barH, false, CycleMethod.NO_CYCLE,
-                new Stop(0.0, Color.web("#FF5252")),
-                new Stop(0.5, Color.web("#D50000")),
-                new Stop(1.0, Color.web("#7F0000")));
+        LinearGradient hpGrad = isBoss ? HP_BOSS_GRAD : HP_ENEMY_GRAD;
 
         gc.setFill(hpGrad);
         gc.fillRoundRect(barX, barY, barW * hpPct, barH, 4, 4);
@@ -276,10 +295,19 @@ public class EntityRenderer {
             }
         }
 
-        // Borda metálica da barra de HP
-        gc.setStroke(isBoss ? Color.web("#FFD54F", 0.85) : stateAccent.deriveColor(0, 1.0, 1.0, 0.75));
-        gc.setLineWidth(1.4);
+        // Borda metálica da barra de HP (destaque pulsante quando Boss está em fúria)
+        Color hpBorder = bossEnraged ? Color.web("#FF5252", 0.95)
+                       : (bossRetreating ? Color.web("#90A4AE", 0.85)
+                       : (isBoss ? Color.web("#FFD54F", 0.85) : stateAccent.deriveColor(0, 1.0, 1.0, 0.75)));
+        gc.setStroke(hpBorder);
+        gc.setLineWidth(bossEnraged ? 2.0 : 1.4);
         gc.strokeRoundRect(barX - 0.5, barY - 0.5, barW + 1, barH + 1, 5, 5);
+
+        if (isBoss && !bossEnraged) {
+            gc.setStroke(Color.web("#FFD54F", 0.85));
+            gc.setLineWidth(1.5);
+            gc.strokeLine(barX + barW * 0.5, barY - 1.5, barX + barW * 0.5, barY + barH + 1.5);
+        }
 
         // 4. Brasão Circular de Classe na Ponta Esquerda da Barra
         double badgeRadius = isBoss ? 9.5 : 7.8;
@@ -300,17 +328,19 @@ public class EntityRenderer {
         );
 
         // 6. Subtítulo Dinâmico do Estado Mental (Abaixo ou Acima com Destaque)
-        Color stateTextFill = isAlert ? Color.web("#FF5252") : (isSuspicious ? Color.web("#FFD54F") : Color.web("#CFD8DC"));
-        iconDrawer.drawStyledText(
-            "‹ " + stateDesc + " ›",
-            ex + 2,
-            barY + barH + 8.0,
-            stateSubFont,
-            stateTextFill,
-            Color.web("#05070A"),
-            2.6,
-            TextAlignment.CENTER
-        );
+        if (GameSettings.get().getGraphicsQuality() != GraphicsQuality.LOW) {
+            Color stateTextFill = isAlert ? Color.web("#FF5252") : (isSuspicious ? Color.web("#FFD54F") : Color.web("#CFD8DC"));
+            iconDrawer.drawStyledText(
+                "‹ " + stateDesc + " ›",
+                ex + 2,
+                barY + barH + 8.0,
+                stateSubFont,
+                stateTextFill,
+                Color.web("#05070A"),
+                2.6,
+                TextAlignment.CENTER
+            );
+        }
 
         // 7. Insígnia de Alerta Pulsante (! / ?) quando o inimigo detecta ou persegue a raposa
         if (isAlert || isSuspicious) {
@@ -352,29 +382,7 @@ public class EntityRenderer {
         EnemyType type = enemy.getType();
         EnemySkin skin = enemy.getSkin();
 
-        if (type == EnemyType.BEAR_BOSS) {
-            if (skin == EnemySkin.CROCODILE) {
-                double mouthX = ex + Math.cos(angle) * 24;
-                double mouthY = ey + Math.sin(angle) * 24;
-                gc.setStroke(Color.web("#00E676", 0.90));
-                gc.setLineWidth(3.0);
-                gc.strokeArc(mouthX - 16, mouthY - 16, 32, 32, -Math.toDegrees(angle) - 50, 100, ArcType.OPEN);
-            } else if (skin == EnemySkin.PANTHER) {
-                gc.setStroke(Color.web("#FFD700", 0.90));
-                gc.setLineWidth(2.5);
-                double slashX = ex + Math.cos(angle) * 22;
-                double slashY = ey + Math.sin(angle) * 22;
-                gc.strokeLine(slashX - 10, slashY - 10, slashX + 10, slashY + 10);
-                gc.strokeLine(slashX - 6, slashY - 14, slashX + 14, slashY + 6);
-                gc.strokeLine(slashX - 14, slashY - 6, slashX + 6, slashY + 14);
-            } else {
-                gc.setStroke(Color.web("#E67E22", 0.95));
-                gc.setLineWidth(3.5);
-                gc.strokeOval(ex - 28, ey - 28, 56, 56);
-                gc.setStroke(Color.web("#D35400", 0.60));
-                gc.strokeOval(ex - 36, ey - 36, 72, 72);
-            }
-        } else if (type == EnemyType.HOUND) {
+        if (type == EnemyType.HOUND) {
             double biteX = ex + Math.cos(angle) * 18;
             double biteY = ey + Math.sin(angle) * 18;
             gc.setStroke(Color.web("#FF1744", 0.90));

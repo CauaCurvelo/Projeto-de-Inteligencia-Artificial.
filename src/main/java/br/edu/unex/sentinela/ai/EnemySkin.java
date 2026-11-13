@@ -15,7 +15,8 @@ public enum EnemySkin {
     // Bosses (Superpredadores Alfa)
     BEAR("Urso Pardo Alfa", "#4A2E16"),
     CROCODILE("Crocodilo do Rio", "#1B5E20"),
-    PANTHER("Pantera Negra", "#212121");
+    PANTHER("Pantera Negra", "#212121"),
+    POLAR_BEAR("Urso Polar Alfa", "#CBD5E1");
 
     private final String displayName;
     private final String hexColor;

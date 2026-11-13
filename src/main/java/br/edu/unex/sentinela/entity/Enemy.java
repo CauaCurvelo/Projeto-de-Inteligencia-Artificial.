@@ -1,10 +1,16 @@
 package br.edu.unex.sentinela.entity;
 
 import br.edu.unex.sentinela.ai.AIState;
+import br.edu.unex.sentinela.ai.AnimalVariant;
+import br.edu.unex.sentinela.ai.BossArchetype;
+import br.edu.unex.sentinela.ai.BossAttackType;
+import br.edu.unex.sentinela.ai.BossBehaviorController;
 import br.edu.unex.sentinela.ai.EnemySkin;
 import br.edu.unex.sentinela.ai.EnemyType;
+import br.edu.unex.sentinela.ai.MobSteeringHelper;
 import br.edu.unex.sentinela.ai.Node;
 import br.edu.unex.sentinela.ai.Pathfinder;
+import br.edu.unex.sentinela.ai.SpeciesBehaviorProfile;
 import br.edu.unex.sentinela.world.*;
 
 import java.util.List;
@@ -20,6 +26,8 @@ import java.util.Random;
 public class Enemy {
     private final EnemyType type;
     private final EnemySkin skin;
+    private final AnimalVariant variant;
+    private final SpeciesBehaviorProfile behaviorProfile;
     private double x;
     private double y;
     private double vx = 0.0;
@@ -44,6 +52,7 @@ public class Enemy {
     private int currentPathIndex = 0;
     private int targetCol = -1;
     private int targetRow = -1;
+    private final Pathfinder pathfinder = new Pathfinder();
 
     // Senses configuration
     private double baseVisionRange;
@@ -61,6 +70,7 @@ public class Enemy {
     private double alertTimer = 0.0;
     private double repathCooldown = 0.0;
     private double patrolPauseTimer = 0.0;
+    private double forageCooldownTimer = 0.0;
     private double patrolHeadingAngle;
     private double stuckTimer = 0.0;
     private double lastCheckX = 0.0;
@@ -73,41 +83,54 @@ public class Enemy {
     private boolean moving = false;
     private double footprintTimer = 0.0;
     private boolean nextFootLeft = true;
+    private BossBehaviorController bossController;
 
     public Enemy(EnemyType type, EnemySkin skin, double startX, double startY, double speedMult, double detectionMult) {
+        this(type, skin, AnimalVariant.STANDARD, startX, startY, speedMult, detectionMult);
+    }
+
+    public Enemy(EnemyType type, EnemySkin skin, AnimalVariant variant, double startX, double startY,
+                 double speedMult, double detectionMult) {
         this.type = type;
         this.skin = skin;
+        this.variant = (variant != null && type != EnemyType.BEAR_BOSS) ? variant : AnimalVariant.STANDARD;
+        this.behaviorProfile = SpeciesBehaviorProfile.of(type, skin);
         this.x = startX;
         this.y = startY;
         this.lastCheckX = startX;
         this.lastCheckY = startY;
-        this.maxHp = type.getMaxHp();
+        this.maxHp = type.getMaxHp() + this.variant.getBonusHpFor(type, skin);
         this.hp = maxHp;
         this.faceAngle = rand.nextDouble() * Math.PI * 2.0 - Math.PI;
         this.patrolHeadingAngle = this.faceAngle;
 
+        double variantSpeed = this.variant.getSpeedMultiplier();
+        double variantVision = this.variant.getVisionMultiplier();
+
         switch (type) {
             case HUNTER:
-                this.baseSpeed = 118.0 * speedMult;
-                this.baseVisionRange = 300.0 * detectionMult;
+                this.baseSpeed = 118.0 * speedMult * variantSpeed;
+                this.baseVisionRange = 300.0 * detectionMult * variantVision;
                 this.baseHearingSensitivity = 0.55 * detectionMult;
                 break;
             case HOUND:
-                this.baseSpeed = 182.0 * speedMult;
-                this.baseVisionRange = 175.0 * detectionMult;
+                this.baseSpeed = 182.0 * speedMult * variantSpeed;
+                this.baseVisionRange = 175.0 * detectionMult * variantVision;
                 this.baseHearingSensitivity = 1.9 * detectionMult;
                 break;
             case RIVAL:
-                this.baseSpeed = 116.0 * speedMult;
-                this.baseVisionRange = 210.0 * detectionMult;
+                this.baseSpeed = 116.0 * speedMult * variantSpeed;
+                this.baseVisionRange = 210.0 * detectionMult * variantVision;
                 this.baseHearingSensitivity = 1.0 * detectionMult;
-                this.state = AIState.SEARCHING_FOOD;
+                this.state = AIState.PATROL;
                 break;
             case BEAR_BOSS:
-                this.baseSpeed = 132.0 * speedMult;
+                BossArchetype archetype = BossArchetype.fromSkin(skin);
+                this.baseSpeed = archetype.getPatrolSpeed() * speedMult;
                 this.baseVisionRange = 340.0 * detectionMult;
                 this.baseHearingSensitivity = 1.4 * detectionMult;
                 this.state = AIState.PATROL;
+                this.bossController = new BossBehaviorController(archetype, startX, startY, speedMult);
                 break;
         }
         this.speed = baseSpeed;
@@ -125,6 +148,7 @@ public class Enemy {
         if (damageFlashTimer > 0) damageFlashTimer -= deltaTime;
         if (attackCooldown > 0) attackCooldown -= deltaTime;
         if (patrolPauseTimer > 0) patrolPauseTimer -= deltaTime;
+        if (forageCooldownTimer > 0) forageCooldownTimer -= deltaTime;
 
         if (attackWindupTimer > 0) {
             attackWindupTimer -= deltaTime;
@@ -133,6 +157,9 @@ public class Enemy {
             }
         }
         if (attackLungeTimer > 0) attackLungeTimer -= deltaTime;
+        if (bossController != null) {
+            bossController.tickTimers(deltaTime, hp, maxHp, attackWindupTimer > 0, attackWindupTimer, attackLungeTimer > 0);
+        }
 
         // Rescue fallback caso o inimigo acabe em cima de um tile bloqueado
         int curCol = (int) Math.floor(x / TileMap.TILE_SIZE);
@@ -161,10 +188,15 @@ public class Enemy {
         this.currentHearingSensitivity = baseHearingSensitivity * weather.getSoundMultiplier();
 
         double duskBoost = 1.0 + (timeProgress * 0.15);
-        double currentActualSpeed = speed * duskBoost;
-
         TileType currentTile = tileMap.getTileAt(curCol, curRow);
 
+        // Apex predator behavior (velocidade, território e leash delegados ao BossBehaviorController)
+        if (type == EnemyType.BEAR_BOSS && bossController != null) {
+            updateApexBoss(player, allEnemies, tileMap, curCol, curRow, deltaTime, duskBoost, scentTrail, currentTile);
+            return;
+        }
+
+        double currentActualSpeed = speed * duskBoost;
         if (skin == EnemySkin.CROCODILE) {
             if (currentTile == TileType.WATER) {
                 currentActualSpeed = baseSpeed * 1.50;
@@ -174,17 +206,11 @@ public class Enemy {
                 currentActualSpeed = baseSpeed * 0.60;
             }
         } else if (currentTile == TileType.MUD) {
-            currentActualSpeed *= 0.55;
+            currentActualSpeed *= variant.isMudAdapted() ? 0.92 : 0.55;
         } else if (currentTile == TileType.WATER) {
             currentActualSpeed *= 0.45;
         } else if (currentTile == TileType.DIRT_PATH) {
             currentActualSpeed *= 1.12;
-        }
-
-        // Apex predator behavior
-        if (type == EnemyType.BEAR_BOSS) {
-            updateApexBoss(player, allEnemies, tileMap, curCol, curRow, deltaTime, currentActualSpeed, scentTrail, currentTile);
-            return;
         }
 
         double distToPlayer = Math.hypot(player.getX() - x, player.getY() - y);
@@ -199,13 +225,13 @@ public class Enemy {
 
         switch (type) {
             case HUNTER:
-                updateHunter(canSeePlayer, canHearPlayer, player, tileMap, projectiles, curCol, curRow, distToPlayer);
+                updateHunter(canSeePlayer, canHearPlayer, player, allEnemies, tileMap, projectiles, curCol, curRow, distToPlayer);
                 break;
             case HOUND:
-                updateHound(canSeePlayer, canHearPlayer, player, scentTrail, tileMap, curCol, curRow);
+                updateHound(canSeePlayer, canHearPlayer, player, allEnemies, scentTrail, tileMap, curCol, curRow);
                 break;
             case RIVAL:
-                updateRival(canSeePlayer, player, foodList, tileMap, curCol, curRow, distToPlayer);
+                updateRival(canSeePlayer, player, foodList, allEnemies, tileMap, curCol, curRow, distToPlayer);
                 break;
         }
 
@@ -214,47 +240,45 @@ public class Enemy {
     }
 
     private void updateApexBoss(Player player, List<Enemy> allEnemies, TileMap tileMap, int curCol, int curRow,
-                                double deltaTime, double currentActualSpeed, List<Footprint> scentTrail, TileType currentTile) {
-        Enemy nearestTargetEnemy = null;
-        double minEnemyDist = Double.MAX_VALUE;
+                                double deltaTime, double duskBoost, List<Footprint> scentTrail, TileType currentTile) {
+        BossBehaviorController.BossTickDecision decision = bossController.evaluateBehavior(
+            this, player, allEnemies, tileMap, curCol, curRow, deltaTime
+        );
+        this.state = decision.state;
 
-        for (Enemy other : allEnemies) {
-            if (other != this && other.getHp() > 0) {
-                double d = Math.hypot(other.getX() - x, other.getY() - y);
-                if (d < 220.0 && d < minEnemyDist) {
-                    minEnemyDist = d;
-                    nearestTargetEnemy = other;
-                }
+        if (decision.stopMovement) {
+            patrolPauseTimer = 0;
+            if (decision.lockFaceAngle != null) {
+                this.faceAngle = lerpAngle(this.faceAngle, decision.lockFaceAngle, Math.min(1.0, deltaTime * 14.0));
             }
+            this.moving = false;
+            this.vx *= 0.4;
+            this.vy *= 0.4;
+            return;
         }
 
-        double distToPlayer = Math.hypot(player.getX() - x, player.getY() - y);
-        boolean targetIsPlayer = (distToPlayer < minEnemyDist && !player.isBurrowed() && distToPlayer < 260.0);
-
-        if (targetIsPlayer) {
-            state = AIState.CHASE;
+        if (decision.state == AIState.CHASE || decision.state == AIState.RETREATING) {
             patrolPauseTimer = 0;
-            requestPath(tileMap, curCol, curRow, (int) Math.floor(player.getX() / TileMap.TILE_SIZE), (int) Math.floor(player.getY() / TileMap.TILE_SIZE), false);
-        } else if (nearestTargetEnemy != null) {
-            state = AIState.FIGHTING_ENEMY;
+            requestPath(tileMap, curCol, curRow, decision.targetCol, decision.targetRow, false);
+        } else if (decision.state == AIState.FIGHTING_ENEMY && decision.rivalTarget != null) {
             patrolPauseTimer = 0;
-            requestPath(tileMap, curCol, curRow, (int) Math.floor(nearestTargetEnemy.getX() / TileMap.TILE_SIZE), (int) Math.floor(nearestTargetEnemy.getY() / TileMap.TILE_SIZE), false);
-
-            if (minEnemyDist < 32.0 && attackCooldown <= 0) {
-                nearestTargetEnemy.takeDamage(2, x, y);
+            requestPath(tileMap, curCol, curRow, decision.targetCol, decision.targetRow, false);
+            double distRival = Math.hypot(decision.rivalTarget.getX() - x, decision.rivalTarget.getY() - y);
+            if (distRival < 34.0 && attackCooldown <= 0) {
+                decision.rivalTarget.takeDamage(2, x, y);
                 attackCooldown = 0.9;
             }
         } else {
-            state = AIState.PATROL;
             if (isPathFinished()) {
-                handleOrganicPatrolArrival(tileMap, curCol, curRow);
+                handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
             }
         }
 
+        double currentActualSpeed = bossController.computeCurrentSpeed(state, currentTile, duskBoost);
         executeFluidMovement(deltaTime, currentActualSpeed, player, allEnemies, tileMap, scentTrail, currentTile);
     }
 
-    private void updateHunter(boolean canSee, boolean canHear, Player player, TileMap tileMap,
+    private void updateHunter(boolean canSee, boolean canHear, Player player, List<Enemy> allEnemies, TileMap tileMap,
                               List<Projectile> projectiles, int curCol, int curRow, double distToPlayer) {
         if (canSee) {
             patrolPauseTimer = 0;
@@ -285,7 +309,7 @@ public class Enemy {
         } else if (alertTimer > 0) {
             state = AIState.ALERT;
             if (isPathFinished()) {
-                handleOrganicPatrolArrival(tileMap, curCol, curRow);
+                handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
             }
         } else if (canHear) {
             state = AIState.SUSPICIOUS;
@@ -295,12 +319,12 @@ public class Enemy {
         } else {
             state = AIState.PATROL;
             if (isPathFinished()) {
-                handleOrganicPatrolArrival(tileMap, curCol, curRow);
+                handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
             }
         }
     }
 
-    private void updateHound(boolean canSee, boolean canHear, Player player,
+    private void updateHound(boolean canSee, boolean canHear, Player player, List<Enemy> allEnemies,
                              List<Footprint> scentTrail, TileMap tileMap, int curCol, int curRow) {
         if (canHear || canSee) {
             state = AIState.CHASE;
@@ -313,7 +337,7 @@ public class Enemy {
         if (alertTimer > 0) {
             state = AIState.ALERT;
             if (isPathFinished()) {
-                handleOrganicPatrolArrival(tileMap, curCol, curRow);
+                handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
             }
             return;
         }
@@ -330,7 +354,7 @@ public class Enemy {
 
         state = AIState.PATROL;
         if (isPathFinished()) {
-            handleOrganicPatrolArrival(tileMap, curCol, curRow);
+            handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
         }
     }
 
@@ -349,7 +373,8 @@ public class Enemy {
         return closest;
     }
 
-    private void updateRival(boolean canSee, Player player, List<FoodItem> foodList, TileMap tileMap, int curCol, int curRow, double distToPlayer) {
+    private void updateRival(boolean canSee, Player player, List<FoodItem> foodList, List<Enemy> allEnemies,
+                             TileMap tileMap, int curCol, int curRow, double distToPlayer) {
         if (distToPlayer < 160.0 && canSee) {
             state = AIState.TERRITORIAL_ATTACK;
             patrolPauseTimer = 0;
@@ -357,11 +382,14 @@ public class Enemy {
             return;
         }
 
-        FoodItem nearestFood = findNearestUnconsumedFood(foodList);
-        if (nearestFood != null && Math.hypot(nearestFood.getX() - x, nearestFood.getY() - y) < 380.0) {
-            double distFoodToPlayer = Math.hypot(player.getX() - nearestFood.getX(), player.getY() - nearestFood.getY());
+        // Apenas onívoros forrageiam arbustos desocupados próximos; carnívoros (Lobo) nunca aglomeram em frutas
+        FoodItem nearestFood = (behaviorProfile.canForageFood() && forageCooldownTimer <= 0)
+                ? MobSteeringHelper.findUncrowdedFoodForForager(this, foodList, allEnemies, behaviorProfile.getFoodSeekRadiusPx())
+                : null;
 
-            if (distFoodToPlayer < 160.0 && distToPlayer < 210.0 && canSee) {
+        if (nearestFood != null) {
+            double distFoodToPlayer = Math.hypot(player.getX() - nearestFood.getX(), player.getY() - nearestFood.getY());
+            if (distFoodToPlayer < 150.0 && distToPlayer < 210.0 && canSee) {
                 state = AIState.TERRITORIAL_ATTACK;
                 patrolPauseTimer = 0;
                 requestPath(tileMap, curCol, curRow, (int) Math.floor(player.getX() / TileMap.TILE_SIZE), (int) Math.floor(player.getY() / TileMap.TILE_SIZE), false);
@@ -370,89 +398,60 @@ public class Enemy {
 
             state = AIState.SEARCHING_FOOD;
             double distToFood = Math.hypot(nearestFood.getX() - x, nearestFood.getY() - y);
-            if (distToFood < 20.0) {
+            if (distToFood < 22.0) {
                 nearestFood.setEaten(true);
                 state = AIState.EATING;
-                patrolPauseTimer = 1.2; // Pausa saboreando a fruta
+                patrolPauseTimer = 1.25;
+                forageCooldownTimer = 22.0; // Evita acampar no mesmo arbusto depois de comer
+                currentPath = null;
             } else {
-                // CORREÇÃO CRÍTICA: force=false para não zerar o pathIndex em todo frame!
                 requestPath(tileMap, curCol, curRow, nearestFood.getCol(), nearestFood.getRow(), false);
             }
         } else {
             state = AIState.PATROL;
             if (isPathFinished()) {
-                handleOrganicPatrolArrival(tileMap, curCol, curRow);
+                handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
             }
         }
     }
 
     /**
-     * Quando o inimigo conclui uma rota de patrulha, faz uma breve pausa natural (0.6s a 1.8s)
-     * olhando ao redor antes de escolher o próximo destino orgânico.
+     * Ao concluir uma rota de patrulha, pausa em vigília de acordo com o perfil da espécie
+     * antes de escolher um novo destino distante de concentrações de outros mobs.
      */
-    private void handleOrganicPatrolArrival(TileMap tileMap, int curCol, int curRow) {
+    private void handleOrganicPatrolArrival(List<Enemy> allEnemies, TileMap tileMap, int curCol, int curRow) {
         if (patrolPauseTimer <= 0) {
             if (moving) {
-                // Acabou de chegar ao fim da rota -> inicia breve pausa natural
                 moving = false;
                 vx = 0;
                 vy = 0;
-                patrolPauseTimer = 0.5 + rand.nextDouble() * 1.1;
+                double minP = behaviorProfile.getPauseMinSec();
+                double maxP = behaviorProfile.getPauseMaxSec();
+                patrolPauseTimer = minP + rand.nextDouble() * Math.max(0.1, maxP - minP);
             } else {
-                pickOrganicPatrolPoint(tileMap, curCol, curRow);
+                pickOrganicPatrolPoint(allEnemies, tileMap, curCol, curRow);
             }
         } else {
-            // Durante a pausa de vigia, olha suavemente para os lados
             faceAngle += Math.sin(breathTimer * 2.0) * 0.008;
         }
     }
 
-    /**
-     * Escolhe rotas de patrulha orgânicas baseadas em continuidade direcional (Wander Steering)
-     * e afinidade de bioma, evitando zigue-zagues aleatórios curtos.
-     */
-    private void pickOrganicPatrolPoint(TileMap tileMap, int curCol, int curRow) {
-        boolean isCroc = (skin == EnemySkin.CROCODILE);
-        int bestC = Integer.MIN_VALUE;
-        int bestR = Integer.MIN_VALUE;
-        int bestScore = -999;
-
-        for (int tries = 0; tries < 22; tries++) {
-            // Prefere seguir em um arco suave à frente da direção atual (60% das tentativas)
-            double angleDelta = (tries < 14) ? (rand.nextDouble() - 0.5) * (Math.PI * 0.85)
-                                             : (rand.nextDouble() * Math.PI * 2.0);
-            double candidateAngle = patrolHeadingAngle + angleDelta;
-            double distTiles = 6.0 + rand.nextDouble() * 8.0; // Caminhadas de 6 a 14 blocos (rotas amplas)
-
-            int targetC = curCol + (int) Math.round(Math.cos(candidateAngle) * distTiles);
-            int targetR = curRow + (int) Math.round(Math.sin(candidateAngle) * distTiles);
-
-            TileType t = tileMap.getTileAt(targetC, targetR);
-            if (!t.isWalkable()) continue;
-
-            int score = 0;
-            if (isCroc) {
-                if (t == TileType.WATER) score += 5;
-                else if (t == TileType.MUD) score += 3;
-                else score -= 3;
-            } else {
-                if (t == TileType.WATER) score -= 5;
-                else if (type == EnemyType.HUNTER && t == TileType.DIRT_PATH) score += 4;
-                else if (skin == EnemySkin.BOAR && (t == TileType.MUD || t == TileType.TALL_GRASS)) score += 3;
-                else if (t == TileType.GRASS || t == TileType.DIRT_PATH) score += 2;
-            }
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestC = targetC;
-                bestR = targetR;
-                if (score >= 4) break;
+    private void pickOrganicPatrolPoint(List<Enemy> allEnemies, TileMap tileMap, int curCol, int curRow) {
+        if (bossController != null) {
+            int[] territoryTile = bossController.pickTerritoryPatrolTile(tileMap, curCol, curRow);
+            if (territoryTile != null) {
+                patrolHeadingAngle = Math.atan2(territoryTile[1] - curRow, territoryTile[0] - curCol);
+                requestPath(tileMap, curCol, curRow, territoryTile[0], territoryTile[1], true);
+                return;
             }
         }
 
-        if (bestC != Integer.MIN_VALUE) {
-            patrolHeadingAngle = Math.atan2(bestR - curRow, bestC - curCol);
-            requestPath(tileMap, curCol, curRow, bestC, bestR, true);
+        int[] bestTile = MobSteeringHelper.pickDispersedPatrolTile(
+            this, allEnemies, tileMap, curCol, curRow, patrolHeadingAngle, behaviorProfile, rand
+        );
+        if (bestTile != null) {
+            patrolHeadingAngle = Math.atan2(bestTile[1] - curRow, bestTile[0] - curCol);
+            requestPath(tileMap, curCol, curRow, bestTile[0], bestTile[1], true);
         }
     }
 
@@ -468,9 +467,8 @@ public class Enemy {
 
         this.targetCol = destCol;
         this.targetRow = destRow;
-        Pathfinder pf = new Pathfinder();
         boolean isCrocodile = (skin == EnemySkin.CROCODILE);
-        List<Node> newPath = pf.findPath(tileMap, startCol, startRow, destCol, destRow, isCrocodile);
+        List<Node> newPath = pathfinder.findPath(tileMap, startCol, startRow, destCol, destRow, isCrocodile);
 
         this.currentPath = newPath;
         this.currentPathIndex = 0;
@@ -486,7 +484,7 @@ public class Enemy {
             }
         }
 
-        this.repathCooldown = (state == AIState.CHASE || state == AIState.TERRITORIAL_ATTACK) ? 0.28 : 0.55;
+        this.repathCooldown = (state == AIState.CHASE || state == AIState.TERRITORIAL_ATTACK || state == AIState.RETREATING) ? 0.28 : 0.55;
     }
 
     /**
@@ -497,10 +495,16 @@ public class Enemy {
      */
     private void executeFluidMovement(double deltaTime, double maxSpeed, Player player, List<Enemy> allEnemies,
                                       TileMap tileMap, List<Footprint> scentTrail, TileType currentTile) {
-        if (state == AIState.AIMING || patrolPauseTimer > 0 || attackWindupTimer > 0) {
+        if (state == AIState.AIMING || state == AIState.ROARING || patrolPauseTimer > 0 || attackWindupTimer > 0) {
             this.moving = false;
             this.vx *= 0.5;
             this.vy *= 0.5;
+            if (state != AIState.ROARING && attackWindupTimer <= 0) {
+                double[] drift = MobSteeringHelper.computePausedDispersionVelocity(this, allEnemies);
+                if (Math.hypot(drift[0], drift[1]) > 2.0) {
+                    moveWithCollisionSlide(drift[0] * deltaTime, drift[1] * deltaTime, tileMap);
+                }
+            }
             return;
         }
 
@@ -511,8 +515,17 @@ public class Enemy {
         boolean isChasingPlayer = (state == AIState.CHASE || state == AIState.TERRITORIAL_ATTACK) && !player.isBurrowed();
         boolean isCroc = (skin == EnemySkin.CROCODILE);
 
-        // 1. Perseguição Vetorial Direta (Direct Pursuit) quando há corredor livre até a Raposa
-        if (isChasingPlayer) {
+        // 1. Perseguição Vetorial Direta (Direct Pursuit) ou Retorno Direto ao Domínio
+        if (state == AIState.RETREATING && bossController != null) {
+            double hx = bossController.getHomeX();
+            double hy = bossController.getHomeY();
+            double distHome = Math.hypot(hx - x, hy - y);
+            if (distHome > 16.0 && Pathfinder.hasClearWorldCorridor(tileMap, x, y, hx, hy, isCroc)) {
+                desiredDirX = (hx - x) / distHome;
+                desiredDirY = (hy - y) / distHome;
+                hasTarget = true;
+            }
+        } else if (isChasingPlayer) {
             double distToP = Math.hypot(player.getX() - x, player.getY() - y);
             if (distToP > 14.0 && distToP < 260.0 &&
                 Pathfinder.hasClearWorldCorridor(tileMap, x, y, player.getX(), player.getY(), isCroc)) {
@@ -549,27 +562,17 @@ public class Enemy {
             this.moving = false;
             this.vx = 0;
             this.vy = 0;
+            double[] drift = MobSteeringHelper.computePausedDispersionVelocity(this, allEnemies);
+            if (Math.hypot(drift[0], drift[1]) > 2.0) {
+                moveWithCollisionSlide(drift[0] * deltaTime, drift[1] * deltaTime, tileMap);
+            }
             return;
         }
 
-        // 3. Força Suave de Separação entre Inimigos (Flocking Separation para não empilharem no mesmo ponto)
-        double sepX = 0.0;
-        double sepY = 0.0;
-        for (Enemy other : allEnemies) {
-            if (other != this && other.getHp() > 0) {
-                double dx = x - other.getX();
-                double dy = y - other.getY();
-                double d = Math.hypot(dx, dy);
-                if (d > 0.001 && d < 28.0) {
-                    double push = (28.0 - d) / 28.0;
-                    sepX += (dx / d) * push * 0.45;
-                    sepY += (dy / d) * push * 0.45;
-                }
-            }
-        }
-
-        double combinedX = desiredDirX + sepX;
-        double combinedY = desiredDirY + sepY;
+        // 3. Força Modular de Separação e Espaço Pessoal entre Inimigos
+        double[] sep = MobSteeringHelper.computeSeparationForce(this, allEnemies, behaviorProfile);
+        double combinedX = desiredDirX + sep[0];
+        double combinedY = desiredDirY + sep[1];
         double combinedLen = Math.hypot(combinedX, combinedY);
         if (combinedLen > 0.001) {
             combinedX /= combinedLen;
@@ -603,7 +606,7 @@ public class Enemy {
                     int c = (int) Math.floor(x / TileMap.TILE_SIZE);
                     int r = (int) Math.floor(y / TileMap.TILE_SIZE);
                     patrolHeadingAngle += Math.PI * 0.65;
-                    pickOrganicPatrolPoint(tileMap, c, r);
+                    pickOrganicPatrolPoint(allEnemies, tileMap, c, r);
                 }
             }
 
@@ -654,6 +657,10 @@ public class Enemy {
         this.hp -= amount;
         this.damageFlashTimer = 0.22;
 
+        if (bossController != null) {
+            bossController.onDamaged(hp, maxHp, fromX, fromY, x, y);
+        }
+
         double dx = x - fromX;
         double dy = y - fromY;
         double dist = Math.hypot(dx, dy);
@@ -667,6 +674,19 @@ public class Enemy {
 
     public boolean takeDamage(int amount) {
         return takeDamage(amount, x, y);
+    }
+
+    public void startBossAttackWindup(double targetX, double targetY, double windupDuration) {
+        if (attackCooldown > 0 || attackWindupTimer > 0) return;
+        this.targetAimX = targetX;
+        this.targetAimY = targetY;
+        this.faceAngle = Math.atan2(targetY - y, targetX - x);
+        this.attackWindupTimer = windupDuration;
+    }
+
+    public void cancelActiveAttackForRetreat() {
+        this.attackWindupTimer = 0.0;
+        this.attackLungeTimer = 0.0;
     }
 
     public void startAttackWindup(double targetX, double targetY) {
@@ -700,21 +720,19 @@ public class Enemy {
 
         switch (type) {
             case BEAR_BOSS:
-                if (skin == EnemySkin.PANTHER) {
-                    this.attackCooldown = 0.95;
-                    this.attackLungeTimer = 0.25;
-                    this.knockbackVx = dirX * 220.0;
-                    this.knockbackVy = dirY * 220.0;
-                } else if (skin == EnemySkin.CROCODILE) {
-                    this.attackCooldown = 1.15;
-                    this.attackLungeTimer = 0.32;
-                    this.knockbackVx = dirX * 180.0;
-                    this.knockbackVy = dirY * 180.0;
+                if (bossController != null) {
+                    BossAttackType atk = bossController.getActiveAttack();
+                    double rateScale = bossController.isEnraged() ? 0.85 : 1.0;
+                    this.attackCooldown = atk.getCooldownDuration() * rateScale;
+                    this.attackLungeTimer = atk.getActiveDuration();
+                    this.knockbackVx = dirX * atk.getLungeImpulse();
+                    this.knockbackVy = dirY * atk.getLungeImpulse();
+                    bossController.beginActiveStrike();
                 } else {
-                    this.attackCooldown = 1.45;
-                    this.attackLungeTimer = 0.35;
-                    this.knockbackVx = dirX * 90.0;
-                    this.knockbackVy = dirY * 90.0;
+                    this.attackCooldown = 1.35;
+                    this.attackLungeTimer = 0.30;
+                    this.knockbackVx = dirX * 140.0;
+                    this.knockbackVy = dirY * 140.0;
                 }
                 break;
 
@@ -753,21 +771,6 @@ public class Enemy {
     public double getTargetAimY() { return targetAimY; }
     public double getAttackCooldown() { return attackCooldown; }
 
-    private FoodItem findNearestUnconsumedFood(List<FoodItem> foodList) {
-        FoodItem nearest = null;
-        double minDist = Double.MAX_VALUE;
-        for (FoodItem item : foodList) {
-            if (!item.isEaten()) {
-                double d = Math.hypot(item.getX() - x, item.getY() - y);
-                if (d < minDist) {
-                    minDist = d;
-                    nearest = item;
-                }
-            }
-        }
-        return nearest;
-    }
-
     private boolean canSensePlayerBySight(Player player, TileMap tileMap, double dist) {
         if (dist > currentVisionRange) return false;
         if (player.isHiddenInGrass() && type != EnemyType.HOUND) {
@@ -801,6 +804,13 @@ public class Enemy {
 
     public EnemyType getType() { return type; }
     public EnemySkin getSkin() { return skin; }
+    public AnimalVariant getVariant() { return variant; }
+    public String getDisplayName() {
+        if (type == EnemyType.BEAR_BOSS) {
+            return skin != null ? skin.getDisplayName() : type.name();
+        }
+        return variant.resolveDisplayName(skin);
+    }
     public double getX() { return x; }
     public double getY() { return y; }
     public int getHp() { return hp; }
@@ -820,4 +830,6 @@ public class Enemy {
     public double getSuspicionMeter() { return suspicionMeter; }
     public List<Node> getCurrentPath() { return currentPath; }
     public int getCurrentPathIndex() { return currentPathIndex; }
+    public boolean isBoss() { return type == EnemyType.BEAR_BOSS; }
+    public BossBehaviorController getBossController() { return bossController; }
 }

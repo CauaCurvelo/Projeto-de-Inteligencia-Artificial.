@@ -1,5 +1,7 @@
 package br.edu.unex.sentinela.world;
 
+import br.edu.unex.sentinela.ai.AnimalVariant;
+import br.edu.unex.sentinela.ai.BossArchetype;
 import br.edu.unex.sentinela.ai.EnemySkin;
 import br.edu.unex.sentinela.ai.EnemyType;
 import br.edu.unex.sentinela.entity.Enemy;
@@ -10,50 +12,59 @@ import java.util.Random;
 
 /**
  * Gerenciador Ecológico de Distribuição e Spawn (Ecosystem Spawner):
- * - Distribuição em anel radial 360° (eliminando o viés de spawn apenas nas 4 diagonais)
- * - Validação estrita de colisão e espaçamento (Poisson-disk mínimo para nunca nascer dentro de árvores/paredes ou empilhados)
- * - Afinidade de Habitat por Espécie:
- *   * Caçador & Cão: Trilhas de terra e clareiras abertas (frequentemente em dupla coordenada)
- *   * Lobo &Pantera: Bordas de floresta densa
- *   * Javali & Texugo: Mata alta, lamaçais e proximidades de arbustos de frutas
- *   * Crocodilo: Exclusivo de rios e margens de lama
- *   * Urso Pardo: Clareiras próximas a encostas rochosas ou mata fechada
+ * - Distribuição aleatória real rotacionada por partida (sem ângulos ou raios engessados)
+ * - Validação de densidade local e distância mínima para impedir amontoamento
+ * - Chefes nativos distribuídos em cada bioma regional (incluindo Tundra Nevada)
  */
 public class EcosystemSpawner {
-    private static final Random rand = new Random();
-    private static final double MIN_ENEMY_SEPARATION = 96.0; // Mínimo de 3 tiles entre inimigos no spawn
+    private static final double MIN_ENEMY_SEPARATION = 190.0;
+    private static final double CROWD_CHECK_RADIUS = 280.0;
+    private static final int MAX_CROWD_NEIGHBORS = 1;
+    private static final double MIN_BOSS_TERRITORY_SPACING = 620.0;
+    private static final int MAX_ACTIVE_BOSSES = 4;
+
+    private final Random rand = new Random();
 
     public void populateInitialEcosystem(TileMap tileMap, List<Enemy> enemies, List<FoodItem> foodItems, List<Burrow> burrows) {
-        // 1. Tocas da Raposa distribuídas em setores angulares ao redor do mapa inicial
-        for (int sector = 0; sector < 6; sector++) {
-            double baseAngle = sector * (Math.PI / 3.0);
-            spawnBurrowInSector(tileMap, burrows, 0, 0, baseAngle, 10, 26);
+        rand.setSeed(tileMap.getWorldSeed() ^ System.nanoTime());
+
+        // 1. Tocas da Raposa distribuídas em direções embaralhadas ao redor do mapa inicial
+        double[] burrowAngles = EcosystemPlacementHelper.generateShuffledAngles(6, rand);
+        for (double angle : burrowAngles) {
+            spawnBurrowInSector(tileMap, burrows, 0, 0, angle, 11, 34);
         }
 
-        // 2. Arbustos de Frutas iniciais próximos a bosques e campinas
-        for (int i = 0; i < 14; i++) {
-            spawnFoodNearPlayer(tileMap, foodItems, 0, 0);
+        // 2. Arbustos de frutas espalhados organicamente sem formar agrupamentos
+        for (int i = 0; i < 20; i++) {
+            spawnFoodNearPlayer(tileMap, foodItems, 0, 0, 8.0, 56.0, 145.0);
         }
 
-        // 3. Distribuição Inicial Balanceada em 360° por Habitat (Sem coordenadas fixas cegas!)
-        // Duplas de Caçador + Cão Rastreador patrulhando trilhas/clareiras em setores opostos
-        spawnHunterAndHoundPair(tileMap, enemies, 0, 0, Math.toRadians(35), 18, 26, 1.0);
-        spawnHunterAndHoundPair(tileMap, enemies, 0, 0, Math.toRadians(215), 20, 28, 1.0);
+        // 3. Patrulhas iniciais com rotação 360° aleatória e ampla dispersão radial
+        double[] patrolAngles = EcosystemPlacementHelper.generateShuffledAngles(4, rand);
+        spawnHunterAndHoundPair(tileMap, enemies, 0, 0, patrolAngles[0], 17, 36, 1.0);
+        spawnHunterAndHoundPair(tileMap, enemies, 0, 0, patrolAngles[1], 22, 46, 1.0);
+        spawnByHabitat(tileMap, enemies, EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, 0, 0, patrolAngles[2], 20, 48, 1.0);
+        spawnByHabitat(tileMap, enemies, EnemyType.HOUND, EnemySkin.HOUND_TRACKER, 0, 0, patrolAngles[3], 18, 42, 1.0);
 
-        // Caçador solitário e Cão farejador em outros quadrantes
-        spawnByHabitat(tileMap, enemies, EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, 0, 0, Math.toRadians(130), 20, 28, 1.0);
-        spawnByHabitat(tileMap, enemies, EnemyType.HOUND, EnemySkin.HOUND_TRACKER, 0, 0, Math.toRadians(310), 18, 26, 1.0);
+        // 4. Fauna silvestre variada conforme o bioma de cada setor sorteado
+        double[] wildAngles = EcosystemPlacementHelper.generateShuffledAngles(7, rand);
+        for (int i = 0; i < wildAngles.length; i++) {
+            double ang = wildAngles[i];
+            int minR = 16 + (i % 3) * 8;
+            int maxR = 36 + (i % 3) * 14;
+            double sampleDist = (minR + maxR) * 0.5;
+            int sampleCol = (int) Math.round(Math.cos(ang) * sampleDist);
+            int sampleRow = (int) Math.round(Math.sin(ang) * sampleDist);
+            BiomeType sectorBiome = tileMap.getBiomeAt(sampleCol, sampleRow);
+            EnemySkin skin = EcosystemPlacementHelper.pickWeightedRivalSkin(sectorBiome, rand);
+            spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, skin, 0, 0, ang, minR, maxR, 1.0);
+        }
 
-        // Fauna Rival distribuída em todos os ângulos (Javalis, Lobos e Texugos)
-        spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, EnemySkin.WOLF,   0, 0, Math.toRadians(15),  14, 22, 1.0);
-        spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, EnemySkin.BOAR,   0, 0, Math.toRadians(85),  13, 21, 1.0);
-        spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, EnemySkin.BADGER, 0, 0, Math.toRadians(155), 14, 22, 1.0);
-        spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, EnemySkin.WOLF,   0, 0, Math.toRadians(200), 16, 24, 1.0);
-        spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, EnemySkin.BOAR,   0, 0, Math.toRadians(260), 14, 22, 1.0);
-        spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, EnemySkin.BADGER, 0, 0, Math.toRadians(335), 15, 23, 1.0);
-
-        // Chefe Territorial Inicial (Distante da clareira central)
-        spawnByHabitat(tileMap, enemies, EnemyType.BEAR_BOSS, EnemySkin.BEAR, 0, 0, Math.toRadians(70), 25, 33, 1.0);
+        // 5. Quatro chefes nativos ancorados em seus respectivos biomas
+        spawnBossInNativeBiome(tileMap, enemies, EnemySkin.CROCODILE, 0, 0, 28, 86, 1.0);
+        spawnBossInNativeBiome(tileMap, enemies, EnemySkin.PANTHER, 0, 0, 28, 86, 1.0);
+        spawnBossInNativeBiome(tileMap, enemies, EnemySkin.BEAR, 0, 0, 28, 86, 1.0);
+        spawnBossInNativeBiome(tileMap, enemies, EnemySkin.POLAR_BEAR, 0, 0, 28, 86, 1.0);
     }
 
     public void spawnReinforcementNearPlayer(TileMap tileMap, List<Enemy> enemies, Player player, double survivalTime) {
@@ -61,64 +72,118 @@ public class EcosystemSpawner {
         int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
         double scale = 1.0 + (survivalTime / 240.0);
 
-        // Escolhe um ângulo 360° real aleatório para evitar concentração nos cantos
         double angle = rand.nextDouble() * Math.PI * 2.0;
+        int sampleCol = pCol + (int) Math.round(Math.cos(angle) * 24.0);
+        int sampleRow = pRow + (int) Math.round(Math.sin(angle) * 24.0);
+        BiomeType sectorBiome = tileMap.getBiomeAt(sampleCol, sampleRow);
         int roll = rand.nextInt(100);
 
         if (roll < 22) {
-            // Patrulha de Caçador (às vezes acompanhado de Cão)
             if (rand.nextBoolean() && enemies.size() + 2 <= 24) {
-                spawnHunterAndHoundPair(tileMap, enemies, pCol, pRow, angle, 20, 30, scale);
+                spawnHunterAndHoundPair(tileMap, enemies, pCol, pRow, angle, 20, 32, scale);
             } else {
-                spawnByHabitat(tileMap, enemies, EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, pCol, pRow, angle, 20, 30, scale);
+                spawnByHabitat(tileMap, enemies, EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, pCol, pRow, angle, 20, 32, scale);
             }
-        } else if (roll < 45) {
-            spawnByHabitat(tileMap, enemies, EnemyType.HOUND, EnemySkin.HOUND_TRACKER, pCol, pRow, angle, 19, 28, scale);
+        } else if (roll < 42) {
+            spawnByHabitat(tileMap, enemies, EnemyType.HOUND, EnemySkin.HOUND_TRACKER, pCol, pRow, angle, 19, 30, scale);
         } else {
-            int rivalPick = rand.nextInt(3);
-            EnemySkin skin = (rivalPick == 0) ? EnemySkin.WOLF : (rivalPick == 1 ? EnemySkin.BOAR : EnemySkin.BADGER);
-            spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, skin, pCol, pRow, angle, 17, 26, scale);
+            EnemySkin skin = EcosystemPlacementHelper.pickWeightedRivalSkin(sectorBiome, rand);
+            spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, skin, pCol, pRow, angle, 17, 30, scale);
         }
     }
 
     public void spawnApexBossNearPlayer(TileMap tileMap, List<Enemy> enemies, Player player, double survivalTime) {
+        long activeBosses = enemies.stream()
+            .filter(e -> e.getType() == EnemyType.BEAR_BOSS && e.getHp() > 0)
+            .count();
+        if (activeBosses >= MAX_ACTIVE_BOSSES) return;
+
         int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
         int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
         double scale = 1.0 + (survivalTime / 240.0);
 
-        int bossChoice = rand.nextInt(3);
-        EnemySkin bossSkin = (bossChoice == 0) ? EnemySkin.BEAR :
-                             (bossChoice == 1 ? EnemySkin.CROCODILE : EnemySkin.PANTHER);
+        BiomeType playerBiome = tileMap.getBiomeAt(pCol, pRow);
+        BossArchetype preferred = BossArchetype.forBiome(playerBiome);
+        if (spawnBossInNativeBiome(tileMap, enemies, preferred.toSkin(), pCol, pRow, 22, 46, scale) != null) {
+            return;
+        }
 
-        double angle = rand.nextDouble() * Math.PI * 2.0;
-        spawnByHabitat(tileMap, enemies, EnemyType.BEAR_BOSS, bossSkin, pCol, pRow, angle, 22, 32, scale);
+        for (EnemySkin candidateSkin : new EnemySkin[]{EnemySkin.CROCODILE, EnemySkin.PANTHER, EnemySkin.BEAR, EnemySkin.POLAR_BEAR}) {
+            if (candidateSkin != preferred.toSkin()
+                    && spawnBossInNativeBiome(tileMap, enemies, candidateSkin, pCol, pRow, 24, 52, scale) != null) {
+                return;
+            }
+        }
+    }
+
+    private Enemy spawnBossInNativeBiome(TileMap tileMap, List<Enemy> enemies, EnemySkin bossSkin,
+                                         int centerCol, int centerRow, int minRadiusTiles, int maxRadiusTiles, double scale) {
+        BiomeType targetBiome = BossArchetype.fromSkin(bossSkin).getNativeBiome();
+        int bestCol = Integer.MIN_VALUE;
+        int bestRow = Integer.MIN_VALUE;
+        int bestScore = Integer.MIN_VALUE;
+
+        for (int attempt = 0; attempt < 180; attempt++) {
+            double angle = rand.nextDouble() * Math.PI * 2.0;
+            double distTiles = minRadiusTiles + rand.nextDouble() * (maxRadiusTiles - minRadiusTiles);
+            int c = centerCol + (int) Math.round(Math.cos(angle) * distTiles);
+            int r = centerRow + (int) Math.round(Math.sin(angle) * distTiles);
+
+            if (!EcosystemPlacementHelper.isTileClearAndUncrowded(
+                    tileMap, enemies, c, r, MIN_ENEMY_SEPARATION, CROWD_CHECK_RADIUS, MAX_CROWD_NEIGHBORS)
+                    || !isBossTerritoryClear(enemies, c, r)) {
+                continue;
+            }
+            if (tileMap.getBiomeAt(c, r) != targetBiome) {
+                continue;
+            }
+
+            int score = 6 + EcosystemPlacementHelper.evaluateHabitatAffinity(tileMap, EnemyType.BEAR_BOSS, bossSkin, c, r);
+            if (score > bestScore) {
+                bestScore = score;
+                bestCol = c;
+                bestRow = r;
+                if (score >= 9) break;
+            }
+        }
+
+        if (bestCol != Integer.MIN_VALUE) {
+            Enemy boss = new Enemy(
+                EnemyType.BEAR_BOSS, bossSkin, AnimalVariant.STANDARD,
+                bestCol * TileMap.TILE_SIZE + 16.0, bestRow * TileMap.TILE_SIZE + 16.0,
+                scale, scale
+            );
+            enemies.add(boss);
+            return boss;
+        }
+        return null;
     }
 
     private void spawnHunterAndHoundPair(TileMap tileMap, List<Enemy> enemies, int centerCol, int centerRow,
                                          double baseAngle, int minRadiusTiles, int maxRadiusTiles, double scale) {
         Enemy hunter = spawnByHabitat(tileMap, enemies, EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER,
                                       centerCol, centerRow, baseAngle, minRadiusTiles, maxRadiusTiles, scale);
-        if (hunter != null) {
-            int hCol = (int) Math.floor(hunter.getX() / TileMap.TILE_SIZE);
-            int hRow = (int) Math.floor(hunter.getY() / TileMap.TILE_SIZE);
-            // Spawna o Cão Rastreador a 2-3 blocos ao lado do seu mestre Caçador
-            for (int tries = 0; tries < 16; tries++) {
-                int c = hCol + (rand.nextInt(5) - 2);
-                int r = hRow + (rand.nextInt(5) - 2);
-                if (isTileClearForSpawn(tileMap, enemies, c, r, 36.0)) {
-                    Enemy hound = new Enemy(EnemyType.HOUND, EnemySkin.HOUND_TRACKER,
-                                            c * TileMap.TILE_SIZE + 16, r * TileMap.TILE_SIZE + 16, scale, scale);
-                    enemies.add(hound);
-                    break;
-                }
+        if (hunter == null) return;
+
+        int hCol = (int) Math.floor(hunter.getX() / TileMap.TILE_SIZE);
+        int hRow = (int) Math.floor(hunter.getY() / TileMap.TILE_SIZE);
+        for (int tries = 0; tries < 20; tries++) {
+            double offsetAngle = rand.nextDouble() * Math.PI * 2.0;
+            double offsetDist = 2.4 + rand.nextDouble() * 1.4; // 76..122 px do caçador (sem empilhar)
+            int c = hCol + (int) Math.round(Math.cos(offsetAngle) * offsetDist);
+            int r = hRow + (int) Math.round(Math.sin(offsetAngle) * offsetDist);
+            if (EcosystemPlacementHelper.isTileClearAndUncrowded(
+                    tileMap, enemies, c, r, MIN_ENEMY_SEPARATION, CROWD_CHECK_RADIUS, MAX_CROWD_NEIGHBORS, hunter, 72.0)) {
+                Enemy hound = new Enemy(
+                    EnemyType.HOUND, EnemySkin.HOUND_TRACKER, hunter.getVariant(),
+                    c * TileMap.TILE_SIZE + 16.0, r * TileMap.TILE_SIZE + 16.0, scale, scale
+                );
+                enemies.add(hound);
+                break;
             }
         }
     }
 
-    /**
-     * Procura no setor angular indicado um tile que combine com o habitat natural da espécie
-     * e que esteja livre de árvores, rochas e outros inimigos.
-     */
     public Enemy spawnByHabitat(TileMap tileMap, List<Enemy> enemies, EnemyType type, EnemySkin skin,
                                 int centerCol, int centerRow, double preferredAngle,
                                 int minRadiusTiles, int maxRadiusTiles, double scale) {
@@ -126,139 +191,93 @@ public class EcosystemSpawner {
         int bestRow = Integer.MIN_VALUE;
         int bestScore = -1;
 
-        for (int attempt = 0; attempt < 45; attempt++) {
-            // Espalha gradualmente o leque angular se não achar de primeira no ângulo exato
-            double angleSpread = (attempt < 15) ? 0.65 : Math.PI;
+        for (int attempt = 0; attempt < 55; attempt++) {
+            double angleSpread = (attempt < 18) ? 0.65 : Math.PI;
             double angle = preferredAngle + (rand.nextDouble() * 2.0 - 1.0) * angleSpread;
             double distTiles = minRadiusTiles + rand.nextDouble() * (maxRadiusTiles - minRadiusTiles);
 
             int c = centerCol + (int) Math.round(Math.cos(angle) * distTiles);
             int r = centerRow + (int) Math.round(Math.sin(angle) * distTiles);
 
-            if (!isTileClearForSpawn(tileMap, enemies, c, r, MIN_ENEMY_SEPARATION)) {
+            if (!EcosystemPlacementHelper.isTileClearAndUncrowded(
+                    tileMap, enemies, c, r, MIN_ENEMY_SEPARATION, CROWD_CHECK_RADIUS, MAX_CROWD_NEIGHBORS)) {
+                continue;
+            }
+            if (type == EnemyType.BEAR_BOSS && !isBossTerritoryClear(enemies, c, r)) {
                 continue;
             }
 
-            int affinityScore = evaluateBiomeAffinity(tileMap, type, skin, c, r);
+            int affinityScore = EcosystemPlacementHelper.evaluateHabitatAffinity(tileMap, type, skin, c, r);
             if (affinityScore > bestScore) {
                 bestScore = affinityScore;
                 bestCol = c;
                 bestRow = r;
-                if (bestScore >= 3) {
-                    break; // Habitat ideal encontrado!
-                }
+                if (bestScore >= 3) break;
             }
         }
 
         if (bestCol != Integer.MIN_VALUE) {
             double wx = bestCol * TileMap.TILE_SIZE + 16.0;
             double wy = bestRow * TileMap.TILE_SIZE + 16.0;
-            Enemy spawned = new Enemy(type, skin, wx, wy, scale, scale);
+            BiomeType biome = tileMap.getBiomeAt(bestCol, bestRow);
+            AnimalVariant variant = (type == EnemyType.BEAR_BOSS)
+                    ? AnimalVariant.STANDARD
+                    : AnimalVariant.forBiome(biome, rand);
+            Enemy spawned = new Enemy(type, skin, variant, wx, wy, scale, scale);
             enemies.add(spawned);
             return spawned;
         }
         return null;
     }
 
-    /**
-     * Calcula a pontuação de afinidade ecológica (0 a 4) entre a espécie e o terreno candidato.
-     */
-    private int evaluateBiomeAffinity(TileMap tileMap, EnemyType type, EnemySkin skin, int col, int row) {
-        TileType tile = tileMap.getTileAt(col, row);
-
-        // Crocodilo: Deve nascer na água ou lama
-        if (skin == EnemySkin.CROCODILE) {
-            if (tile == TileType.WATER) return 4;
-            if (tile == TileType.MUD) return 3;
-            return hasNeighborOfType(tileMap, col, row, TileType.WATER) ? 2 : 0;
-        }
-
-        // Animais terrestres não devem nascer submersos no meio do rio
-        if (tile == TileType.WATER) {
-            return -1;
-        }
-
-        if (type == EnemyType.HUNTER || type == EnemyType.HOUND) {
-            if (tile == TileType.DIRT_PATH) return 4;
-            if (tile == TileType.GRASS && hasNeighborOfType(tileMap, col, row, TileType.DIRT_PATH)) return 3;
-            if (tile == TileType.GRASS) return 2;
-            return 1;
-        }
-
-        if (skin == EnemySkin.BOAR) {
-            if (tile == TileType.MUD || tile == TileType.TALL_GRASS) return 4;
-            if (hasNeighborOfType(tileMap, col, row, TileType.MUD)) return 3;
-            return 2;
-        }
-
-        if (skin == EnemySkin.WOLF || skin == EnemySkin.PANTHER || skin == EnemySkin.BADGER) {
-            if (tile == TileType.TALL_GRASS) return 4;
-            if (tile == TileType.GRASS && hasNeighborOfType(tileMap, col, row, TileType.TREE)) return 3;
-            return 2;
-        }
-
-        if (skin == EnemySkin.BEAR) {
-            if (tile == TileType.GRASS && hasNeighborOfType(tileMap, col, row, TileType.WALL)) return 4;
-            if (tile == TileType.GRASS && hasNeighborOfType(tileMap, col, row, TileType.TREE)) return 3;
-            return 2;
-        }
-
-        return 2;
-    }
-
-    /**
-     * Garante que o tile e suas bordas imediatas não sejam obstáculos e que não haja outro inimigo muito próximo.
-     */
-    private boolean isTileClearForSpawn(TileMap tileMap, List<Enemy> enemies, int col, int row, double minSeparationPx) {
-        TileType center = tileMap.getTileAt(col, row);
-        if (!center.isWalkable()) {
-            return false;
-        }
-
-        // Garante que o inimigo não nasça totalmente cercado por 4 árvores/paredes (beco sem saída de 1 tile)
-        int walkableNeighbors = 0;
-        if (tileMap.getTileAt(col + 1, row).isWalkable()) walkableNeighbors++;
-        if (tileMap.getTileAt(col - 1, row).isWalkable()) walkableNeighbors++;
-        if (tileMap.getTileAt(col, row + 1).isWalkable()) walkableNeighbors++;
-        if (tileMap.getTileAt(col, row - 1).isWalkable()) walkableNeighbors++;
-        if (walkableNeighbors < 2) {
-            return false;
-        }
-
+    private boolean isBossTerritoryClear(List<Enemy> enemies, int col, int row) {
         double wx = col * TileMap.TILE_SIZE + 16.0;
         double wy = row * TileMap.TILE_SIZE + 16.0;
-
         for (Enemy existing : enemies) {
-            if (Math.hypot(existing.getX() - wx, existing.getY() - wy) < minSeparationPx) {
-                return false;
+            if (existing.getType() == EnemyType.BEAR_BOSS && existing.getHp() > 0 && existing.getBossController() != null) {
+                double distHome = Math.hypot(existing.getBossController().getHomeX() - wx,
+                                             existing.getBossController().getHomeY() - wy);
+                if (distHome < MIN_BOSS_TERRITORY_SPACING) {
+                    return false;
+                }
             }
         }
         return true;
     }
 
     public void spawnFoodNearPlayer(TileMap tileMap, List<FoodItem> foodItems, int playerCol, int playerRow) {
-        for (int tries = 0; tries < 45; tries++) {
+        spawnFoodNearPlayer(tileMap, foodItems, playerCol, playerRow, 7.0, 32.0, 128.0);
+    }
+
+    private void spawnFoodNearPlayer(TileMap tileMap, List<FoodItem> foodItems, int playerCol, int playerRow,
+                                     double minDistTiles, double maxDistTiles, double minSpacingPx) {
+        for (int tries = 0; tries < 55; tries++) {
             double angle = rand.nextDouble() * Math.PI * 2.0;
-            double dist = 7 + rand.nextDouble() * 22;
+            double dist = minDistTiles + rand.nextDouble() * (maxDistTiles - minDistTiles);
             int c = playerCol + (int) Math.round(Math.cos(angle) * dist);
             int r = playerRow + (int) Math.round(Math.sin(angle) * dist);
             TileType t = tileMap.getTileAt(c, r);
+            BiomeType biome = tileMap.getBiomeAt(c, r);
 
             if (t == TileType.GRASS || t == TileType.TALL_GRASS) {
-                boolean nearVegetation = (t == TileType.TALL_GRASS) || hasNeighborOfType(tileMap, c, r, TileType.TREE);
+                boolean nearVegetation = (t == TileType.TALL_GRASS)
+                    || EcosystemPlacementHelper.hasNeighborOfType(tileMap, c, r, TileType.TREE)
+                    || (biome == BiomeType.SWAMP && EcosystemPlacementHelper.hasNeighborOfType(tileMap, c, r, TileType.WATER))
+                    || ((biome == BiomeType.HIGHLAND || biome == BiomeType.SNOW)
+                        && EcosystemPlacementHelper.hasNeighborOfType(tileMap, c, r, TileType.WALL));
                 if (!nearVegetation) continue;
 
                 double wx = c * TileMap.TILE_SIZE + 16;
                 double wy = r * TileMap.TILE_SIZE + 16;
                 boolean tooClose = false;
                 for (FoodItem f : foodItems) {
-                    if (!f.isEaten() && Math.hypot(f.getX() - wx, f.getY() - wy) < 96.0) {
+                    if (!f.isEaten() && Math.hypot(f.getX() - wx, f.getY() - wy) < minSpacingPx) {
                         tooClose = true;
                         break;
                     }
                 }
                 if (!tooClose) {
-                    foodItems.add(new FoodItem(c, r));
+                    foodItems.add(new FoodItem(c, r, FoodVariant.pickForBiome(biome, rand)));
                     break;
                 }
             }
@@ -267,7 +286,7 @@ public class EcosystemSpawner {
 
     public void spawnBurrowInSector(TileMap tileMap, List<Burrow> burrows, int centerCol, int centerRow,
                                     double sectorAngle, int minDist, int maxDist) {
-        for (int tries = 0; tries < 25; tries++) {
+        for (int tries = 0; tries < 28; tries++) {
             double angle = sectorAngle + (rand.nextDouble() - 0.5) * (Math.PI / 3.0);
             double dist = minDist + rand.nextDouble() * (maxDist - minDist);
             int c = centerCol + (int) Math.round(Math.cos(angle) * dist);
@@ -279,7 +298,7 @@ public class EcosystemSpawner {
                 double wy = r * TileMap.TILE_SIZE + 16;
                 boolean tooClose = false;
                 for (Burrow b : burrows) {
-                    if (Math.hypot(b.getX() - wx, b.getY() - wy) < 160.0) {
+                    if (Math.hypot(b.getX() - wx, b.getY() - wy) < 170.0) {
                         tooClose = true;
                         break;
                     }
@@ -290,12 +309,5 @@ public class EcosystemSpawner {
                 }
             }
         }
-    }
-
-    private boolean hasNeighborOfType(TileMap tileMap, int c, int r, TileType targetType) {
-        return tileMap.getTileAt(c + 1, r) == targetType ||
-               tileMap.getTileAt(c - 1, r) == targetType ||
-               tileMap.getTileAt(c, r + 1) == targetType ||
-               tileMap.getTileAt(c, r - 1) == targetType;
     }
 }

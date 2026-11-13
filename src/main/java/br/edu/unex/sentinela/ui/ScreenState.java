@@ -7,6 +7,7 @@ public enum ScreenState {
     MAIN_MENU,
     PLAYING,
     PAUSED,
+    GAME_OVER,
     SETTINGS,
     HISTORY,
     ACHIEVEMENTS,

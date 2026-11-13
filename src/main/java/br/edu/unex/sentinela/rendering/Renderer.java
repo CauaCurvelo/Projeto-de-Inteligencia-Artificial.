@@ -3,6 +3,8 @@ package br.edu.unex.sentinela.rendering;
 import br.edu.unex.sentinela.entity.Enemy;
 import br.edu.unex.sentinela.entity.Player;
 import br.edu.unex.sentinela.input.InputManager;
+import br.edu.unex.sentinela.settings.GameSettings;
+import br.edu.unex.sentinela.settings.GraphicsQuality;
 import br.edu.unex.sentinela.world.*;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
@@ -25,27 +27,38 @@ public class Renderer {
     private double height;
 
     private final TerrainRenderer terrainRenderer;
+    private final TerrainChunkCache terrainChunkCache;
     private final FoliageAndCliffRenderer foliageAndCliffRenderer;
+    private final BossAuraAndTelegraphRenderer bossAuraRenderer;
     private final TacticalAuraRenderer tacticalAuraRenderer;
     private final EntityRenderer entityRenderer;
     private final LightingAndWeatherRenderer lightingAndWeatherRenderer;
     private final HudRenderer hudRenderer;
+    private final UiIconDrawer overlayDrawer;
+    private boolean renderHud = true;
 
     public Renderer(GraphicsContext gc, double width, double height) {
         this.gc = gc;
         this.width = width;
         this.height = height;
         this.terrainRenderer = new TerrainRenderer(gc);
+        this.terrainChunkCache = new TerrainChunkCache();
         this.foliageAndCliffRenderer = new FoliageAndCliffRenderer(gc);
+        this.bossAuraRenderer = new BossAuraAndTelegraphRenderer(gc);
         this.tacticalAuraRenderer = new TacticalAuraRenderer(gc);
         this.entityRenderer = new EntityRenderer(gc);
         this.lightingAndWeatherRenderer = new LightingAndWeatherRenderer(gc);
         this.hudRenderer = new HudRenderer(gc);
+        this.overlayDrawer = new UiIconDrawer(gc);
     }
 
     public void updateViewport(double width, double height) {
         this.width = width;
         this.height = height;
+    }
+
+    public void setRenderHud(boolean renderHud) {
+        this.renderHud = renderHud;
     }
 
     public void render(World world, InputManager inputManager) {
@@ -54,6 +67,7 @@ public class Renderer {
         double camX = cam.getX();
         double camY = cam.getY();
         double animTime = world.getSurvivalTime();
+        GraphicsQuality quality = GameSettings.get().getGraphicsQuality();
 
         double cycleProgress = world.getCycleProgressTimer() / world.getCycleDuration();
         double sunOffsetX = 6.0 + Math.cos(cycleProgress * Math.PI) * 3.5;
@@ -77,29 +91,37 @@ public class Renderer {
         int startRow = (int) Math.floor(camY / ts) - 1;
         int endRow = (int) Math.ceil((camY + visibleH) / ts) + 1;
 
-        // PASSO 1: Terreno detalhado, micro-texturas e Oclusão de Ambiente (AO)
-        for (int row = startRow; row <= endRow; row++) {
-            for (int col = startCol; col <= endCol; col++) {
-                TileType type = tileMap.getTileAt(col, row);
-                double sx = col * ts - camX;
-                double sy = row * ts - camY;
-                terrainRenderer.renderGroundTile(type, sx, sy, ts, col, row, tileMap, animTime);
-            }
-        }
-
-        // PASSO 2: Sombras Projetadas Direcionais no solo (Árvores e Paredões)
-        for (int row = startRow; row <= endRow; row++) {
-            for (int col = startCol; col <= endCol; col++) {
-                TileType type = tileMap.getTileAt(col, row);
-                if (type == TileType.TREE || type == TileType.WALL) {
-                    double sx = col * ts - camX;
-                    double sy = row * ts - camY;
-                    foliageAndCliffRenderer.renderCastShadow(type, sx, sy, ts, col, row, sunOffsetX, sunOffsetY);
+        // PASSO 1: Terreno estático em chunks pré-renderizados + sobreposições animadas (água / grama alta)
+        terrainChunkCache.renderCachedGround(gc, tileMap, camX, camY, startCol, endCol, startRow, endRow, quality);
+        if (quality != GraphicsQuality.LOW) {
+            for (int row = startRow; row <= endRow; row++) {
+                for (int col = startCol; col <= endCol; col++) {
+                    TileType type = tileMap.getTileAt(col, row);
+                    if (type == TileType.WATER || (quality == GraphicsQuality.HIGH && type == TileType.TALL_GRASS)) {
+                        double sx = col * ts - camX;
+                        double sy = row * ts - camY;
+                        terrainRenderer.renderAnimatedTileOverlay(type, sx, sy, ts, col, row, animTime, quality, tileMap.getBiomeAt(col, row));
+                    }
                 }
             }
         }
 
-        // PASSO 3: Auras de Visão Táticas, Rotas de Rastreamento Fluidas e Sonar Acústico (projetados sobre o solo)
+        // PASSO 2: Sombras Projetadas Direcionais no solo (Árvores e Paredões)
+        if (quality != GraphicsQuality.LOW) {
+            for (int row = startRow; row <= endRow; row++) {
+                for (int col = startCol; col <= endCol; col++) {
+                    TileType type = tileMap.getTileAt(col, row);
+                    if (type == TileType.TREE || type == TileType.WALL) {
+                        double sx = col * ts - camX;
+                        double sy = row * ts - camY;
+                        foliageAndCliffRenderer.renderCastShadow(type, sx, sy, ts, col, row, sunOffsetX, sunOffsetY);
+                    }
+                }
+            }
+        }
+
+        // PASSO 3: Áreas dos Bosses (sempre visíveis), Cones de Visão Táticos, Rotas e Sonar
+        bossAuraRenderer.renderBossTerritories(world, camX, camY, visibleW, visibleH, animTime);
         tacticalAuraRenderer.renderTacticalAuras(world, camX, camY, visibleW, visibleH, animTime, inputManager.isDebugOverlay());
 
         // PASSO 4: Tocas, Pegadas/Rastro de Cheiro, Partículas, Arbustos de Frutas e Carne
@@ -133,7 +155,7 @@ public class Renderer {
                 double fx = food.getX() - camX;
                 double fy = food.getY() - camY;
                 if (fx >= -25 && fx <= visibleW + 25 && fy >= -25 && fy <= visibleH + 25) {
-                    entityRenderer.drawBerryBush(fx, fy, sunOffsetX, sunOffsetY);
+                    entityRenderer.drawBerryBush(food, fx, fy, sunOffsetX, sunOffsetY);
                 }
             }
         }
@@ -142,8 +164,8 @@ public class Renderer {
             if (!meat.isEaten()) {
                 double mx = meat.getX() - camX;
                 double my = meat.getY() - camY;
-                if (mx >= -25 && mx <= visibleW + 25 && my >= -25 && my <= visibleH + 25) {
-                    entityRenderer.drawMeatDrop(mx, my);
+                if (mx >= -30 && mx <= visibleW + 30 && my >= -30 && my <= visibleH + 30) {
+                    entityRenderer.drawMeatDrop(meat, mx, my, animTime);
                 }
             }
         }
@@ -155,7 +177,7 @@ public class Renderer {
                 double sx = col * ts - camX;
                 double sy = row * ts - camY;
                 if (type == TileType.WALL) {
-                    foliageAndCliffRenderer.renderGraniteWall25D(sx, sy, ts, col, row, tileMap);
+                    foliageAndCliffRenderer.renderGraniteWall25D(sx, sy, ts, col, row, tileMap, quality);
                 } else if (type == TileType.TREE) {
                     foliageAndCliffRenderer.renderTreeTrunk(sx, sy, ts, col, row);
                 }
@@ -199,7 +221,7 @@ public class Renderer {
                 if (tileMap.getTileAt(col, row) == TileType.TREE) {
                     double sx = col * ts - camX;
                     double sy = row * ts - camY;
-                    foliageAndCliffRenderer.renderTreeCanopy(sx, sy, ts, col, row, animTime);
+                    foliageAndCliffRenderer.renderTreeCanopy(sx, sy, ts, col, row, animTime, quality, tileMap.getBiomeAt(col, row));
                 }
             }
         }
@@ -210,7 +232,13 @@ public class Renderer {
 
         gc.restore();
 
-        // PASSO 9: Interface Arcade Fixa (HUD)
-        hudRenderer.renderInfiniteHUD(world, inputManager, width, height);
+        if (player.isLowLife()) {
+            overlayDrawer.drawLowLifeEdgeVignette(width, height, animTime);
+        }
+
+        // PASSO 9: Interface Arcade Fixa (HUD — ocultada no Menu Principal limpo)
+        if (renderHud) {
+            hudRenderer.renderInfiniteHUD(world, inputManager, width, height);
+        }
     }
 }
