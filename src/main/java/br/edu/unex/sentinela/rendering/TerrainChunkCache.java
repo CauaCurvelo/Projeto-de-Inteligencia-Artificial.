@@ -18,6 +18,8 @@ import java.util.Map;
  * preservando transições e oclusão de ambiente nas bordas entre chunks.
  */
 public class TerrainChunkCache {
+    public TerrainChunkCache() {}
+
     public static final int CHUNK_TILES = 16;
     private static final int CHUNK_PX = CHUNK_TILES * TileMap.TILE_SIZE;
     private static final int MAX_CACHED_CHUNKS = 48;

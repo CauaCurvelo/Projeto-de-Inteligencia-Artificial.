@@ -19,6 +19,8 @@ import java.util.Random;
  * e dispara os sons correspondentes, sem acoplar áudio às classes de entidade.
  */
 public final class GameAudioDirector {
+    public GameAudioDirector() {}
+
     private static final double VOICE_COOLDOWN = 1.6;
 
     private final SpatialAudio spatial = new SpatialAudio();

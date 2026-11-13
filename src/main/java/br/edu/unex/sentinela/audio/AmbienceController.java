@@ -15,6 +15,8 @@ import java.util.Random;
  * e dispara eventos pontuais (pássaros, coruja, grilos, trovão).
  */
 public final class AmbienceController {
+    public AmbienceController() {}
+
     private static final SoundId[] LOOPS = {
         SoundId.LOOP_WIND, SoundId.LOOP_FOREST, SoundId.LOOP_NIGHT,
         SoundId.LOOP_RIVER, SoundId.LOOP_RAIN, SoundId.LOOP_STORM_WIND

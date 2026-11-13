@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 public class InputManager {
+    public InputManager() {}
+
     private final Set<KeyCode> activeKeys = new HashSet<>();
     private double dx = 0;
     private double dy = 0;

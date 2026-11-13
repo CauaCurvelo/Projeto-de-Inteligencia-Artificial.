@@ -18,6 +18,8 @@ import javafx.stage.Stage;
 import java.io.InputStream;
 
 public class Main extends Application {
+    public Main() {}
+
     private static final int INITIAL_WIDTH = 960;
     private static final int INITIAL_HEIGHT = 640;
 

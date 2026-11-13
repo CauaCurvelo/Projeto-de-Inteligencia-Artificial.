@@ -3,6 +3,7 @@ package br.edu.unex.sentinela.rendering;
 import br.edu.unex.sentinela.settings.GameSettings;
 import br.edu.unex.sentinela.settings.GraphicsQuality;
 import br.edu.unex.sentinela.world.BiomeType;
+import br.edu.unex.sentinela.world.Camera;
 import br.edu.unex.sentinela.world.WeatherDrop;
 import br.edu.unex.sentinela.world.WeatherType;
 import br.edu.unex.sentinela.world.World;

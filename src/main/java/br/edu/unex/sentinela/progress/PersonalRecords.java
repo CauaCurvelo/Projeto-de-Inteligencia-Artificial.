@@ -13,6 +13,8 @@ public class PersonalRecords {
     private int totalApplesAccumulated = 0;
     private double totalTimePlayed = 0.0;
 
+    public PersonalRecords() {}
+
     public void updateWithMatch(MatchRecord match) {
         if (match == null) return;
         totalMatchesPlayed++;

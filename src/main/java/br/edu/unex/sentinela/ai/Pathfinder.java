@@ -20,6 +20,8 @@ import java.util.Set;
  */
 public class Pathfinder {
 
+    public Pathfinder() {}
+
     private static final int[][] DIRECTIONS_8 = {
         { 0, -1, 10}, // N
         { 0,  1, 10}, // S

@@ -17,6 +17,8 @@ import java.util.Random;
  * - Chefes nativos distribuídos em cada bioma regional (incluindo Tundra Nevada)
  */
 public class EcosystemSpawner {
+    public EcosystemSpawner() {}
+
     private static final double MIN_ENEMY_SEPARATION = 190.0;
     private static final double CROWD_CHECK_RADIUS = 280.0;
     private static final int MAX_CROWD_NEIGHBORS = 1;

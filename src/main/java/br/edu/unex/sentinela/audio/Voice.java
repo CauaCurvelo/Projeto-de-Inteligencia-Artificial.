@@ -1,7 +1,7 @@
 package br.edu.unex.sentinela.audio;
 
 /** Uma instância de som tocando no mixer (one-shot ou loop com ganho suavizado). */
-final class Voice {
+public final class Voice {
     final float[] data;
     final boolean loop;
     private double pos;

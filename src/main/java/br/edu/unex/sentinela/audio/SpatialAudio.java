@@ -2,6 +2,8 @@ package br.edu.unex.sentinela.audio;
 
 /** Áudio espacial 2D: atenuação por distância e pan estéreo relativos ao ouvinte (raposa). */
 public final class SpatialAudio {
+    public SpatialAudio() {}
+
     public static final double HEARING_RADIUS = 18 * 32.0;
     private static final double PAN_WIDTH = 320.0;
 

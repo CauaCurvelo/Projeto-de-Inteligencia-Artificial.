@@ -274,7 +274,7 @@ public class TileMap {
     }
 
     private double rawHash(int x, int y, long seedOffset) {
-        long n = (long)(x * 374761393L + y * 668265263L + worldSeed + seedOffset);
+        long n = x * 374761393L + y * 668265263L + worldSeed + seedOffset;
         n = (n ^ (n >> 13)) * 1274126177L;
         return ((n ^ (n >> 16)) & 0x7FFFFFFFL) / (double) 0x7FFFFFFFL;
     }
