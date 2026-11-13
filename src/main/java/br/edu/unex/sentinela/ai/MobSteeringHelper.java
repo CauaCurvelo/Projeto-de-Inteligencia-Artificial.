@@ -27,6 +27,13 @@ public final class MobSteeringHelper {
         for (Enemy other : allEnemies) {
             if (other == self || other.getHp() <= 0) continue;
 
+            // Não aplica repulsão entre combatentes rivais em combate territorial (Lobo x Cão)
+            boolean isRivalFight = (self.getSkin() == EnemySkin.WOLF && other.getType() == EnemyType.HOUND)
+                                || (self.getType() == EnemyType.HOUND && other.getSkin() == EnemySkin.WOLF);
+            if (isRivalFight && (self.getState() == AIState.FIGHTING_ENEMY || other.getState() == AIState.FIGHTING_ENEMY)) {
+                continue;
+            }
+
             // Duplas Caçador + Cão toleram distância menor entre si do que desconhecidos
             boolean isHunterHoundPair = !inCombat
                 && ((self.getType() == EnemyType.HOUND && other.getType() == EnemyType.HUNTER)

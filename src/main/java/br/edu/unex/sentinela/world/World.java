@@ -430,9 +430,9 @@ public class World {
 
             // Ataque da Raposa contra a fauna passiva
             if (player.isAttacking() && !player.hasProcessedAttackHit()) {
-                double attackRange = 36.0;
-                double attackX = player.getX() + player.getFaceDx() * 18;
-                double attackY = player.getY() + player.getFaceDy() * 18;
+                double attackRange = 40.0;
+                double attackX = player.getX() + Math.cos(player.getVisualAngle()) * 18.0;
+                double attackY = player.getY() + Math.sin(player.getVisualAngle()) * 18.0;
                 double distToAnimal = Math.hypot(animal.getX() - attackX, animal.getY() - attackY);
 
                 if (distToAnimal <= attackRange) {
@@ -441,8 +441,8 @@ public class World {
                     br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.8, 0, 1.15);
                     for (int k = 0; k < 5; k++) {
                         particles.add(new Particle(animal.getX(), animal.getY(),
-                            player.getFaceDx() * 50 + (rand.nextDouble() * 40 - 20),
-                            player.getFaceDy() * 50 + (rand.nextDouble() * 40 - 20),
+                            Math.cos(player.getVisualAngle()) * 50 + (rand.nextDouble() * 40 - 20),
+                            Math.sin(player.getVisualAngle()) * 50 + (rand.nextDouble() * 40 - 20),
                             0.25, "#D7CCC8", 2.8));
                     }
                     if (dead) {
@@ -484,9 +484,9 @@ public class World {
             }
 
             if (player.isAttacking() && !player.hasProcessedAttackHit()) {
-                double attackRange = 38.0;
-                double attackX = player.getX() + player.getFaceDx() * 18;
-                double attackY = player.getY() + player.getFaceDy() * 18;
+                double attackRange = 42.0;
+                double attackX = player.getX() + Math.cos(player.getVisualAngle()) * 18.0;
+                double attackY = player.getY() + Math.sin(player.getVisualAngle()) * 18.0;
                 double distToAttack = Math.hypot(enemy.getX() - attackX, enemy.getY() - attackY);
 
                 if (distToAttack <= attackRange) {
@@ -496,8 +496,8 @@ public class World {
                     for (int k = 0; k < 6; k++) {
                         particles.add(new Particle(
                             enemy.getX(), enemy.getY(),
-                            player.getFaceDx() * 80 + (rand.nextDouble() * 50 - 25),
-                            player.getFaceDy() * 80 + (rand.nextDouble() * 50 - 25),
+                            Math.cos(player.getVisualAngle()) * 80 + (rand.nextDouble() * 50 - 25),
+                            Math.sin(player.getVisualAngle()) * 80 + (rand.nextDouble() * 50 - 25),
                             0.30, "#FFD700", 3.5
                         ));
                     }
@@ -527,16 +527,19 @@ public class World {
                 continue;
             }
 
-            // Enemy Attack Preparation & Strike against Player (Zelda-style Wind-up Telegraph & Physical Impact)
-            if (distToPlayer < 75.0 && enemy.getHp() > 0 && enemy.getType() != EnemyType.HUNTER) {
+            // Preparação de ataque e bote do inimigo contra o Jogador (em distância corpo a corpo natural)
+            double strikePrepDist = (enemy.getType() == EnemyType.BEAR_BOSS || enemy.getSkin() == EnemySkin.BOAR) ? 48.0 : 42.0;
+            if (distToPlayer <= strikePrepDist && enemy.getHp() > 0 && enemy.getType() != EnemyType.HUNTER) {
                 if (enemy.getAttackCooldown() <= 0 && !enemy.isWindup() && !enemy.isLunging()) {
-                    // Starts attack telegraph (wind-up warning indicator)
                     enemy.startAttackWindup(player.getX(), player.getY());
                 }
             }
 
-            if (distToPlayer < 36.0 && enemy.getHp() > 0 && enemy.isLunging()) {
-                if (player.takeDamage(enemy.getX(), enemy.getY())) {
+            // Conexão física do golpe (durante o bote ou contato imediato próximo)
+            boolean isContactAttack = (distToPlayer <= 25.0 && enemy.getAttackCooldown() <= 0);
+            if ((enemy.isLunging() || isContactAttack) && distToPlayer <= 42.0 && enemy.getHp() > 0 && enemy.getType() != EnemyType.HUNTER) {
+                if (player.takeDamage(enemy.getX(), enemy.getY(), 260.0)) {
+                    enemy.triggerAttackCooldownAfterHit();
                     // Impact sparks customized by enemy type
                     String particleColor = "#E74C3C";
                     int particleCount = 7;

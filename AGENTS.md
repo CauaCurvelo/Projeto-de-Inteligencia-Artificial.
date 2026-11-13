@@ -263,7 +263,14 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - Acionamento universal: imobiliza a raposa por 2.5s com 1 coração de dano; atordoa e fere predadores por 3.5s caso pisem nela.
 - **Ondulações Realistas na Água ([WaterRipple.java](src/main/java/br/edu/unex/sentinela/world/WaterRipple.java), [Renderer.java](src/main/java/br/edu/unex/sentinela/rendering/Renderer.java)):**
   - Ondulações concêntricas com atenuação suave ao caminhar/nadar em água, mergulhos de sapos e impacto de gotas de chuva.
-- **Ecossistema e Rotina Biológica Interativa ([Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+- **Ecossistema e Rotina Biológica Interativa ([Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java), [MobSteeringHelper.java](src/main/java/br/edu/unex/sentinela/ai/MobSteeringHelper.java)):**
   - Predadores (Lobos, Panteras, Ursos, Javalis, Crocodilos) perseguem ativamente coelhos, cervos e sapos na mata.
   - Conflito territorial e latidos/rosnados quando Cães Sabujos e Lobos se cruzam.
   - Predadores e cães farejam e devoram carcaças de carne caídas no chão.
+  - **Overhaul de Combate e Perseguição:**
+    - Corrigido o bug onde inimigos iniciavam windup a 75px de distância e paravam no ar, errando todos os botes. Agora engajam a distâncias naturais de combate corpo a corpo (42..48px) mantendo avanço firme durante a preparação e desferindo botes com impulso veloz (220..310 px/s).
+    - Ataques físicos conectam de forma consistente (`distToPlayer <= 42.0` no bote ou contato corpo a corpo a `<= 25.0`), disparando cooldown pós-golpe para evitar dano contínuo instantâneo.
+    - `updateRival` integrado com sentidos de audição e visão com perseguição persistente (`alertTimer = 5.0s`), eliminando a perda repentina de foco e oscilação entre patrulha e ataque a 160px.
+    - Perseguição direta via `Pathfinder.hasClearWorldCorridor` habilitada para caça de presas passivas e disputa territorial entre cães e lobos.
+    - Supressão de repulsão (`computeSeparationForce`) entre rivais territoriais em combate direto para permitir que se aproximem e troquem golpes.
+    - Caixa de acerto do ataque da Raposa sincronizada com seu ângulo de visão (`visualAngle`).

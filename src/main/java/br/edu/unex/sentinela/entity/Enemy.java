@@ -249,7 +249,7 @@ public class Enemy {
                 updateHound(canSeePlayer, canHearPlayer, player, allEnemies, scentTrail, tileMap, curCol, curRow);
                 break;
             case RIVAL:
-                updateRival(canSeePlayer, player, foodList, meatList, preyList, allEnemies, tileMap, curCol, curRow, distToPlayer);
+                updateRival(canSeePlayer, canHearPlayer, player, foodList, meatList, preyList, allEnemies, tileMap, curCol, curRow, distToPlayer);
                 break;
             case BEAR_BOSS:
                 break;
@@ -369,16 +369,18 @@ public class Enemy {
                 if (other == this || other.getHp() <= 0) continue;
                 if (other.getSkin() == EnemySkin.WOLF) {
                     double distToWolf = Math.hypot(other.getX() - x, other.getY() - y);
-                    if (distToWolf < 130.0) {
+                    if (distToWolf < 160.0) {
                         state = AIState.FIGHTING_ENEMY;
                         patrolPauseTimer = 0;
+                        targetAimX = other.getX();
+                        targetAimY = other.getY();
                         int wCol = (int) Math.floor(other.getX() / TileMap.TILE_SIZE);
                         int wRow = (int) Math.floor(other.getY() / TileMap.TILE_SIZE);
                         requestPath(tileMap, curCol, curRow, wCol, wRow, false);
-                        if (distToWolf < 28.0 && attackCooldown <= 0) {
-                            attackCooldown = 1.75;
+                        if (distToWolf <= 38.0 && attackCooldown <= 0) {
+                            attackCooldown = 1.25;
                             other.takeDamage(1, x, y);
-                            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.DOG_BARK, 0.7, 0, 1.2);
+                            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.DOG_BARK, 0.75, 0, 1.2);
                         }
                         return;
                     }
@@ -425,22 +427,34 @@ public class Enemy {
         return closest;
     }
 
-    private void updateRival(boolean canSee, Player player, List<FoodItem> foodList, List<MeatItem> meatList,
+    private void updateRival(boolean canSee, boolean canHear, Player player, List<FoodItem> foodList, List<MeatItem> meatList,
                              List<PassiveAnimal> preyList, List<Enemy> allEnemies,
                              TileMap tileMap, int curCol, int curRow, double distToPlayer) {
-        if (distToPlayer < 160.0 && canSee) {
-            state = AIState.TERRITORIAL_ATTACK;
+        // 1. Engajamento com a Raposa (Visão direta ou Audição atenta com persistência de alerta)
+        if (canSee || (canHear && distToPlayer < 220.0)) {
+            state = AIState.CHASE;
+            alertTimer = 5.0;
             patrolPauseTimer = 0;
-            requestPath(tileMap, curCol, curRow, (int) Math.floor(player.getX() / TileMap.TILE_SIZE), (int) Math.floor(player.getY() / TileMap.TILE_SIZE), false);
+            int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
+            int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
+            requestPath(tileMap, curCol, curRow, pCol, pRow, false);
             return;
         }
 
-        // 1. Predadores caçam presas da fauna passiva (Coelho, Cervo, Sapo)
+        if (alertTimer > 0) {
+            state = AIState.ALERT;
+            if (isPathFinished()) {
+                handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
+            }
+            return;
+        }
+
+        // 2. Predadores caçam presas da fauna passiva (Coelho, Cervo, Sapo)
         boolean isPredator = (skin == EnemySkin.WOLF || skin == EnemySkin.PANTHER || skin == EnemySkin.BEAR ||
                               skin == EnemySkin.CROCODILE || skin == EnemySkin.BOAR);
-        if (isPredator && preyList != null && !canSee) {
+        if (isPredator && preyList != null) {
             PassiveAnimal nearestPrey = null;
-            double minPreyDist = 180.0;
+            double minPreyDist = 220.0;
             for (PassiveAnimal prey : preyList) {
                 if (prey.isDespawned()) continue;
                 double dp = Math.hypot(prey.getX() - x, prey.getY() - y);
@@ -453,15 +467,17 @@ public class Enemy {
             if (nearestPrey != null) {
                 state = AIState.HUNTING_PREY;
                 patrolPauseTimer = 0;
+                targetAimX = nearestPrey.getX();
+                targetAimY = nearestPrey.getY();
                 int preyCol = (int) Math.floor(nearestPrey.getX() / TileMap.TILE_SIZE);
                 int preyRow = (int) Math.floor(nearestPrey.getY() / TileMap.TILE_SIZE);
                 requestPath(tileMap, curCol, curRow, preyCol, preyRow, false);
 
-                if (minPreyDist < 26.0) {
+                if (minPreyDist <= 38.0) {
                     boolean dead = nearestPrey.takeDamage(1);
-                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.7, 0, 1.1);
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.75, 0, 1.1);
                     if (dead) {
-                        patrolPauseTimer = 1.6;
+                        patrolPauseTimer = 2.0;
                         state = AIState.EATING;
                         currentPath = null;
                     }
@@ -470,22 +486,24 @@ public class Enemy {
             }
         }
 
-        // 2. Disputa territorial de Lobos contra Cães Sabujos
-        if (skin == EnemySkin.WOLF && !canSee) {
+        // 3. Disputa territorial de Lobos contra Cães Sabujos
+        if (skin == EnemySkin.WOLF) {
             for (Enemy other : allEnemies) {
                 if (other == this || other.getHp() <= 0) continue;
                 if (other.getType() == EnemyType.HOUND) {
                     double distToHound = Math.hypot(other.getX() - x, other.getY() - y);
-                    if (distToHound < 130.0) {
+                    if (distToHound < 160.0) {
                         state = AIState.FIGHTING_ENEMY;
                         patrolPauseTimer = 0;
+                        targetAimX = other.getX();
+                        targetAimY = other.getY();
                         int hCol = (int) Math.floor(other.getX() / TileMap.TILE_SIZE);
                         int hRow = (int) Math.floor(other.getY() / TileMap.TILE_SIZE);
                         requestPath(tileMap, curCol, curRow, hCol, hRow, false);
-                        if (distToHound < 28.0 && attackCooldown <= 0) {
-                            attackCooldown = 1.75;
+                        if (distToHound <= 38.0 && attackCooldown <= 0) {
+                            attackCooldown = 1.25;
                             other.takeDamage(1, x, y);
-                            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.WOLF_SNARL, 0.7, 0, 1.0);
+                            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.WOLF_SNARL, 0.75, 0, 1.0);
                         }
                         return;
                     }
@@ -493,8 +511,8 @@ public class Enemy {
             }
         }
 
-        // 3. Carnívoros e onívoros disputam carcaças e carnes deixadas no solo
-        if (meatList != null && !canSee && (skin == EnemySkin.WOLF || skin == EnemySkin.BEAR || skin == EnemySkin.PANTHER || skin == EnemySkin.BOAR)) {
+        // 4. Carnívoros e onívoros disputam carcaças e carnes deixadas no solo
+        if (meatList != null && (skin == EnemySkin.WOLF || skin == EnemySkin.BEAR || skin == EnemySkin.PANTHER || skin == EnemySkin.BOAR)) {
             MeatItem nearestMeat = null;
             double minMeatDist = 180.0;
             for (MeatItem meat : meatList) {
@@ -508,6 +526,8 @@ public class Enemy {
 
             if (nearestMeat != null) {
                 state = AIState.SEARCHING_FOOD;
+                targetAimX = nearestMeat.getX();
+                targetAimY = nearestMeat.getY();
                 int mCol = (int) Math.floor(nearestMeat.getX() / TileMap.TILE_SIZE);
                 int mRow = (int) Math.floor(nearestMeat.getY() / TileMap.TILE_SIZE);
                 requestPath(tileMap, curCol, curRow, mCol, mRow, false);
@@ -531,7 +551,8 @@ public class Enemy {
         if (nearestFood != null) {
             double distFoodToPlayer = Math.hypot(player.getX() - nearestFood.getX(), player.getY() - nearestFood.getY());
             if (distFoodToPlayer < 150.0 && distToPlayer < 210.0 && canSee) {
-                state = AIState.TERRITORIAL_ATTACK;
+                state = AIState.CHASE;
+                alertTimer = 5.0;
                 patrolPauseTimer = 0;
                 requestPath(tileMap, curCol, curRow, (int) Math.floor(player.getX() / TileMap.TILE_SIZE), (int) Math.floor(player.getY() / TileMap.TILE_SIZE), false);
                 return;
@@ -625,7 +646,7 @@ public class Enemy {
             }
         }
 
-        this.repathCooldown = (state == AIState.CHASE || state == AIState.TERRITORIAL_ATTACK || state == AIState.RETREATING) ? 0.28 : 0.55;
+        this.repathCooldown = (state == AIState.CHASE || state == AIState.TERRITORIAL_ATTACK || state == AIState.HUNTING_PREY || state == AIState.FIGHTING_ENEMY || state == AIState.RETREATING) ? 0.22 : 0.55;
     }
 
     /**
@@ -636,15 +657,29 @@ public class Enemy {
      */
     private void executeFluidMovement(double deltaTime, double maxSpeed, Player player, List<Enemy> allEnemies,
                                       TileMap tileMap, List<Footprint> scentTrail, TileType currentTile) {
-        if (state == AIState.AIMING || state == AIState.ROARING || patrolPauseTimer > 0 || attackWindupTimer > 0) {
+        if (state == AIState.AIMING || state == AIState.ROARING || patrolPauseTimer > 0) {
             this.moving = false;
             this.vx *= 0.5;
             this.vy *= 0.5;
-            if (state != AIState.ROARING && attackWindupTimer <= 0) {
+            if (state != AIState.ROARING) {
                 double[] drift = MobSteeringHelper.computePausedDispersionVelocity(this, allEnemies);
                 if (Math.hypot(drift[0], drift[1]) > 2.0) {
                     moveWithCollisionSlide(drift[0] * deltaTime, drift[1] * deltaTime, tileMap);
                 }
+            }
+            return;
+        }
+
+        // Durante a preparação do bote (wind-up), mantém avanço direto e firme em direção ao alvo
+        if (attackWindupTimer > 0) {
+            double distTarget = Math.hypot(targetAimX - x, targetAimY - y);
+            if (distTarget > 6.0) {
+                double windupSpeed = maxSpeed * 0.65;
+                this.vx = ((targetAimX - x) / distTarget) * windupSpeed;
+                this.vy = ((targetAimY - y) / distTarget) * windupSpeed;
+                moveWithCollisionSlide(this.vx * deltaTime, this.vy * deltaTime, tileMap);
+                this.faceAngle = Math.atan2(targetAimY - y, targetAimX - x);
+                this.moving = true;
             }
             return;
         }
@@ -654,6 +689,7 @@ public class Enemy {
         boolean hasTarget = false;
 
         boolean isChasingPlayer = (state == AIState.CHASE || state == AIState.TERRITORIAL_ATTACK) && !player.isBurrowed();
+        boolean isHuntingOrFighting = (state == AIState.HUNTING_PREY || state == AIState.FIGHTING_ENEMY);
         boolean isCroc = (skin == EnemySkin.CROCODILE);
 
         // 1. Perseguição Vetorial Direta (Direct Pursuit) ou Retorno Direto ao Domínio
@@ -668,10 +704,18 @@ public class Enemy {
             }
         } else if (isChasingPlayer) {
             double distToP = Math.hypot(player.getX() - x, player.getY() - y);
-            if (distToP > 14.0 && distToP < 260.0 &&
+            if (distToP > 10.0 && distToP < 320.0 &&
                 Pathfinder.hasClearWorldCorridor(tileMap, x, y, player.getX(), player.getY(), isCroc)) {
                 desiredDirX = (player.getX() - x) / distToP;
                 desiredDirY = (player.getY() - y) / distToP;
+                hasTarget = true;
+            }
+        } else if (isHuntingOrFighting) {
+            double distT = Math.hypot(targetAimX - x, targetAimY - y);
+            if (distT > 10.0 && distT < 280.0 &&
+                Pathfinder.hasClearWorldCorridor(tileMap, x, y, targetAimX, targetAimY, isCroc)) {
+                desiredDirX = (targetAimX - x) / distT;
+                desiredDirY = (targetAimY - y) / distT;
                 hasTarget = true;
             }
         }
@@ -839,19 +883,25 @@ public class Enemy {
 
         switch (type) {
             case BEAR_BOSS:
-                this.attackWindupTimer = (skin == EnemySkin.PANTHER) ? 0.35 : (skin == EnemySkin.CROCODILE ? 0.40 : 0.55);
+                this.attackWindupTimer = (skin == EnemySkin.PANTHER) ? 0.20 : (skin == EnemySkin.CROCODILE ? 0.24 : 0.28);
                 break;
             case HOUND:
-                this.attackWindupTimer = 0.28;
+                this.attackWindupTimer = 0.18;
                 break;
             case RIVAL:
-                this.attackWindupTimer = (skin == EnemySkin.BOAR) ? 0.45 : 0.35;
+                this.attackWindupTimer = (skin == EnemySkin.BOAR) ? 0.26 : 0.20;
                 break;
             case HUNTER:
             default:
-                this.attackWindupTimer = 0.40;
+                this.attackWindupTimer = 0.24;
                 break;
         }
+    }
+
+    public void triggerAttackCooldownAfterHit() {
+        this.attackLungeTimer = 0.0;
+        this.attackWindupTimer = 0.0;
+        this.attackCooldown = Math.max(this.attackCooldown, 0.75);
     }
 
     private void executeLungeStrike() {
@@ -870,38 +920,40 @@ public class Enemy {
                     this.knockbackVy = dirY * atk.getLungeImpulse();
                     bossController.beginActiveStrike();
                 } else {
-                    this.attackCooldown = 1.35;
-                    this.attackLungeTimer = 0.30;
-                    this.knockbackVx = dirX * 140.0;
-                    this.knockbackVy = dirY * 140.0;
+                    this.attackCooldown = 1.15;
+                    this.attackLungeTimer = 0.26;
+                    this.knockbackVx = dirX * 220.0;
+                    this.knockbackVy = dirY * 220.0;
                 }
                 break;
 
             case HOUND:
                 this.attackCooldown = 0.85;
-                this.attackLungeTimer = 0.22;
-                this.knockbackVx = dirX * 190.0;
-                this.knockbackVy = dirY * 190.0;
+                this.attackLungeTimer = 0.24;
+                this.knockbackVx = dirX * 240.0;
+                this.knockbackVy = dirY * 240.0;
                 break;
 
             case RIVAL:
                 if (skin == EnemySkin.BOAR) {
-                    this.attackCooldown = 1.20;
-                    this.attackLungeTimer = 0.38;
-                    this.knockbackVx = dirX * 240.0;
-                    this.knockbackVy = dirY * 240.0;
+                    this.attackCooldown = 1.15;
+                    this.attackLungeTimer = 0.32;
+                    this.knockbackVx = dirX * 310.0;
+                    this.knockbackVy = dirY * 310.0;
                 } else {
-                    this.attackCooldown = 0.95;
-                    this.attackLungeTimer = 0.25;
-                    this.knockbackVx = dirX * 150.0;
-                    this.knockbackVy = dirY * 150.0;
+                    this.attackCooldown = 0.90;
+                    this.attackLungeTimer = 0.24;
+                    this.knockbackVx = dirX * 220.0;
+                    this.knockbackVy = dirY * 220.0;
                 }
                 break;
 
             case HUNTER:
             default:
-                this.attackCooldown = 1.30;
-                this.attackLungeTimer = 0.25;
+                this.attackCooldown = 1.20;
+                this.attackLungeTimer = 0.22;
+                this.knockbackVx = dirX * 180.0;
+                this.knockbackVy = dirY * 180.0;
                 break;
         }
     }
