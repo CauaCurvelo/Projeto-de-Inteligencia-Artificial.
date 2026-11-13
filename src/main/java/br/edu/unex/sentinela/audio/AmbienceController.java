@@ -3,7 +3,6 @@ package br.edu.unex.sentinela.audio;
 import br.edu.unex.sentinela.world.BiomeType;
 import br.edu.unex.sentinela.world.TileMap;
 import br.edu.unex.sentinela.world.TileType;
-import br.edu.unex.sentinela.world.WeatherType;
 import br.edu.unex.sentinela.world.World;
 
 import java.util.EnumMap;

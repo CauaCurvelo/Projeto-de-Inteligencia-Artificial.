@@ -26,14 +26,7 @@ public class GroundItemRenderer {
     // Arbusto & Frutinhas
     private static final Color BUSH_CAST_SHADOW = Color.color(0.02, 0.06, 0.02, 0.45);
     private static final Color BUSH_AO_SHADOW = Color.color(0.01, 0.04, 0.01, 0.65);
-    private static final Color BUSH_LEAF_DARK = Color.web("#143D14");
-    private static final Color BUSH_LEAF_MID = Color.web("#235E23");
-    private static final Color BUSH_LEAF_LIGHT = Color.web("#388E3C");
-    private static final Color BUSH_LEAF_TOP = Color.web("#4CAF50", 0.75);
     private static final Color BERRY_SHADOW = Color.color(0.05, 0.12, 0.05, 0.65);
-    private static final Color BERRY_DARK = Color.web("#B71C1C");
-    private static final Color BERRY_MID = Color.web("#E53935");
-    private static final Color BERRY_SPEC = Color.web("#FFFFFF", 0.90);
 
     // Ossos & Marmoreio
     private static final Color BONE_SHADE = Color.web("#CFD8DC");

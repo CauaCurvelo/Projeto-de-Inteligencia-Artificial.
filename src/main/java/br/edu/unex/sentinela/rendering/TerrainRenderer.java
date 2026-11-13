@@ -15,25 +15,13 @@ import javafx.scene.shape.ArcType;
 public class TerrainRenderer {
     private static final Color WALL_BASE = Color.web("#202428");
     private static final Color FLOWER_SHADOW = Color.color(0.08, 0.18, 0.05, 0.45);
-    private static final Color FLOWER_YELLOW = Color.web("#FFF59D");
-    private static final Color FLOWER_LAVENDER = Color.web("#E1BEE7");
     private static final Color TALL_GRASS_AO = Color.color(0.04, 0.10, 0.03, 0.50);
     private static final Color TALL_GRASS_ROOT = Color.color(0.02, 0.07, 0.02, 0.55);
-    private static final Color TALL_GRASS_STEM = Color.web("#1E4618");
-    private static final Color TALL_GRASS_TIP_A = Color.web("#4E8C3A");
-    private static final Color TALL_GRASS_TIP_B = Color.web("#66A64F");
     private static final Color PEBBLE_SHADOW = Color.color(0.12, 0.08, 0.04, 0.55);
     private static final Color PEBBLE_BODY = Color.web("#8D7762");
     private static final Color PEBBLE_TOP = Color.web("#BCAAA4", 0.80);
     private static final Color MUD_GLOSS_A = Color.web("#8D6E63", 0.45);
     private static final Color MUD_GLOSS_B = Color.web("#CFD8DC", 0.30);
-    private static final Color WATER_DEEP = Color.web("#124675");
-    private static final Color WATER_SHALLOW = Color.web("#1B639E");
-    private static final Color WATER_ABYSS = Color.web("#0D3357", 0.55);
-    private static final Color WATER_SAND_TINT = Color.web("#2980B9", 0.45);
-    private static final Color WATER_WAVE = Color.web("#64B5F6", 0.45);
-    private static final Color WATER_SPARKLE = Color.web("#E1F5FE", 0.50);
-    private static final Color GRASS_EDGE = Color.web("#3D732E", 0.85);
     private static final Color BIOME_AO = Color.color(0.05, 0.08, 0.03, 0.32);
 
     private final GraphicsContext gc;

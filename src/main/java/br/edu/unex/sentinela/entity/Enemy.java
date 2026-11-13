@@ -233,6 +233,8 @@ public class Enemy {
             case RIVAL:
                 updateRival(canSeePlayer, player, foodList, allEnemies, tileMap, curCol, curRow, distToPlayer);
                 break;
+            case BEAR_BOSS:
+                break;
         }
 
         // Executa o movimento fluido: Perseguição Direta se corredor livre ou Seguimento de Rota Suavizada

@@ -13,7 +13,6 @@ import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.Stop;
 import javafx.scene.shape.ArcType;
 import javafx.scene.shape.StrokeLineCap;
-import javafx.scene.shape.StrokeLineJoin;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
@@ -596,7 +595,7 @@ public class UiIconDrawer {
         gc.fillRect(width - bandW, 0, bandW, height);
     }
 
-    private static final Font METER_BAR_FONT = Font.font("Segoe UI", javafx.scene.text.FontWeight.BOLD, 9.5);
+    private static final Font METER_BAR_FONT = Font.font("Segoe UI", FontWeight.BOLD, 9.5);
 
     /**
      * Desenha a barra completa de Sprint/Stamina no HUD, refletindo corrida, exaustão e bloqueio por fome.

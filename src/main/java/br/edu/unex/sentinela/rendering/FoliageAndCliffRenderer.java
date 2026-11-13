@@ -23,8 +23,6 @@ public class FoliageAndCliffRenderer {
     private static final Color WALL_FOOT_AO = Color.color(0.05, 0.06, 0.08, 0.85);
     private static final Color WALL_CRACK_DARK = Color.web("#1C2024", 0.80);
     private static final Color WALL_CRACK_LIGHT = Color.web("#78909C", 0.45);
-    private static final Color WALL_MOSS_DARK = Color.web("#2E5928", 0.70);
-    private static final Color WALL_MOSS_LIGHT = Color.web("#4CAF50", 0.45);
 
     private static final Color TRUNK_ROOT = Color.web("#261407");
     private static final Color TRUNK_BODY = Color.web("#3B210E");

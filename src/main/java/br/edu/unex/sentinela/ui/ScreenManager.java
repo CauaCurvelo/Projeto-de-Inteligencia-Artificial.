@@ -6,7 +6,6 @@ import br.edu.unex.sentinela.progress.MatchRecord;
 import br.edu.unex.sentinela.world.World;
 import javafx.event.EventHandler;
 import javafx.scene.Node;
-import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.StackPane;

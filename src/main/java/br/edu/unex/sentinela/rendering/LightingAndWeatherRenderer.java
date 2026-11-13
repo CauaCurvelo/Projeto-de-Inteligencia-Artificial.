@@ -5,7 +5,6 @@ import br.edu.unex.sentinela.settings.GraphicsQuality;
 import br.edu.unex.sentinela.world.BiomeType;
 import br.edu.unex.sentinela.world.Camera;
 import br.edu.unex.sentinela.world.WeatherDrop;
-import br.edu.unex.sentinela.world.WeatherType;
 import br.edu.unex.sentinela.world.World;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
@@ -22,8 +21,6 @@ import javafx.scene.paint.Stop;
  * - Efeitos climáticos volumétricos (Chuva com ripples de impacto e Neblina densa em camadas)
  */
 public class LightingAndWeatherRenderer {
-    private static final Color RAIN_COLOR = Color.web("#B3E5FC", 0.58);
-    private static final Color RAIN_RIPPLE_COLOR = Color.web("#E1F5FE", 0.35);
     private static final Color FOG_LOW_COLOR = Color.color(0.82, 0.88, 0.92, 0.34);
 
     private static final RadialGradient FOG_GRAD = new RadialGradient(

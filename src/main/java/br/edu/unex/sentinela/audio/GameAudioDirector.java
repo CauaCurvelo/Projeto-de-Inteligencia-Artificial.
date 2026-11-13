@@ -32,7 +32,7 @@ public final class GameAudioDirector {
 
     private Player lastPlayer;
     private int lastLives, lastApples, lastMeats, lastDefeated, lastDay;
-    private double lastHunger, heartbeatTimer, hungerTimer;
+    private double heartbeatTimer, hungerTimer;
     private long lastStepIndex;
     private boolean lastAttacking, lastBurrowed, lastGameOver, lastSwimming;
     private WeatherType lastWeather;
@@ -90,7 +90,6 @@ public final class GameAudioDirector {
         if (world.getMeatsEaten() > lastMeats) {
             AudioEngine.get().play(SoundId.EAT_MEAT, 0.75, 0, 1);
         }
-        lastHunger = p.getHunger();
         lastApples = world.getApplesEaten();
         lastMeats = world.getMeatsEaten();
 
@@ -186,7 +185,6 @@ public final class GameAudioDirector {
         Player p = world.getPlayer();
         lastPlayer = p;
         lastLives = p.getLives();
-        lastHunger = p.getHunger();
         lastApples = world.getApplesEaten();
         lastMeats = world.getMeatsEaten();
         lastDefeated = world.getEnemiesDefeated();
