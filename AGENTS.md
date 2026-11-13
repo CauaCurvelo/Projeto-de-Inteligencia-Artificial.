@@ -247,7 +247,14 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
     - `FROG`: anfíbio saltitante de brejos e rios, nadando e emitindo ondulações na água.
     - `BIRD`: debica sementes em terra e alça voo rápido batendo asas ao menor sinal de perigo.
   - Carne miúda e nutrição balanceada (`MeatTier.GAME_MORSEL`): restaura apenas 8% de fome, 0 cura de vida e 75 pontos, mantendo a caça de animais passivos como recurso de emergência.
-  - Renderizador 2.5D dedicado com sombras dinâmicas no solo e animações de debicar, correr e voar.
+  - Renderizador 2.5D Top-Down especializado (`PassiveAnimalRenderer.java`) padronizado à direção e perspectiva de `CharacterSpriteRenderer.java`:
+    - Rotação 360° no vetor visual (`visualAngle`) com interpolação angular fluida (`lerpAngle`).
+    - Sombras de contato no solo preservadas em elevação 2.5D com atenuação de altitude (`hopHeight`, `flightHeight`).
+    - Anatomia multicamada e texturas:
+      - **Coelho:** patas traseiras de lebre estendendo em saltos, pompom branco na anca, corpo em pêra com dorso avelã e ventre claro, focinho afilado com bigodes finos, olhos pretos brilhantes e orelhas longas com interior aveludado rosado que se mexem alertamente.
+      - **Cervo:** marcha quadrúpede esbelta em 4 pernas com cascos escuros, cauda com escudo branco de alarme (*rump patch*), flancos com sardas claras, pescoço longo, olhos amendoados e galhada 2.5D ramificada em osso polido.
+      - **Sapo:** postura anfíbia dobrada em repouso e empuxo traseiro esticado com pés palmados em saltos, saco vocal na garganta inflando ritmicamente, pele olivácea mosqueada com verrugas e grandes olhos bulbares dourados com fenda pupilar horizontal no topo do crânio.
+      - **Pássaro:** corpo compacto com asas dobradas em repouso, patinhas com garras, cauda afilada e animação rápida de debicar o chão; asas abertas em envergadura total no voo com batimento rápido, penas primárias fanned out e cauda em leque.
 - **Vagalumes Noturnos com Bioluminescência ([Firefly.java](src/main/java/br/edu/unex/sentinela/world/Firefly.java), [LightingAndWeatherRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/LightingAndWeatherRenderer.java)):**
   - Aparecem exclusivamente durante o Crepúsculo e a Noite em biomas de Mata Fechada, Brejo e Pradaria úmida.
   - Flutuação senoidal suave em 3 eixos e pulso de luz orgânico descompassado com halo radial suave.

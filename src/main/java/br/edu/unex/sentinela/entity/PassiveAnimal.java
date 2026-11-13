@@ -31,6 +31,11 @@ public class PassiveAnimal {
     private double vy;
     private double faceDx = 1.0;
     private double faceDy = 0.0;
+    private double visualAngle = 0.0;
+    private double walkPhase = 0.0;
+    private double breathTimer = 0.0;
+    private double peckTimer = 0.0;
+    private boolean moving = false;
     private int hp;
 
     private State state = State.FORAGING;
@@ -50,8 +55,10 @@ public class PassiveAnimal {
         this.y = y;
         this.hp = this.type.getMaxHp();
         this.stateTimer = 1.0 + RAND.nextDouble() * 2.0;
-        this.faceDx = RAND.nextBoolean() ? 1.0 : -1.0;
-        this.faceDy = (RAND.nextDouble() - 0.5) * 0.4;
+        this.visualAngle = RAND.nextDouble() * Math.PI * 2.0 - Math.PI;
+        this.faceDx = Math.cos(visualAngle);
+        this.faceDy = Math.sin(visualAngle);
+        this.breathTimer = RAND.nextDouble() * 5.0;
     }
 
     public void update(double dt, Player player, List<Enemy> predators, TileMap tileMap, List<WaterRipple> ripples) {
@@ -59,6 +66,7 @@ public class PassiveAnimal {
 
         stateTimer -= dt;
         animPhase += dt * 6.0;
+        breathTimer += dt;
         rippleCooldown -= dt;
 
         // 1. Identificar a ameaça mais próxima (Jogador ou Predador)
@@ -95,6 +103,10 @@ public class PassiveAnimal {
             double flySpeed = type.getBaseSpeed() * 1.35;
             x += faceDx * flySpeed * dt;
             y += faceDy * flySpeed * dt;
+            moving = true;
+            walkPhase += dt * 24.0;
+            double awayAngle = Math.atan2(faceDy, faceDx);
+            visualAngle = lerpAngle(visualAngle, awayAngle, Math.min(1.0, dt * 10.0));
             if (flightHeight >= 90.0) {
                 despawned = true;
             }
@@ -108,6 +120,7 @@ public class PassiveAnimal {
                 double awayAngle = Math.atan2(y - threatY, x - threatX);
                 faceDx = Math.cos(awayAngle);
                 faceDy = Math.sin(awayAngle);
+                visualAngle = awayAngle;
                 return;
             } else {
                 state = State.FLEEING;
@@ -129,7 +142,10 @@ public class PassiveAnimal {
                 vx *= 0.85;
                 vy *= 0.85;
                 if (sensedThreat) {
-                    faceDx = Math.signum(threatX - x);
+                    double targetAngle = Math.atan2(threatY - y, threatX - x);
+                    visualAngle = lerpAngle(visualAngle, targetAngle, Math.min(1.0, dt * 12.0));
+                    faceDx = Math.cos(visualAngle);
+                    faceDy = Math.sin(visualAngle);
                 }
                 break;
             case FLEEING:
@@ -139,16 +155,33 @@ public class PassiveAnimal {
                 break;
         }
 
-        // 4. Mecânica de Saltos (Coelhos e Sapos)
+        // 4. Velocidade, Rotação e Ciclos de Animação
+        double curSpeed = Math.hypot(vx, vy);
+        moving = curSpeed > 2.0;
+
+        if (moving) {
+            double moveAngle = Math.atan2(vy, vx);
+            double turnRate = (state == State.FLEEING ? 16.0 : 8.0);
+            visualAngle = lerpAngle(visualAngle, moveAngle, Math.min(1.0, dt * turnRate));
+            faceDx = Math.cos(visualAngle);
+            faceDy = Math.sin(visualAngle);
+            walkPhase += curSpeed * dt * (type == PassiveAnimalType.DEER ? 0.11 : 0.15);
+        } else {
+            if (type == PassiveAnimalType.BIRD && state == State.FORAGING) {
+                peckTimer += dt * 3.8;
+            }
+        }
+
+        // 5. Mecânica de Saltos (Coelhos e Sapos)
         if (type == PassiveAnimalType.RABBIT || type == PassiveAnimalType.FROG) {
             hopTimer += dt * (state == State.FLEEING ? 9.5 : 4.5);
             hopHeight = Math.max(0.0, Math.sin(hopTimer) * (type == PassiveAnimalType.RABBIT ? 7.0 : 4.5));
         }
 
-        // 5. Aplicação de Movimento e Colisão
+        // 6. Aplicação de Movimento e Colisão
         moveWithCollision(dt, tileMap);
 
-        // 6. Geração de Ondulações na Água
+        // 7. Geração de Ondulações na Água
         if (ripples != null && rippleCooldown <= 0) {
             int col = (int) Math.floor(x / TileMap.TILE_SIZE);
             int row = (int) Math.floor(y / TileMap.TILE_SIZE);
@@ -254,11 +287,27 @@ public class PassiveAnimal {
         return list;
     }
 
+    public static double lerpAngle(double from, double to, double alpha) {
+        double diff = normalizeAngle(to - from);
+        return from + diff * alpha;
+    }
+
+    public static double normalizeAngle(double a) {
+        while (a > Math.PI) a -= 2 * Math.PI;
+        while (a < -Math.PI) a += 2 * Math.PI;
+        return a;
+    }
+
     public PassiveAnimalType getType() { return type; }
     public double getX() { return x; }
     public double getY() { return y; }
     public double getFaceDx() { return faceDx; }
     public double getFaceDy() { return faceDy; }
+    public double getVisualAngle() { return visualAngle; }
+    public double getWalkPhase() { return walkPhase; }
+    public double getBreathTimer() { return breathTimer; }
+    public double getPeckTimer() { return peckTimer; }
+    public boolean isMoving() { return moving; }
     public double getAnimPhase() { return animPhase; }
     public double getHopHeight() { return hopHeight; }
     public double getFlightHeight() { return flightHeight; }
