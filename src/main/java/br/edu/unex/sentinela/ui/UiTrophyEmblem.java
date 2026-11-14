@@ -235,6 +235,57 @@ public final class UiTrophyEmblem {
                 gc.fillOval(cx - u * 0.14, cy - u * 0.14, u * 0.28, u * 0.28);
                 break;
 
+            case SNOWFLAKE:
+                for (int a = 0; a < 6; a++) {
+                    double rad = Math.toRadians(a * 60);
+                    double x2 = cx + Math.cos(rad) * u * 0.88;
+                    double y2 = cy + Math.sin(rad) * u * 0.88;
+                    gc.strokeLine(cx, cy, x2, y2);
+                    double branchX = cx + Math.cos(rad) * u * 0.52;
+                    double branchY = cy + Math.sin(rad) * u * 0.52;
+                    double bRad1 = rad + Math.PI / 4.0;
+                    double bRad2 = rad - Math.PI / 4.0;
+                    gc.strokeLine(branchX, branchY, branchX + Math.cos(bRad1) * u * 0.28, branchY + Math.sin(bRad1) * u * 0.28);
+                    gc.strokeLine(branchX, branchY, branchX + Math.cos(bRad2) * u * 0.28, branchY + Math.sin(bRad2) * u * 0.28);
+                }
+                gc.fillOval(cx - u * 0.16, cy - u * 0.16, u * 0.32, u * 0.32);
+                break;
+
+            case SHIELD:
+                gc.beginPath();
+                gc.moveTo(cx - u * 0.75, cy - u * 0.72);
+                gc.lineTo(cx + u * 0.75, cy - u * 0.72);
+                gc.lineTo(cx + u * 0.75, cy);
+                gc.arcTo(cx + u * 0.75, cy + u * 0.78, cx, cy + u * 0.95, u * 0.75);
+                gc.arcTo(cx - u * 0.75, cy + u * 0.78, cx - u * 0.75, cy, u * 0.75);
+                gc.closePath();
+                gc.fill();
+                gc.stroke();
+                break;
+
+            case FEATHER:
+                gc.save();
+                gc.translate(cx, cy);
+                gc.rotate(-38);
+                gc.strokeLine(0, u * 0.95, 0, -u * 0.95);
+                gc.beginPath();
+                gc.moveTo(0, -u * 0.95);
+                gc.bezierCurveTo(-u * 0.55, -u * 0.45, -u * 0.55, u * 0.25, 0, u * 0.55);
+                gc.bezierCurveTo(u * 0.55, u * 0.25, u * 0.55, -u * 0.45, 0, -u * 0.95);
+                gc.closePath();
+                gc.fill();
+                gc.restore();
+                break;
+
+            case COMPASS:
+                gc.strokeOval(cx - u * 0.85, cy - u * 0.85, u * 1.70, u * 1.70);
+                gc.fillPolygon(
+                    new double[]{cx, cx + u * 0.22, cx, cx - u * 0.22},
+                    new double[]{cy - u * 0.72, cy, cy + u * 0.72, cy}, 4);
+                gc.setFill(Color.web("#0D1311"));
+                gc.fillOval(cx - u * 0.14, cy - u * 0.14, u * 0.28, u * 0.28);
+                break;
+
             case TROPHY:
             default:
                 gc.fillRoundRect(cx - u * 0.56, cy - u * 0.80, u * 1.12, u * 0.82, 5, 5);

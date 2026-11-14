@@ -330,3 +330,33 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - Adicionado `sceneKeyFilter` global em `ScreenManager` com captura prioritária via `addEventFilter(KeyEvent.KEY_PRESSED)`.
   - Ao morrer ou com a tela de `GAME_OVER` ativa, pressionar a tecla **`R`** ou **`ENTER`** no teclado reinicia imediatamente uma nova corrida (`startGame()`), com foco garantido e botão atualizado para `[R] JOGAR DE NOVO`.
 
+## Feature: Bestiário com Desbloqueio Progressivo por Abate, Fauna Passiva e Expansão de Lagos e Rios Glaciais
+- **Sistema de Desbloqueio Progressivo do Bestiário ([BestiaryUnlockManager.java](src/main/java/br/edu/unex/sentinela/bestiary/BestiaryUnlockManager.java), [BestiaryScreen.java](src/main/java/br/edu/unex/sentinela/ui/BestiaryScreen.java), [CreaturePreviewRenderer.java](src/main/java/br/edu/unex/sentinela/bestiary/CreaturePreviewRenderer.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - `BestiaryUnlockManager`: Gerenciador singleton que persiste o conjunto de criaturas derrotadas em `bestiary_unlocked.properties` através do `SaveStorage`. A raposa ("fox") inicia desbloqueada por padrão.
+  - Ao derrotar qualquer inimigo humano, cão, predador rival, superpredador alfa ou capturar presas passivas, o método `recordKill(id)` desbloqueia permanentemente o registro da espécie no Bestiário.
+  - Criaturas não catalogadas aparecem na lista com título `??? (Não Catalogada)`, ícone de cadeado e cartão com descrição misteriosa informando que a criatura ainda não foi encontrada ou abatida.
+  - No expositor 2.5D animado (`CreaturePreviewRenderer`), espécies não descobertas são exibidas como silhuetas sombreadas escuras e misteriosas (`alpha = 0.20`), revelando seu modelo 3D colorido e brilhante somente após o primeiro abate.
+- **Inclusão da Fauna Passiva no Bestiário ([CreatureCatalog.java](src/main/java/br/edu/unex/sentinela/bestiary/CreatureCatalog.java), [CreatureInfo.java](src/main/java/br/edu/unex/sentinela/bestiary/CreatureInfo.java), [CreaturePreviewRenderer.java](src/main/java/br/edu/unex/sentinela/bestiary/CreaturePreviewRenderer.java)):**
+  - Fichas completas integradas para os 4 animais silvestres: **Coelho Silvestre** (`rabbit`), **Cervo da Mata** (`deer`), **Sapo Cururu** (`frog`) e **Pássaro Canoro** (`bird`).
+  - Cada presa possui atributos de agilidade, perigo (1), vida, dieta, habitat, comportamento dinâmico de fuga e dicas estratégicas de caça e emboscada.
+  - Tag visual exclusiva `PRESA SILVESTRE` em azul celeste (`#38BDF8`) no Bestiário e renderização 2.5D no pedestal animado via `PassiveAnimalRenderer`.
+- **Rios e Lagos Glaciais Contínuos no Bioma de Neve ([TileMap.java](src/main/java/br/edu/unex/sentinela/world/TileMap.java)):**
+  - No bioma de Tundra Nevada (`BiomeType.SNOW`), toda a hidrografia (grandes bacias lacustres fluviais, rio principal, riacho afluente secundário, lagos de meandro e lagos regionais) é 100% convertida em pistas maciças de gelo espesso (`TileType.ICE`), proporcionando amplas áreas para travessia em alta velocidade e física de drift.
+
+## Feature / Polish: 20 Conquistas Rebalanceadas, Novos Desafios e Medalhões Vetoriais
+- **Rebalanceamento do Catálogo e Novos Desafios ([Achievement.java](src/main/java/br/edu/unex/sentinela/progress/Achievement.java), [AchievementTracker.java](src/main/java/br/edu/unex/sentinela/progress/AchievementTracker.java), [GameEvent.java](src/main/java/br/edu/unex/sentinela/progress/GameEvent.java)):**
+  - Total expandido para **20 conquistas** equilibradas para um ciclo de gameplay recompensador e desafiador.
+  - Metas existentes aprimoradas para maior engajamento:
+    - Sobrevivência estendida para 8 minutos contínuos (`SURVIVOR_8MIN`).
+    - Pontuações elevadas para 1.500 (`SCORE_1500`) e 7.500 pontos (`SCORE_7500`).
+    - Exigência de 10 abates de inimigos (`APEX_SLAYER`), 20 maçãs coletadas (`FORAGER`), 10 carnes consumidas (`CARNIVORE`), 2 noites sobrevividas (`NIGHT_OWL`), 2 tempestades enfrentadas (`RAIN_SURVIVOR`) e 8 espécies observadas (`BESTIARY_OBSERVER`).
+  - 6 novas conquistas introduzidas:
+    - **Predador Supremo dos Quatro Reinos (`FOUR_ALPHAS`):** Derrotar os 4 superpredadores alfas (Urso Pardo, Pantera Negra, Crocodilo e Urso Polar).
+    - **Caçador de Presas Silvestres (`PREY_HUNTER`):** Capturar 6 presas rápidas em uma mesma corrida.
+    - **Pássaro na Mão (`BIRD_IN_HAND`):** Capturar um pássaro canoro no solo antes que ele alce voo no céu.
+    - **Pata de Ferro (`TRAP_SURVIVOR`):** Acionar e sobreviver ao dano de uma armadilha de urso oculta no capim.
+    - **Patinação Glacial (`ICE_SKATER`):** Deslizar e derrapar no gelo por 3 segundos consecutivos sem parar.
+    - **Viajante dos Biomas (`BIOME_VOYAGER`):** Explorar todos os 5 biomas da floresta em uma única vida.
+- **Medalhões Vetoriais Exclusivos ([UiTrophyEmblem.java](src/main/java/br/edu/unex/sentinela/ui/UiTrophyEmblem.java), [AchievementVisualCatalog.java](src/main/java/br/edu/unex/sentinela/ui/AchievementVisualCatalog.java)):**
+  - Adicionados emblemas desenhados proceduralmente em Canvas para as novas conquistas: floco de gelo cristalino (`SNOWFLAKE`), escudo heráldico de sobrevivência (`SHIELD`), pluma silvestre (`FEATHER`) e rosa dos ventos / bússola de exploração (`COMPASS`).
+

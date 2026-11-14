@@ -2,6 +2,7 @@ package br.edu.unex.sentinela.bestiary;
 
 import br.edu.unex.sentinela.ai.EnemySkin;
 import br.edu.unex.sentinela.ai.EnemyType;
+import br.edu.unex.sentinela.entity.PassiveAnimalType;
 
 /**
  * Informações e ficha técnica detalhada de cada animal e personagem do jogo.
@@ -10,8 +11,9 @@ public class CreatureInfo {
     private final String id;
     private final String name;
     private final String title;
-    private final EnemySkin skin; // null para a Raposa
-    private final EnemyType type; // null para a Raposa
+    private final EnemySkin skin;             // null para a Raposa e Fauna Passiva
+    private final EnemyType type;             // null para a Raposa e Fauna Passiva
+    private final PassiveAnimalType passiveType; // null para a Raposa e Inimigos
     private final String diet;
     private final String habitat;
     private final String attackType;
@@ -25,11 +27,29 @@ public class CreatureInfo {
                         String diet, String habitat, String attackType,
                         int speedStars, int dangerStars, int healthPoints,
                         String behaviorDescription, String survivalTip) {
+        this(id, name, title, skin, type, null, diet, habitat, attackType,
+             speedStars, dangerStars, healthPoints, behaviorDescription, survivalTip);
+    }
+
+    public CreatureInfo(String id, String name, String title, PassiveAnimalType passiveType,
+                        String diet, String habitat, String attackType,
+                        int speedStars, int dangerStars, int healthPoints,
+                        String behaviorDescription, String survivalTip) {
+        this(id, name, title, null, null, passiveType, diet, habitat, attackType,
+             speedStars, dangerStars, healthPoints, behaviorDescription, survivalTip);
+    }
+
+    public CreatureInfo(String id, String name, String title, EnemySkin skin, EnemyType type,
+                        PassiveAnimalType passiveType,
+                        String diet, String habitat, String attackType,
+                        int speedStars, int dangerStars, int healthPoints,
+                        String behaviorDescription, String survivalTip) {
         this.id = id;
         this.name = name;
         this.title = title;
         this.skin = skin;
         this.type = type;
+        this.passiveType = passiveType;
         this.diet = diet;
         this.habitat = habitat;
         this.attackType = attackType;
@@ -45,6 +65,8 @@ public class CreatureInfo {
     public String getTitle() { return title; }
     public EnemySkin getSkin() { return skin; }
     public EnemyType getType() { return type; }
+    public PassiveAnimalType getPassiveType() { return passiveType; }
+    public boolean isPassive() { return passiveType != null; }
     public String getDiet() { return diet; }
     public String getHabitat() { return habitat; }
     public String getAttackType() { return attackType; }

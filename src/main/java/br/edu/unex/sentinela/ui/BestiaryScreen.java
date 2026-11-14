@@ -1,6 +1,7 @@
 package br.edu.unex.sentinela.ui;
 
 import br.edu.unex.sentinela.ai.EnemyType;
+import br.edu.unex.sentinela.bestiary.BestiaryUnlockManager;
 import br.edu.unex.sentinela.bestiary.CreatureCatalog;
 import br.edu.unex.sentinela.bestiary.CreatureInfo;
 import br.edu.unex.sentinela.bestiary.CreaturePreviewRenderer;
@@ -23,7 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Enciclopédia de fauna com vitrine ampliada, zero truncamento e barras gráficas segmentadas.
+ * Enciclopédia de fauna com vitrine 2.5D ampliada e desbloqueio progressivo por abate.
  */
 public class BestiaryScreen extends StackPane {
     private final CreaturePreviewRenderer previewRenderer = new CreaturePreviewRenderer(178, 178);
@@ -38,7 +39,14 @@ public class BestiaryScreen extends StackPane {
         panel.setSpacing(14);
 
         List<CreatureInfo> catalog = CreatureCatalog.getAll();
-        Label countChip = new Label(catalog.size() + " Espécies");
+        int unlockedCount = 0;
+        for (CreatureInfo c : catalog) {
+            if (BestiaryUnlockManager.get().isUnlocked(c.getId())) {
+                unlockedCount++;
+            }
+        }
+
+        Label countChip = new Label(unlockedCount + " / " + catalog.size() + " Catalogadas");
         countChip.setPadding(new Insets(4, 10, 4, 10));
         countChip.getStyleClass().add("glass-card");
         countChip.setTextFill(Color.web(UiTheme.TEXT_SECONDARY));
@@ -73,13 +81,18 @@ public class BestiaryScreen extends StackPane {
         for (int i = 0; i < catalog.size(); i++) {
             CreatureInfo info = catalog.get(i);
             final int index = i;
+            boolean unlocked = BestiaryUnlockManager.get().isUnlocked(info.getId());
 
-            Button row = new Button(info.getName());
+            String buttonText = unlocked ? info.getName() : "??? (Não Catalogada)";
+            Button row = new Button(buttonText);
             row.setMaxWidth(Double.MAX_VALUE);
             row.setAlignment(Pos.CENTER_LEFT);
-            row.setGraphic(new Circle(4, roleColor(info)));
+            row.setGraphic(new Circle(4, unlocked ? roleColor(info) : Color.web("#475569")));
             row.setGraphicTextGap(10);
             row.getStyleClass().add("species-row");
+            if (!unlocked) {
+                row.setTextFill(Color.web("#94A3B8"));
+            }
             UiTypography.bind(row, UiTypography.TypoRole.LABEL);
             UiMotion.attachPressFeedback(row, true);
             row.setOnAction(e -> selectCreature(info, index));
@@ -91,7 +104,7 @@ public class BestiaryScreen extends StackPane {
         ScrollPane scroll = new ScrollPane(listBox);
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        UiTypography.bindScaledWidth(scroll, 226);
+        UiTypography.bindScaledWidth(scroll, 236);
         return scroll;
     }
 
@@ -120,6 +133,52 @@ public class BestiaryScreen extends StackPane {
     }
 
     private void populateDetails(CreatureInfo info) {
+        boolean unlocked = BestiaryUnlockManager.get().isUnlocked(info.getId());
+
+        if (!unlocked) {
+            Label nameLbl = new Label("Criatura Não Catalogada");
+            nameLbl.setTextFill(Color.web("#94A3B8"));
+            UiTypography.bind(nameLbl, UiTypography.TypoRole.TITLE);
+
+            Label rolePill = new Label("SILHUETA BLOQUEADA");
+            rolePill.setPadding(new Insets(3, 9, 3, 9));
+            rolePill.setTextFill(Color.web("#64748B"));
+            rolePill.setStyle("-fx-background-color: rgba(255,255,255,0.04); -fx-background-radius: 99;");
+            UiTypography.bind(rolePill, UiTypography.TypoRole.MICRO);
+
+            HBox titleRow = new HBox(10, nameLbl, rolePill);
+            titleRow.setAlignment(Pos.CENTER_LEFT);
+
+            Label hpBadge = new Label("♥  ? HP");
+            hpBadge.setTextFill(Color.web("#64748B"));
+            UiTypography.bind(hpBadge, UiTypography.TypoRole.NUMERIC);
+
+            VBox statsColumn = new VBox(9,
+                    titleRow,
+                    createMetricRow("Velocidade", 0, 5, "#475569"),
+                    createMetricRow("Ameaça", 0, 5, "#475569"),
+                    hpBadge
+            );
+            HBox.setHgrow(statsColumn, Priority.ALWAYS);
+            showcaseRow.getChildren().setAll(previewRenderer, statsColumn);
+
+            tagStrip.getChildren().setAll(
+                    attributeChip("DIETA", "Desconhecida"),
+                    attributeChip("HABITAT", "Desconhecido"),
+                    attributeChip("ATAQUE", "Desconhecido")
+            );
+
+            intelContainer.getChildren().setAll(
+                    intelBlock("STATUS DE DESCOBERTA",
+                        "Esta criatura ainda não foi derrotada pelo jogador na natureza selvagem. Encontre-a nos biomas e derrote ao menos um exemplar para desvendar sua anatomia, atributos, pontos fracos e comportamento no Bestiário.",
+                        UiTheme.TEXT_MUTED),
+                    intelBlock("DICA DE RASTREAMENTO",
+                        "Explore tocas, matas fechadas, rios, brejos pantanosos, encostas rochosas e a tundra nevada à procura de rastros e pegadas.",
+                        UiTheme.ACCENT_SKY)
+            );
+            return;
+        }
+
         Color accent = roleColor(info);
 
         Label nameLbl = new Label(info.getName());
@@ -218,17 +277,19 @@ public class BestiaryScreen extends StackPane {
     }
 
     private static Color roleColor(CreatureInfo info) {
+        if (info.isPassive()) return Color.web("#38BDF8");
         if (info.getType() == null) return Color.web(UiTheme.ACCENT_EMERALD);
         if (info.getType() == EnemyType.BEAR_BOSS) return Color.web(UiTheme.ACCENT_CRIMSON);
         if (info.getType() == EnemyType.HUNTER) return Color.web(UiTheme.ACCENT_AMBER);
-        return Color.web(UiTheme.ACCENT_SKY);
+        return Color.web(UiTheme.ACCENT_AMBER);
     }
 
     private static String roleBadge(CreatureInfo info) {
+        if (info.isPassive()) return "PRESA SILVESTRE";
         if (info.getType() == null) return "SENTINELA · VOCÊ";
         if (info.getType() == EnemyType.BEAR_BOSS) return "CHEFE ALFA";
         if (info.getType() == EnemyType.HUNTER) return "PATRULHEIRO";
-        return "FAUNA HOSTIL";
+        return "FAUNA RIVAL";
     }
 
     public void stopPreview() {

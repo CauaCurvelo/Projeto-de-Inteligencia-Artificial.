@@ -192,12 +192,9 @@ public class TileMap {
                 // Processa o Grande Lago Fluvial se o ponto estiver dentro do raio da bacia lacustre
                 if (distToLake < effectiveLakeRadius) {
                     if (biome == BiomeType.SNOW) {
-                        // Grandes pistas de gelo e calotas congeladas nos lagos do bioma glacial
-                        double freezeNoise = fbm(worldCol * 0.08, worldRow * 0.08, 4013L);
-                        if (distToLake > effectiveLakeRadius * 0.32 || freezeNoise > 0.30) {
-                            chunk[r][c] = TileType.ICE;
-                            continue;
-                        }
+                        // Grandes bacias lacustres totalmente congeladas formando pistas majestosas de gelo
+                        chunk[r][c] = TileType.ICE;
+                        continue;
                     } else if (biome == BiomeType.SWAMP) {
                         // No PANTANO: a água se fragmenta em bancos de lodo, restingas e juncais (bayou/wetland)
                         double swampNoise = fbm(worldCol * 0.11, worldRow * 0.11, 3109L);
@@ -272,8 +269,9 @@ public class TileMap {
                 double marshHalfWidth = mudHalfWidth + (biome == BiomeType.SWAMP ? 2.2 : 1.4);
 
                 if (riverDist < riverHalfWidth) {
-                    if (biome == BiomeType.SNOW && (riverDist > riverHalfWidth * 0.55 || fbm(ru * 0.06, 4.2, 4027L) > 0.60)) {
-                        chunk[r][c] = TileType.ICE; // Calota de gelo nas margens e remansos fluviais congelados
+                    if (biome == BiomeType.SNOW) {
+                        // Rio congelado completo no bioma ártico: vasta rodovia contínua de gelo cristalino
+                        chunk[r][c] = TileType.ICE;
                         continue;
                     } else if (biome == BiomeType.SWAMP) {
                         // No PANTANO: rios formam bancos de lodo e canais rasos entrelaçados (braided river)
@@ -320,8 +318,8 @@ public class TileMap {
                 }
 
                 if (tribDist < tribWidth) {
-                    if (biome == BiomeType.SNOW && (tribDist > tribWidth * 0.50 || rawHash(worldCol, worldRow, 4049L) > 0.42)) {
-                        chunk[r][c] = TileType.ICE;
+                    if (biome == BiomeType.SNOW) {
+                        chunk[r][c] = TileType.ICE; // Riacho afluente congelado na neve
                         continue;
                     } else if (biome == BiomeType.SWAMP) {
                         double tribSwampNoise = fbm(worldCol * 0.16, worldRow * 0.16, 3181L);
@@ -357,10 +355,8 @@ public class TileMap {
                             chunk[r][c] = TileType.WATER; // Poças e canais de água barrenta
                         }
                     } else if (biome == BiomeType.SNOW) {
-                        if (adjElevation < 0.12) {
-                            chunk[r][c] = TileType.WATER;
-                        } else if (adjElevation < 0.21) {
-                            chunk[r][c] = TileType.ICE; // Lagoas e platôs de gelo cristalino
+                        if (adjElevation < 0.22) {
+                            chunk[r][c] = TileType.ICE; // Lagos glaciais amplos totalmente congelados
                         } else {
                             chunk[r][c] = (rawHash(worldCol, worldRow, 529L) > 0.40) ? TileType.MUD : TileType.TALL_GRASS;
                         }

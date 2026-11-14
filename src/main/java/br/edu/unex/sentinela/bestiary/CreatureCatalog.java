@@ -109,6 +109,46 @@ public final class CreatureCatalog {
             4, 5, 10,
             "Colosso da nevasca; atravessa águas geladas com facilidade e esmaga o gelo ao redor.",
             "Afaste-se da onda de impacto e atraia-o para fora dos lagos congelados."
+        ),
+        new CreatureInfo(
+            "rabbit", "Coelho Silvestre", "Presa Silvestre · Prado e Bosques",
+            br.edu.unex.sentinela.entity.PassiveAnimalType.RABBIT,
+            "Herbívoro (Folhas, Brotos e Frutas)",
+            "Clareiras, Pradarias e Bordas da Mata",
+            "Fuga em Zigue-zague",
+            5, 1, 1,
+            "Ágil e esquivo; percebe predadores a média distância e dispara em saltos elásticos rápidos.",
+            "Aproxime-se agachado pela mata alta ou pelas costas; correr abertamente faz o coelho disparar."
+        ),
+        new CreatureInfo(
+            "deer", "Cervo da Mata", "Presa Silvestre · Bosques e Serras",
+            br.edu.unex.sentinela.entity.PassiveAnimalType.DEER,
+            "Herbívoro (Ervas, Arbustos e Cascas)",
+            "Mata Fechada, Bosques e Encostas",
+            "Arrancada Veloz",
+            5, 1, 2,
+            "Guardião vigilante da mata; possui ampla visão periférica e escudo branco de alarme na cauda.",
+            "Use o vento a favor e arbustos densos para emboscá-lo; em linha reta, sua velocidade supera a maioria dos animais."
+        ),
+        new CreatureInfo(
+            "frog", "Sapo Cururu", "Presa Silvestre · Pântanos e Rios",
+            br.edu.unex.sentinela.entity.PassiveAnimalType.FROG,
+            "Insetívoro (Vagalumes, Mosquitos e Larvas)",
+            "Pântano Sombrio, Charcos e Margens de Rio",
+            "Salto Parabólico e Nado",
+            3, 1, 1,
+            "Anfíbio saltitante de brejos; pula ágil na água produzindo ondulações e nada com facilidade.",
+            "Mais fácil de surpreender em terra firme antes que consiga saltar em remansos e canais fundos."
+        ),
+        new CreatureInfo(
+            "bird", "Pássaro Canoro", "Presa Silvestre · Todos os Biomas",
+            br.edu.unex.sentinela.entity.PassiveAnimalType.BIRD,
+            "Granívoro (Sementes, Bagas e Insetos)",
+            "Chão de Floresta, Clareiras e Copas",
+            "Decolagem Vertical Rápida",
+            4, 1, 1,
+            "Debica sementes pacientemente no solo e alça voo rápido abrindo asas ao menor sinal de passos.",
+            "Só pode ser capturado enquanto ainda está no solo ou nos primeiros metros de subida; ao subir no céu, fica inalcançável!"
         )
     );
 

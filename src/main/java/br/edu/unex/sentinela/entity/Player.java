@@ -464,6 +464,8 @@ public class Player {
     public boolean isSwimming() { return isSwimming; }
     public boolean isOnIce() { return isOnIce; }
     public boolean isSlidingOnIce() { return isSlidingOnIce; }
+    public double getSlideVx() { return slideVx; }
+    public double getSlideVy() { return slideVy; }
     public boolean isBurrowed() { return isBurrowed; }
     public void trapImmobilize(double duration) {
         this.trappedTimer = Math.max(this.trappedTimer, duration);

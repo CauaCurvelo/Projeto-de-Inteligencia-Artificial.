@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * Monitor e gerenciador de conquistas em tempo real.
+ * Monitor e gerenciador de conquistas em tempo real com tracking persistente e equilibrado.
  */
 public final class AchievementTracker {
     private static final String FILE_NAME = "achievements.properties";
@@ -22,15 +22,20 @@ public final class AchievementTracker {
 
     private final Map<Achievement, String> unlocked = new ConcurrentHashMap<>();
     private final Set<EnemySkin> spottedSpecies = Collections.synchronizedSet(new HashSet<>());
+    private final Set<String> defeatedAlphas = Collections.synchronizedSet(new HashSet<>());
+    private final Set<String> visitedBiomes = Collections.synchronizedSet(new HashSet<>());
     private Consumer<Achievement> unlockListener;
 
     // Estatísticas da corrida atual
     private int runKills = 0;
+    private int runPreyKills = 0;
     private int runApples = 0;
     private int runMeat = 0;
     private int runScore = 0;
     private double runTime = 0.0;
     private int runLives = 3;
+    private int runNights = 0;
+    private int runRains = 0;
 
     private AchievementTracker() {
         load();
@@ -47,11 +52,14 @@ public final class AchievementTracker {
 
     public void resetRunStats() {
         runKills = 0;
+        runPreyKills = 0;
         runApples = 0;
         runMeat = 0;
         runScore = 0;
         runTime = 0.0;
         runLives = 3;
+        runNights = 0;
+        runRains = 0;
     }
 
     public void updateTick(double survivalTime, int score, int lives) {
@@ -59,14 +67,14 @@ public final class AchievementTracker {
         this.runScore = score;
         this.runLives = lives;
 
-        if (runTime >= 300.0) {
-            unlock(Achievement.SURVIVOR_5MIN);
+        if (runTime >= 480.0) { // 8 minutos de sobrevivência
+            unlock(Achievement.SURVIVOR_8MIN);
         }
-        if (runScore >= 1000) {
-            unlock(Achievement.SCORE_1000);
+        if (runScore >= 1500) {
+            unlock(Achievement.SCORE_1500);
         }
-        if (runScore >= 5000) {
-            unlock(Achievement.SCORE_5000);
+        if (runScore >= 7500) {
+            unlock(Achievement.SCORE_7500);
         }
     }
 
@@ -75,50 +83,102 @@ public final class AchievementTracker {
             case ENEMY_DEFEATED:
                 runKills++;
                 unlock(Achievement.FIRST_BITE);
-                if (runKills >= 5) unlock(Achievement.HUNTER_OF_HUNTERS);
+                if (runKills >= 10) unlock(Achievement.HUNTER_OF_HUNTERS);
                 if (runLives <= 1) unlock(Achievement.NEAR_DEATH);
                 break;
+
             case BOSS_DEFEATED:
                 unlock(Achievement.APEX_SLAYER);
+                if (e.getTargetSkin() != null) {
+                    defeatedAlphas.add(e.getTargetSkin().name());
+                    save();
+                    if (defeatedAlphas.size() >= 4) {
+                        unlock(Achievement.FOUR_ALPHAS);
+                    }
+                }
                 break;
+
+            case PASSIVE_HUNTED:
+                runPreyKills++;
+                if (runPreyKills >= 5) {
+                    unlock(Achievement.PREY_HUNTER);
+                }
+                break;
+
+            case BIRD_CAUGHT:
+                unlock(Achievement.BIRD_IN_HAND);
+                break;
+
+            case ICE_DRIFT:
+                unlock(Achievement.ICE_SKATER);
+                break;
+
+            case TRAP_TRIGGERED:
+                unlock(Achievement.TRAP_SURVIVOR);
+                break;
+
+            case BIOME_VISITED:
+                if (e.getBiome() != null) {
+                    visitedBiomes.add(e.getBiome().name());
+                    save();
+                    if (visitedBiomes.size() >= 5) {
+                        unlock(Achievement.BIOME_VOYAGER);
+                    }
+                }
+                break;
+
             case APPLE_EATEN:
                 runApples++;
-                if (runApples >= 10) unlock(Achievement.FORAGER);
+                if (runApples >= 20) unlock(Achievement.FORAGER);
                 break;
+
             case MEAT_EATEN:
                 runMeat++;
-                if (runMeat >= 5) unlock(Achievement.CARNIVORE);
+                if (runMeat >= 10) unlock(Achievement.CARNIVORE);
                 break;
+
             case BURROW_ENTERED:
                 unlock(Achievement.GHOST_FOX);
                 break;
+
             case RIVER_SWAM:
                 unlock(Achievement.AQUATIC);
                 break;
+
             case RAIN_SURVIVED:
-                unlock(Achievement.RAIN_SURVIVOR);
+                runRains++;
+                if (runRains >= 2) {
+                    unlock(Achievement.RAIN_SURVIVOR);
+                }
                 break;
+
             case DAY_CYCLE_PASSED:
-                unlock(Achievement.NIGHT_OWL);
+                runNights++;
+                if (runNights >= 2) {
+                    unlock(Achievement.NIGHT_OWL);
+                }
                 break;
+
             case CREATURE_SPOTTED:
                 if (e.getTargetSkin() != null) {
                     spottedSpecies.add(e.getTargetSkin());
-                    if (spottedSpecies.size() >= 5) {
+                    if (spottedSpecies.size() >= 8) {
                         unlock(Achievement.BESTIARY_OBSERVER);
                     }
                 }
                 break;
+
             case GAME_OVER:
                 resetRunStats();
                 break;
+
             default:
                 break;
         }
     }
 
     public synchronized void unlock(Achievement a) {
-        if (unlocked.containsKey(a)) return;
+        if (a == null || unlocked.containsKey(a)) return;
         String dateStr = LocalDateTime.now().format(FORMATTER);
         unlocked.put(a, dateStr);
         save();
@@ -146,6 +206,14 @@ public final class AchievementTracker {
         return Collections.unmodifiableSet(spottedSpecies);
     }
 
+    public Set<String> getDefeatedAlphas() {
+        return Collections.unmodifiableSet(defeatedAlphas);
+    }
+
+    public Set<String> getVisitedBiomes() {
+        return Collections.unmodifiableSet(visitedBiomes);
+    }
+
     public void load() {
         File f = SaveStorage.resolveFileForRead(FILE_NAME);
         if (!f.exists()) return;
@@ -157,6 +225,10 @@ public final class AchievementTracker {
                     try {
                         spottedSpecies.add(EnemySkin.valueOf(key.substring(5)));
                     } catch (Exception ignored) {}
+                } else if (key.startsWith("alpha.")) {
+                    defeatedAlphas.add(key.substring(6));
+                } else if (key.startsWith("biome.")) {
+                    visitedBiomes.add(key.substring(6));
                 } else {
                     try {
                         Achievement a = Achievement.valueOf(key);
@@ -174,6 +246,12 @@ public final class AchievementTracker {
         }
         for (EnemySkin skin : spottedSpecies) {
             p.setProperty("seen." + skin.name(), "true");
+        }
+        for (String alpha : defeatedAlphas) {
+            p.setProperty("alpha." + alpha, "true");
+        }
+        for (String b : visitedBiomes) {
+            p.setProperty("biome." + b, "true");
         }
         File outFile = SaveStorage.resolveFileForWrite(FILE_NAME);
         try (FileOutputStream out = new FileOutputStream(outFile)) {

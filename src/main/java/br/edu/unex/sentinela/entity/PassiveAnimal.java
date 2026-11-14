@@ -410,10 +410,18 @@ public class PassiveAnimal {
     public double getFaceDx() { return faceDx; }
     public double getFaceDy() { return faceDy; }
     public double getVisualAngle() { return visualAngle; }
+    public void setVisualAngle(double visualAngle) {
+        this.visualAngle = visualAngle;
+        this.faceDx = Math.cos(visualAngle);
+        this.faceDy = Math.sin(visualAngle);
+    }
     public double getWalkPhase() { return walkPhase; }
+    public void setWalkPhase(double walkPhase) { this.walkPhase = walkPhase; }
     public double getBreathTimer() { return breathTimer; }
+    public void setBreathTimer(double breathTimer) { this.breathTimer = breathTimer; }
     public double getPeckTimer() { return peckTimer; }
     public boolean isMoving() { return moving; }
+    public void setMoving(boolean moving) { this.moving = moving; }
     public double getAnimPhase() { return animPhase; }
     public double getHopHeight() { return hopHeight; }
     public double getFlightHeight() { return flightHeight; }

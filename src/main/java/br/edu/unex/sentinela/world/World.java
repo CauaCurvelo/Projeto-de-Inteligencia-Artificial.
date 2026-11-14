@@ -3,6 +3,7 @@ package br.edu.unex.sentinela.world;
 import br.edu.unex.sentinela.ai.BossCombatExecutor;
 import br.edu.unex.sentinela.ai.EnemySkin;
 import br.edu.unex.sentinela.ai.EnemyType;
+import br.edu.unex.sentinela.bestiary.BestiaryUnlockManager;
 import br.edu.unex.sentinela.core.HighScoreManager;
 import br.edu.unex.sentinela.entity.Enemy;
 import br.edu.unex.sentinela.entity.PassiveAnimal;
@@ -307,6 +308,12 @@ public class World {
         if (currentWeather == WeatherType.RAIN) {
             GameEventBus.get().post(new GameEvent(GameEvent.Type.RAIN_SURVIVED));
         }
+        if (player.isOnIce() && Math.hypot(player.getSlideVx(), player.getSlideVy()) > 130.0) {
+            GameEventBus.get().post(new GameEvent(GameEvent.Type.ICE_DRIFT));
+        }
+        BiomeType currentBiome = tileMap.getBiomeAtWorld(player.getX(), player.getY());
+        GameEventBus.get().post(new GameEvent(GameEvent.Type.BIOME_VISITED, currentBiome));
+
         AchievementTracker.get().updateTick(survivalTime, score, player.getLives());
 
         double scentDecayMultiplier = currentWeather.getScentWashMultiplier();
@@ -418,6 +425,7 @@ public class World {
                     trap.snap();
                     player.takeDamage(trap.getX(), trap.getY());
                     player.trapImmobilize(2.5);
+                    GameEventBus.get().post(new GameEvent(GameEvent.Type.TRAP_TRIGGERED));
                     br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.95, 0, 0.70);
                     for (int k = 0; k < 6; k++) {
                         particles.add(new Particle(trap.getX(), trap.getY(),
@@ -496,6 +504,11 @@ public class World {
                     if (dead) {
                         meatItems.addAll(animal.createMorselDrops());
                         score += 50;
+                        GameEventBus.get().post(new GameEvent(GameEvent.Type.PASSIVE_HUNTED));
+                        if (animal.getType() == br.edu.unex.sentinela.entity.PassiveAnimalType.BIRD) {
+                            GameEventBus.get().post(new GameEvent(GameEvent.Type.BIRD_CAUGHT));
+                        }
+                        recordBestiaryDefeatForPassive(animal);
                     }
                 }
             }
@@ -568,6 +581,7 @@ public class World {
                         } else {
                             GameEventBus.get().post(new GameEvent(GameEvent.Type.ENEMY_DEFEATED, enemy.getSkin(), 1, "Inimigo Derrotado"));
                         }
+                        recordBestiaryDefeatForEnemy(enemy);
                         enemyIt.remove();
                         continue;
                     }
@@ -807,6 +821,50 @@ public class World {
             if (biome == BiomeType.DENSE_FOREST || biome == BiomeType.SWAMP || biome == BiomeType.MEADOW) {
                 fireflies.add(new Firefly(fx, fy, biome));
             }
+        }
+    }
+
+    private void recordBestiaryDefeatForEnemy(Enemy enemy) {
+        if (enemy == null) return;
+        String id = null;
+        if (enemy.getType() == EnemyType.HUNTER || enemy.getSkin() == EnemySkin.HUNTER_SNIPER) {
+            id = "hunter";
+        } else if (enemy.getType() == EnemyType.HOUND || enemy.getSkin() == EnemySkin.HOUND_TRACKER) {
+            id = "hound";
+        } else if (enemy.getSkin() == EnemySkin.WOLF) {
+            id = "wolf";
+        } else if (enemy.getSkin() == EnemySkin.BOAR) {
+            id = "boar";
+        } else if (enemy.getSkin() == EnemySkin.BADGER) {
+            id = "badger";
+        } else if (enemy.getSkin() == EnemySkin.BEAR) {
+            id = "bear";
+        } else if (enemy.getSkin() == EnemySkin.PANTHER) {
+            id = "panther";
+        } else if (enemy.getSkin() == EnemySkin.CROCODILE) {
+            id = "crocodile";
+        } else if (enemy.getSkin() == EnemySkin.POLAR_BEAR) {
+            id = "polar_bear";
+        }
+        if (id != null) {
+            BestiaryUnlockManager.get().recordKill(id);
+        }
+    }
+
+    private void recordBestiaryDefeatForPassive(PassiveAnimal animal) {
+        if (animal == null) return;
+        String id = null;
+        if (animal.getType() == PassiveAnimalType.RABBIT) {
+            id = "rabbit";
+        } else if (animal.getType() == PassiveAnimalType.DEER) {
+            id = "deer";
+        } else if (animal.getType() == PassiveAnimalType.FROG) {
+            id = "frog";
+        } else if (animal.getType() == PassiveAnimalType.BIRD) {
+            id = "bird";
+        }
+        if (id != null) {
+            BestiaryUnlockManager.get().recordKill(id);
         }
     }
 }
