@@ -198,6 +198,17 @@ public class TileMap {
                             chunk[r][c] = TileType.ICE;
                             continue;
                         }
+                    } else if (biome == BiomeType.SWAMP) {
+                        // No PANTANO: a água se fragmenta em bancos de lodo, restingas e juncais (bayou/wetland)
+                        double swampNoise = fbm(worldCol * 0.11, worldRow * 0.11, 3109L);
+                        double edgeFactor = distToLake / effectiveLakeRadius;
+                        if (swampNoise > 0.62 || (swampNoise > 0.48 && edgeFactor > 0.52)) {
+                            chunk[r][c] = TileType.MUD; // Bancos de lodo/lama emergente
+                            continue;
+                        } else if (swampNoise > 0.44 && rawHash(worldCol, worldRow, 3119L) > 0.35) {
+                            chunk[r][c] = TileType.TALL_GRASS; // Juncos, taboas e vegetação pantaneira
+                            continue;
+                        }
                     }
                     chunk[r][c] = TileType.WATER;
                     continue;
@@ -227,6 +238,17 @@ public class TileMap {
                     if (distOxbow < oxbowRadius) {
                         if (biome == BiomeType.SNOW) {
                             chunk[r][c] = TileType.ICE; // Lagoas de ferradura congeladas na neve
+                        } else if (biome == BiomeType.SWAMP) {
+                            double oxbowSwamp = fbm(worldCol * 0.12, worldRow * 0.12, 3137L);
+                            if (oxbowSwamp > 0.58) {
+                                chunk[r][c] = TileType.MUD; // Bancos de lodo nos meandros do pântano
+                                continue;
+                            } else if (oxbowSwamp > 0.46) {
+                                chunk[r][c] = TileType.TALL_GRASS; // Taboas em charco estagnado
+                                continue;
+                            } else {
+                                chunk[r][c] = TileType.WATER;
+                            }
                         } else {
                             chunk[r][c] = TileType.WATER;
                         }
@@ -253,6 +275,18 @@ public class TileMap {
                     if (biome == BiomeType.SNOW && (riverDist > riverHalfWidth * 0.55 || fbm(ru * 0.06, 4.2, 4027L) > 0.60)) {
                         chunk[r][c] = TileType.ICE; // Calota de gelo nas margens e remansos fluviais congelados
                         continue;
+                    } else if (biome == BiomeType.SWAMP) {
+                        // No PANTANO: rios formam bancos de lodo e canais rasos entrelaçados (braided river)
+                        double riverSwampNoise = fbm(worldCol * 0.13, worldRow * 0.13, 3121L);
+                        if (riverDist > riverHalfWidth * 0.28) {
+                            if (riverSwampNoise > 0.62) {
+                                chunk[r][c] = TileType.MUD; // Banco de lodo emergente
+                                continue;
+                            } else if (riverSwampNoise > 0.50) {
+                                chunk[r][c] = TileType.TALL_GRASS; // Juncais e taboas ribeirinhas
+                                continue;
+                            }
+                        }
                     }
                     chunk[r][c] = TileType.WATER;
                     continue;
@@ -289,6 +323,12 @@ public class TileMap {
                     if (biome == BiomeType.SNOW && (tribDist > tribWidth * 0.50 || rawHash(worldCol, worldRow, 4049L) > 0.42)) {
                         chunk[r][c] = TileType.ICE;
                         continue;
+                    } else if (biome == BiomeType.SWAMP) {
+                        double tribSwampNoise = fbm(worldCol * 0.16, worldRow * 0.16, 3181L);
+                        if (tribSwampNoise > 0.66) {
+                            chunk[r][c] = TileType.MUD; // Vales lamacentos e restingas
+                            continue;
+                        }
                     }
                     chunk[r][c] = TileType.WATER;
                     continue;
@@ -308,10 +348,13 @@ public class TileMap {
                 double adjMoisture = moisture + biome.getMudBias();
                 if (adjElevation < 0.24 && adjMoisture > 0.52) {
                     if (biome == BiomeType.SWAMP) {
-                        if (adjElevation < 0.18) {
-                            chunk[r][c] = TileType.WATER;
+                        double bogPattern = fbm(worldCol * 0.10, worldRow * 0.10, 3163L);
+                        if (bogPattern > 0.54) {
+                            chunk[r][c] = TileType.MUD; // Lodaçais e restingas de turfa
+                        } else if (bogPattern > 0.38) {
+                            chunk[r][c] = TileType.TALL_GRASS; // Juncais densos de brejo
                         } else {
-                            chunk[r][c] = TileType.MUD;
+                            chunk[r][c] = TileType.WATER; // Poças e canais de água barrenta
                         }
                     } else if (biome == BiomeType.SNOW) {
                         if (adjElevation < 0.12) {

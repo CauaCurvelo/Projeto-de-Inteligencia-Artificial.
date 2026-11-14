@@ -316,8 +316,13 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - **Design de Som & Partículas:** Partículas cristalinas de pó e lascas de gelo azul-celeste e branco emitidas sob as patas ao deslizar e derrapar (`#E0F7FA`, `#BAE6FD`), acompanhadas pela síntese procedural em tempo real de raspagem de garras/lâminas afiadas no gelo liso (`STEP_ICE`).
 
 ## Refactor / Polish: Rios e Lagos Limpos (Sem Ilhas), Pontes Raras e Atalho [R] para Reinício Rápido
-- **Remoção de Ilhas e Desobstrução Hídrica ([TileMap.java](src/main/java/br/edu/unex/sentinela/world/TileMap.java)):**
-  - Removidas todas as ilhotas e bancos de vegetação que surgiam no meio dos grandes lagos e em trechos largos de rios e brejos pantanosos. Cursos d'água e espelhos lacustres agora fluem de forma contínua, limpa e desimpedida.
+- **Remoção de Ilhas nos Biomas Gerais e Desobstrução Hídrica ([TileMap.java](src/main/java/br/edu/unex/sentinela/world/TileMap.java)):**
+  - Removidas as ilhotas e bancos de terra nos grandes lagos e rios dos biomas comuns (Clareira, Mata Fechada, Montanha e Neve), deixando os cursos d'água e espelhos lacustres limpos, abertos e navegáveis.
+- **Formação Pantaneira Orgânica de Charcos, Restingas e Bancos de Lodo ([TileMap.java](src/main/java/br/edu/unex/sentinela/world/TileMap.java)):**
+  - Exclusivamente no bioma de Pântano (`BiomeType.SWAMP`), a hidrografia assume a formação natural caótica de brejos (*bayous* e *wetlands*):
+    - **Bacias Lacustres do Pântano:** A água se fragmenta organicamente em canais entrelaçados, lodaçais e bancos emergentes de turfa/lama (`TileType.MUD`) e tufos de juncais e taboas pantaneiras (`TileType.TALL_GRASS`).
+    - **Rios e Riachos de Brejo:** Leito fluvial entrelaçado (*braided river*) com restingas de lama e capinzal ribeirinho intercalados por água corrente navegável.
+    - **Lagos de Meandro e Charcos Autônomos:** Formações estagnadas com bancos de lodo e vegetação densa aquática em equilíbrio ecológico.
 - **Pontes Raras e Preservação de Lagos ([TileMap.java](src/main/java/br/edu/unex/sentinela/world/TileMap.java)):**
   - Pontes sobre o rio principal e riacho secundário tornaram-se significativamente raras: espaçadas em intervalos amplos (~180–190 tiles) e condicionadas a probabilidade moderada (~50%).
   - Bloqueio estrito de travessias cortando lagos: trilhas e pontes nunca mais cortam ou atravessam o interior de corpos lacustres.
