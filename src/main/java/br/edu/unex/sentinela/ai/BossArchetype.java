@@ -115,10 +115,12 @@ public enum BossArchetype {
             case POLAR_BEAR:
                 if (tile == TileType.MUD) return 0.98; // adaptado à neve fofa e gelo fino
                 if (tile == TileType.WATER) return 0.92; // excelente nadador glacial
+                if (tile == TileType.ICE) return 1.25; // garras adaptadas a tracionar no gelo
                 if (tile == TileType.DIRT_PATH) return 1.08;
                 return 1.0;
             case GRIZZLY_BEAR:
             default:
+                if (tile == TileType.ICE) return 0.88;
                 if (tile == TileType.DIRT_PATH) return 1.08;
                 if (tile == TileType.MUD) return 0.80;
                 if (tile == TileType.WATER) return 0.78;

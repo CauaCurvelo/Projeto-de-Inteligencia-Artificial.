@@ -196,6 +196,14 @@ public class TileMap {
                             continue;
                         }
                     }
+                    if (biome == BiomeType.SNOW) {
+                        // Grandes pistas de gelo e calotas congeladas nos lagos do bioma glacial
+                        double freezeNoise = fbm(worldCol * 0.08, worldRow * 0.08, 4013L);
+                        if (distToLake > effectiveLakeRadius * 0.32 || freezeNoise > 0.30) {
+                            chunk[r][c] = TileType.ICE;
+                            continue;
+                        }
+                    }
                     chunk[r][c] = TileType.WATER;
                     continue;
                 } else if (distToLake < effectiveLakeRadius + 1.8) {
@@ -222,7 +230,11 @@ public class TileMap {
                     double oxbowRadius = 4.2 + rawHash(oxbowCell, 43, 2129L) * 2.6;
 
                     if (distOxbow < oxbowRadius) {
-                        chunk[r][c] = TileType.WATER;
+                        if (biome == BiomeType.SNOW) {
+                            chunk[r][c] = TileType.ICE; // Lagoas de ferradura congeladas na neve
+                        } else {
+                            chunk[r][c] = TileType.WATER;
+                        }
                         continue;
                     } else if (distOxbow < oxbowRadius + 1.5) {
                         chunk[r][c] = TileType.MUD;
@@ -253,6 +265,10 @@ public class TileMap {
                 }
 
                 if (riverDist < riverHalfWidth) {
+                    if (biome == BiomeType.SNOW && (riverDist > riverHalfWidth * 0.55 || fbm(ru * 0.06, 4.2, 4027L) > 0.60)) {
+                        chunk[r][c] = TileType.ICE; // Calota de gelo nas margens e remansos fluviais congelados
+                        continue;
+                    }
                     chunk[r][c] = TileType.WATER;
                     continue;
                 } else if (riverDist < mudHalfWidth) {
@@ -284,6 +300,10 @@ public class TileMap {
                 }
 
                 if (tribDist < tribWidth) {
+                    if (biome == BiomeType.SNOW && (tribDist > tribWidth * 0.50 || rawHash(worldCol, worldRow, 4049L) > 0.42)) {
+                        chunk[r][c] = TileType.ICE;
+                        continue;
+                    }
                     chunk[r][c] = TileType.WATER;
                     continue;
                 } else if (tribDist < tribWidth + 1.2) {
@@ -311,14 +331,18 @@ public class TileMap {
                             chunk[r][c] = TileType.MUD;
                         }
                     } else if (biome == BiomeType.SNOW) {
-                        if (adjElevation < 0.17) {
+                        if (adjElevation < 0.12) {
                             chunk[r][c] = TileType.WATER;
+                        } else if (adjElevation < 0.21) {
+                            chunk[r][c] = TileType.ICE; // Lagoas e platôs de gelo cristalino
                         } else {
                             chunk[r][c] = (rawHash(worldCol, worldRow, 529L) > 0.40) ? TileType.MUD : TileType.TALL_GRASS;
                         }
                     } else if (biome == BiomeType.HIGHLAND) {
-                        if (adjElevation < 0.16) {
+                        if (adjElevation < 0.14) {
                             chunk[r][c] = TileType.WATER;
+                        } else if (adjElevation < 0.19 && moisture > 0.58) {
+                            chunk[r][c] = TileType.ICE; // Geleiras de altitude
                         } else {
                             chunk[r][c] = TileType.MUD;
                         }
@@ -332,13 +356,13 @@ public class TileMap {
                     continue;
                 }
 
-                // Bolsões de lama no Pântano e neve úmida/slush ocasional na Tundra
+                // Bolsões de lama no Pântano e poças congeladas/slush na Tundra
                 if (biome == BiomeType.SWAMP && forestClumping > 0.36 && forestClumping < 0.44 && moisture > 0.50) {
                     chunk[r][c] = TileType.MUD;
                     continue;
                 }
                 if (biome == BiomeType.SNOW && forestClumping > 0.34 && forestClumping < 0.39 && moisture > 0.56) {
-                    chunk[r][c] = TileType.MUD;
+                    chunk[r][c] = rawHash(worldCol, worldRow, 533L) > 0.40 ? TileType.ICE : TileType.MUD;
                     continue;
                 }
 

@@ -32,6 +32,7 @@ final class CreatureSoundMap {
             case DIRT_PATH:  return SoundId.STEP_DIRT;
             case MUD:        return SoundId.STEP_MUD;
             case WATER:      return SoundId.STEP_WATER;
+            case ICE:        return SoundId.STEP_ICE;
             case WALL:       return SoundId.STEP_STONE;
             default:         return biome == BiomeType.SNOW ? SoundId.STEP_SNOW : SoundId.STEP_GRASS;
         }

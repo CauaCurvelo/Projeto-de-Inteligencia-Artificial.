@@ -65,6 +65,12 @@ public class Player {
     private double knockbackVx = 0.0;
     private double knockbackVy = 0.0;
 
+    // Física de Deslizamento no Gelo (Ice Sliding / Inertia Drift)
+    private double slideVx = 0.0;
+    private double slideVy = 0.0;
+    private boolean isOnIce = false;
+    private boolean isSlidingOnIce = false;
+
     private double noiseRadius = 0.0;
 
     // Timers
@@ -131,6 +137,7 @@ public class Player {
 
         this.isHiddenInGrass = (currentTile == TileType.TALL_GRASS);
         this.isSwimming = (currentTile == TileType.WATER);
+        this.isOnIce = (currentTile == TileType.ICE);
 
         double speedMultiplier = 1.0;
         if (currentTile == TileType.MUD) {
@@ -139,6 +146,8 @@ public class Player {
             speedMultiplier = 0.45;
         } else if (currentTile == TileType.DIRT_PATH) {
             speedMultiplier = 1.15;
+        } else if (currentTile == TileType.ICE) {
+            speedMultiplier = 1.25;
         }
 
         if (isLowLife()) {
@@ -154,11 +163,13 @@ public class Player {
             speedMultiplier = 0.0;
         }
 
-        if (isSprinting && moving) {
+        boolean inputActive = (dx != 0 || dy != 0) && !isBurrowed;
+
+        if (isSprinting && inputActive) {
             currentSpeed = baseSpeed * 1.55 * speedMultiplier;
             noiseRadius = 240.0;
             hunger -= 3.8 * deltaTime;
-        } else if (moving) {
+        } else if (inputActive) {
             currentSpeed = baseSpeed * speedMultiplier;
             noiseRadius = 100.0;
             hunger -= 1.4 * deltaTime;
@@ -170,17 +181,46 @@ public class Player {
 
         if (hunger < 0) hunger = 0;
 
-        if (moving) {
-            walkPhase += currentSpeed * deltaTime * 0.095;
+        // Física vetorial de inércia e derrapagem no Gelo
+        double targetVx = inputActive ? dx * currentSpeed : 0.0;
+        double targetVy = inputActive ? dy * currentSpeed : 0.0;
 
-            double nextX = x + dx * currentSpeed * deltaTime;
-            double nextY = y + dy * currentSpeed * deltaTime;
-
-            if (!isColliding(nextX, y, tileMap)) {
-                x = nextX;
+        if (isOnIce) {
+            double accelRate = inputActive ? 5.2 : 1.15;
+            double blend = 1.0 - Math.pow(0.04, deltaTime * accelRate);
+            slideVx += (targetVx - slideVx) * blend;
+            slideVy += (targetVy - slideVy) * blend;
+        } else {
+            double groundFrictionRate = 18.0;
+            double blend = 1.0 - Math.pow(0.001, deltaTime * groundFrictionRate);
+            slideVx += (targetVx - slideVx) * blend;
+            slideVy += (targetVy - slideVy) * blend;
+            if (!inputActive && Math.hypot(slideVx, slideVy) < 8.0) {
+                slideVx = 0.0;
+                slideVy = 0.0;
             }
-            if (!isColliding(x, nextY, tileMap)) {
-                y = nextY;
+        }
+
+        double actualSlideSpeed = Math.hypot(slideVx, slideVy);
+        this.isSlidingOnIce = isOnIce && (actualSlideSpeed > 24.0);
+        this.moving = (inputActive || actualSlideSpeed > 12.0) && !isBurrowed;
+
+        if (moving) {
+            walkPhase += Math.max(currentSpeed, actualSlideSpeed) * deltaTime * 0.095;
+
+            double stepX = slideVx * deltaTime;
+            double stepY = slideVy * deltaTime;
+
+            if (!isColliding(x + stepX, y, tileMap)) {
+                x += stepX;
+            } else {
+                slideVx = 0.0;
+            }
+
+            if (!isColliding(x, y + stepY, tileMap)) {
+                y += stepY;
+            } else {
+                slideVy = 0.0;
             }
 
             // Pegadas direcionadas alternando esquerda/direita (Paw Prints)
@@ -198,7 +238,7 @@ public class Player {
 
             // Partículas orgânicas de movimento por bioma
             particleTimer += deltaTime;
-            double emitInterval = isSprinting ? 0.045 : 0.095;
+            double emitInterval = (isSprinting || isSlidingOnIce) ? 0.040 : 0.095;
             if (particleTimer >= emitInterval) {
                 particleTimer = 0.0;
                 spawnMovementParticles(currentTile, dx, dy, particles);
@@ -239,6 +279,19 @@ public class Player {
                 0.38,
                 "#5D4037",
                 rand.nextDouble() * 3.5 + 2.0
+            ));
+        } else if (currentTile == TileType.ICE) {
+            // Fagulhas e pó de gelo cristalino espalhando sob as patas ao deslizar
+            double pVx = (slideVx != 0) ? -slideVx * 0.22 : -dx * 28;
+            double pVy = (slideVy != 0) ? -slideVy * 0.22 : -dy * 28;
+            particles.add(new Particle(
+                x - dx * 6 + (rand.nextDouble() * 10 - 5),
+                y - dy * 6 + (rand.nextDouble() * 10 - 5),
+                pVx + (rand.nextDouble() * 24 - 12),
+                pVy + (rand.nextDouble() * 24 - 12),
+                0.35,
+                rand.nextBoolean() ? "#E0F7FA" : "#BAE6FD",
+                rand.nextDouble() * 3.0 + 1.6
             ));
         } else if (isSprinting || currentTile == TileType.DIRT_PATH) {
             // Pufes de poeira de corrida
@@ -409,6 +462,8 @@ public class Player {
     public double getMaxHunger() { return maxHunger; }
     public boolean isHiddenInGrass() { return isHiddenInGrass; }
     public boolean isSwimming() { return isSwimming; }
+    public boolean isOnIce() { return isOnIce; }
+    public boolean isSlidingOnIce() { return isSlidingOnIce; }
     public boolean isBurrowed() { return isBurrowed; }
     public void trapImmobilize(double duration) {
         this.trappedTimer = Math.max(this.trappedTimer, duration);

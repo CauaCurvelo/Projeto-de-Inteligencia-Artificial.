@@ -1055,7 +1055,12 @@ public class Enemy {
         }
 
         // 4. Interpolação Suave de Velocidade (Steering Inertia) e Ângulo Visual
-        double steerFactor = Math.min(1.0, deltaTime * 12.0);
+        double steerRate = 12.0;
+        if (currentTile == TileType.ICE) {
+            boolean hasFrostGrip = (skin == EnemySkin.POLAR_BEAR || variant == AnimalVariant.ARCTIC);
+            steerRate = hasFrostGrip ? 9.5 : 2.6;
+        }
+        double steerFactor = Math.min(1.0, deltaTime * steerRate);
         double targetVx = combinedX * maxSpeed;
         double targetVy = combinedY * maxSpeed;
         this.vx = this.vx + (targetVx - this.vx) * steerFactor;

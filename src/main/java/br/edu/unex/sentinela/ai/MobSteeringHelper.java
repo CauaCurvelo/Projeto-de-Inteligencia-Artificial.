@@ -143,6 +143,7 @@ public final class MobSteeringHelper {
             return -3.5;
         }
         if (t == TileType.WATER) return coldHardy ? -1.5 : -5.5;
+        if (t == TileType.ICE) return coldHardy ? 4.5 : 1.2;
         if (self.getType() == EnemyType.HUNTER && t == TileType.DIRT_PATH) return 4.0;
         if (self.getSkin() == EnemySkin.BOAR && (t == TileType.MUD || t == TileType.TALL_GRASS)) return 3.2;
         if (self.getSkin() == EnemySkin.WOLF && (t == TileType.GRASS || t == TileType.DIRT_PATH)) return 2.8;

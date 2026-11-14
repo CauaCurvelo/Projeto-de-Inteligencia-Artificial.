@@ -10,6 +10,7 @@ public enum SoundId {
     STEP_WATER(AudioChannel.STEPS),
     STEP_STONE(AudioChannel.STEPS),
     STEP_SNOW(AudioChannel.STEPS),
+    STEP_ICE(AudioChannel.STEPS),
 
     // Passos de inimigos
     STEP_BOOT(AudioChannel.STEPS),

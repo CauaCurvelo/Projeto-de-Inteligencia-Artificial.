@@ -36,6 +36,7 @@ final class FootstepSynthesizer {
             case STEP_WATER:      return waterStep(v, rng);
             case STEP_STONE:      return stoneStep(v, rng);
             case STEP_SNOW:       return snowStep(v, rng);
+            case STEP_ICE:        return iceStep(v, rng);
             case STEP_BOOT:       return bootStep(v, rng);
             case STEP_PAW:        return pawStep(v, rng);
             case STEP_HOOF:       return hoofStep(v, rng);
@@ -130,6 +131,18 @@ final class FootstepSynthesizer {
         scatterGrains(out, 12, 0.008, 0.088, 1300, 2700, 0.28, rng);
         biquadLowPass(out, 3100, 0.7);
         return normalize(edgeFade(out, 0.005, 0.020), 0.44);
+    }
+
+    private static float[] iceStep(int v, Random rng) {
+        double dur = 0.088 + (v % 2) * 0.015;
+        float[] out = mixInto(buffer(dur), thump(0.042, 115 + v * 8, 55, 42, 3.2), 0.0, 0.22);
+        float[] scrape = biquadBandPass(pinkNoise(0.075, rng), 3200 + rng.nextDouble() * 600, 2.6);
+        float[] ping = biquadBandPass(whiteNoise(0.045), 5400 + rng.nextDouble() * 700, 3.2);
+        mixInto(out, envelope(scrape, 0.005, 2.8), 0.002, 0.68);
+        mixInto(out, envelope(ping, 0.003, 3.8), 0.005, 0.38);
+        scatterGrains(out, 6, 0.004, 0.055, 2200, 4800, 0.32, rng);
+        biquadLowPass(out, 4200, 0.7);
+        return normalize(edgeFade(out, 0.003, 0.014), 0.42);
     }
 
     private static float[] pawStep(int v, Random rng) {

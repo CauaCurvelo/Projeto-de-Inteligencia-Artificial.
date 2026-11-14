@@ -74,6 +74,10 @@ public class TerrainRenderer {
                 renderDetailedWaterStatic(sx, sy, ts, col, row, tileMap, biome, pal);
                 break;
 
+            case ICE:
+                renderDetailedIceStatic(sx, sy, ts, col, row, tileMap, biome, pal);
+                break;
+
             case WALL:
                 gc.setFill(WALL_BASE);
                 gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
@@ -123,6 +127,17 @@ public class TerrainRenderer {
                 gc.setStroke(i % 2 == 0 ? pal.tallGrassTipA : pal.tallGrassTipB);
                 gc.strokeLine(bx + sway * 0.35, by - height * 0.4, bx + sway + (hX - 0.5) * 3.5, by - height);
             }
+        } else if (type == TileType.ICE && quality == GraphicsQuality.HIGH) {
+            double glintPhase = Math.sin(animTime * 2.0 + col * 0.55 + row * 0.45);
+            if (glintPhase > 0.60) {
+                double intensity = (glintPhase - 0.60) / 0.40;
+                double gx = sx + 7 + coordHash(col, row, 7789L) * (ts - 14);
+                double gy = sy + 7 + coordHash(col, row, 7793L) * (ts - 14);
+                gc.setFill(Color.color(1.0, 1.0, 1.0, intensity * 0.70));
+                gc.fillOval(gx - 1.5, gy - 1.5, 3.0, 3.0);
+                gc.setFill(Color.color(0.70, 0.92, 1.0, intensity * 0.45));
+                gc.fillOval(gx - 3.5, gy - 3.5, 7.0, 7.0);
+            }
         }
     }
 
@@ -152,6 +167,10 @@ public class TerrainRenderer {
                         && tileMap.getTileAt(col - 1, row) == TileType.WATER
                         && tileMap.getTileAt(col + 1, row) == TileType.WATER;
                 gc.setFill(isDeep ? pal.waterDeep : pal.waterShallow);
+                gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+                break;
+            case ICE:
+                gc.setFill(Color.web("#BAE6FD"));
                 gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
                 break;
             case WALL:
@@ -400,6 +419,65 @@ public class TerrainRenderer {
             gc.fillRoundRect(ix, iy, 10, 7, 3, 3);
             gc.setFill(Color.web("#F8FAFC", 0.85));
             gc.fillRoundRect(ix + 1, iy + 0.8, 7.5, 4.2, 2, 2);
+        }
+    }
+
+    private void renderDetailedIceStatic(double sx, double sy, int ts, int col, int row,
+                                         TileMap tileMap, BiomeType biome, BiomeTerrainPalette pal) {
+        // Base de gelo azul-turquesa cristalino e translúcido
+        double hue = 199.0 + (coordHash(col, row, 701L) - 0.5) * 8.0;
+        double sat = 0.38 + (coordHash(col, row, 709L) - 0.5) * 0.10;
+        double bri = 0.88 + (coordHash(col, row, 719L) - 0.5) * 0.08;
+        Color iceBase = Color.hsb(hue, clamp(sat, 0.25, 0.55), clamp(bri, 0.78, 0.96));
+
+        gc.setFill(iceBase);
+        gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+
+        // Núcleo reflexivo oval mais claro
+        gc.setFill(Color.web("#E0F7FA", 0.55));
+        gc.fillOval(sx + 2.5, sy + 2.5, ts - 5, ts - 5);
+
+        // Faixa de reflexo especular polido diagonal
+        double glossOffset = (coordHash(col, row, 733L) - 0.5) * 5.0;
+        gc.setFill(Color.web("#FFFFFF", 0.35));
+        gc.fillPolygon(
+                new double[]{sx + 4 + glossOffset, sx + 13 + glossOffset, sx + ts - 4, sx + ts - 13},
+                new double[]{sy + ts - 4, sy + ts - 4, sy + 4, sy + 4},
+                4
+        );
+
+        // Fissuras e rachaduras internas cristalinas no gelo
+        if (coordHash(col, row, 751L) > 0.32) {
+            double startX = sx + 5 + coordHash(col, row, 757L) * (ts - 10);
+            double startY = sy + 5 + coordHash(col, row, 761L) * (ts - 10);
+            double midX = startX + (coordHash(col, row, 769L) - 0.5) * 13.0;
+            double midY = startY + (coordHash(col, row, 773L) - 0.5) * 13.0;
+            double endX = midX + (coordHash(col, row, 787L) - 0.5) * 10.0;
+            double endY = midY + (coordHash(col, row, 797L) - 0.5) * 10.0;
+
+            gc.setStroke(Color.web("#0284C7", 0.40));
+            gc.setLineWidth(1.6);
+            gc.strokeLine(startX + 0.5, startY + 0.5, midX + 0.5, midY + 0.5);
+            gc.strokeLine(midX + 0.5, midY + 0.5, endX + 0.5, endY + 0.5);
+
+            gc.setStroke(Color.web("#FFFFFF", 0.82));
+            gc.setLineWidth(0.9);
+            gc.strokeLine(startX, startY, midX, midY);
+            gc.strokeLine(midX, midY, endX, endY);
+        }
+
+        // Borda de congelamento / geada periférica nas margens
+        boolean nIce = tileMap.getTileAt(col, row - 1) == TileType.ICE;
+        boolean sIce = tileMap.getTileAt(col, row + 1) == TileType.ICE;
+        boolean wIce = tileMap.getTileAt(col - 1, row) == TileType.ICE;
+        boolean eIce = tileMap.getTileAt(col + 1, row) == TileType.ICE;
+
+        if (!nIce || !sIce || !wIce || !eIce) {
+            gc.setFill(Color.web("#FFFFFF", 0.48));
+            if (!nIce) gc.fillRect(sx, sy, ts + 0.6, 2.5);
+            if (!sIce) gc.fillRect(sx, sy + ts - 2.5, ts + 0.6, 2.5);
+            if (!wIce) gc.fillRect(sx, sy, 2.5, ts + 0.6);
+            if (!eIce) gc.fillRect(sx + ts - 2.5, sy, 2.5, ts + 0.6);
         }
     }
 

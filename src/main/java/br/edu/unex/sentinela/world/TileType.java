@@ -6,6 +6,7 @@ public enum TileType {
     DIRT_PATH(true, 1), // Fast natural paths
     MUD(true, 3),       // Heavy swamp terrain, washes scent
     WATER(true, 4),     // Swimmable river/lakes, completely clears scent
+    ICE(true, 1),       // Frozen lakes/rivers, causes slipping & sliding with low friction
     TREE(false, 999),   // Impassable obstacle & blocks vision
     WALL(false, 999);   // Granite cliffs and border mountains
 

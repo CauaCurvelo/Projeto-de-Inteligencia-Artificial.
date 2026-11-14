@@ -100,7 +100,7 @@ public class Renderer {
             for (int row = startRow; row <= endRow; row++) {
                 for (int col = startCol; col <= endCol; col++) {
                     TileType type = tileMap.getTileAt(col, row);
-                    if (type == TileType.WATER || (quality == GraphicsQuality.HIGH && type == TileType.TALL_GRASS)) {
+                    if (type == TileType.WATER || (quality == GraphicsQuality.HIGH && (type == TileType.TALL_GRASS || type == TileType.ICE))) {
                         double sx = col * ts - camX;
                         double sy = row * ts - camY;
                         terrainRenderer.renderAnimatedTileOverlay(type, sx, sy, ts, col, row, animTime, quality, tileMap.getBiomeAt(col, row));
