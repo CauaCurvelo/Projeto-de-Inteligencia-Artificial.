@@ -9,4 +9,8 @@ slides aula/
 *.properties
 match_history.csv
 *.log
+bin/
+.classpath
+.project
+.settings/
 

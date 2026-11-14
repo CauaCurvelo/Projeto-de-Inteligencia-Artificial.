@@ -62,6 +62,10 @@ public class PassiveAnimal {
     }
 
     public void update(double dt, Player player, List<Enemy> predators, TileMap tileMap, List<WaterRipple> ripples) {
+        update(dt, player, predators, null, tileMap, ripples);
+    }
+
+    public void update(double dt, Player player, List<Enemy> predators, List<PassiveAnimal> allPassives, TileMap tileMap, List<WaterRipple> ripples) {
         if (despawned) return;
 
         stateTimer -= dt;
@@ -124,6 +128,16 @@ public class PassiveAnimal {
                 return;
             } else {
                 state = State.FLEEING;
+                // Cervo emite sinal de alerta e assusta outros animais passivos no raio de 150px
+                if (type == PassiveAnimalType.DEER && allPassives != null) {
+                    for (PassiveAnimal other : allPassives) {
+                        if (other == this || other.isDespawned()) continue;
+                        double dOther = Math.hypot(other.getX() - x, other.getY() - y);
+                        if (dOther < 150.0 && other.getState() != State.FLEEING) {
+                            other.triggerAlertFlee(threatX, threatY);
+                        }
+                    }
+                }
             }
         } else if (state == State.FLEEING && stateTimer <= 0) {
             state = State.ALERT;
@@ -234,7 +248,68 @@ public class PassiveAnimal {
         }
     }
 
+    public void triggerAlertFlee(double threatX, double threatY) {
+        if (state != State.FLEEING && state != State.FLYING_AWAY) {
+            if (type == PassiveAnimalType.BIRD) {
+                state = State.FLYING_AWAY;
+                double awayAngle = Math.atan2(y - threatY, x - threatX);
+                faceDx = Math.cos(awayAngle);
+                faceDy = Math.sin(awayAngle);
+                visualAngle = awayAngle;
+            } else {
+                state = State.FLEEING;
+                stateTimer = 2.5 + RAND.nextDouble() * 1.5;
+            }
+        }
+    }
+
     private void updateFleeing(double dt, double threatX, double threatY, TileMap tileMap) {
+        if (type == PassiveAnimalType.FROG) {
+            // Sapo busca se salvar pulando na água mais próxima
+            int curC = (int) Math.floor(x / TileMap.TILE_SIZE);
+            int curR = (int) Math.floor(y / TileMap.TILE_SIZE);
+            if (tileMap.getTileAt(curC, curR) == TileType.WATER) {
+                // Já está na água! Nada em linha reta para longe com bônus aquático
+                double away = Math.atan2(y - threatY, x - threatX);
+                double swimSpeed = type.getBaseSpeed() * 1.35;
+                vx = Math.cos(away) * swimSpeed;
+                vy = Math.sin(away) * swimSpeed;
+                if (Math.abs(vx) > 5.0) faceDx = Math.signum(vx);
+                faceDy = vy / swimSpeed;
+                return;
+            }
+
+            int bestWaterC = -1;
+            int bestWaterR = -1;
+            double minWDist = 140.0;
+            for (int dc = -4; dc <= 4; dc++) {
+                for (int dr = -4; dr <= 4; dr++) {
+                    if (tileMap.getTileAt(curC + dc, curR + dr) == TileType.WATER) {
+                        double wx = (curC + dc) * TileMap.TILE_SIZE + 16.0;
+                        double wy = (curR + dr) * TileMap.TILE_SIZE + 16.0;
+                        double d = Math.hypot(wx - x, wy - y);
+                        if (d < minWDist) {
+                            minWDist = d;
+                            bestWaterC = curC + dc;
+                            bestWaterR = curR + dr;
+                        }
+                    }
+                }
+            }
+
+            if (bestWaterC != -1) {
+                double targetWaterX = bestWaterC * TileMap.TILE_SIZE + 16.0;
+                double targetWaterY = bestWaterR * TileMap.TILE_SIZE + 16.0;
+                double toWaterAngle = Math.atan2(targetWaterY - y, targetWaterX - x);
+                double hopSpeed = type.getBaseSpeed() * 1.20;
+                vx = Math.cos(toWaterAngle) * hopSpeed;
+                vy = Math.sin(toWaterAngle) * hopSpeed;
+                if (Math.abs(vx) > 5.0) faceDx = Math.signum(vx);
+                faceDy = vy / hopSpeed;
+                return;
+            }
+        }
+
         zigZagTimer -= dt;
         if (zigZagTimer <= 0) {
             zigZagTimer = 0.25 + RAND.nextDouble() * 0.20;

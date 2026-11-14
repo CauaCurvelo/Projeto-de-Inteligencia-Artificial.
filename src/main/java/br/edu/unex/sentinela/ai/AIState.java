@@ -15,7 +15,12 @@ public enum AIState {
     HUNTING_PREY("Caçando Presa"),
     TRAPPED("Preso em Armadilha"),
     ROARING("Rugido de Fúria"),
-    RETREATING("Recuando ao Domínio");
+    RETREATING("Recuando ao Domínio"),
+    STALKING("Espreitando em Silêncio"),
+    CHARGING("Investida com Presas"),
+    DRINKING("Bebendo Água"),
+    KITING("Recuo Tático com Arco"),
+    SATIATED("Saciado e em Digestão");
 
     private final String description;
 

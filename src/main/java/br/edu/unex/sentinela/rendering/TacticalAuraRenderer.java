@@ -159,8 +159,11 @@ public class TacticalAuraRenderer {
         boolean isAlert = enemy.getState() == AIState.CHASE ||
                           enemy.getState() == AIState.AIMING ||
                           enemy.getState() == AIState.ROARING ||
-                          enemy.getState() == AIState.FIGHTING_ENEMY;
-        boolean isSuspicious = enemy.getState() == AIState.SUSPICIOUS;
+                          enemy.getState() == AIState.FIGHTING_ENEMY ||
+                          enemy.getState() == AIState.CHARGING ||
+                          enemy.getState() == AIState.KITING;
+        boolean isSuspicious = enemy.getState() == AIState.SUSPICIOUS ||
+                               enemy.getState() == AIState.STALKING;
 
         double baseAlpha = isAlert ? 0.26 : (isSuspicious ? 0.20 : 0.13);
         if (isAlert) {
@@ -246,12 +249,21 @@ public class TacticalAuraRenderer {
         if (state == null) return Color.web("#CFD8DC");
         switch (state) {
             case ROARING:
-                return Color.web("#FF6D00"); // Laranja-Fogo (Rugido de Aviso / Fúria)
+            case CHARGING:
+                return Color.web("#FF6D00"); // Laranja-Fogo (Rugido de Aviso / Investida de Javali)
             case CHASE:
             case AIMING:
             case FIGHTING_ENEMY:
             case HUNTING_PREY:
                 return Color.web("#FF2A55"); // Vermelho Carmesim Tático (Perigo / Combate)
+            case STALKING:
+                return Color.web("#AB47BC"); // Roxo Furtivo (Espreita Felina da Pantera)
+            case KITING:
+                return Color.web("#FF9100"); // Âmbar Vibrante (Recuo Tático do Caçador)
+            case DRINKING:
+                return Color.web("#29B6F6"); // Azul Celeste (Bebendo Água na Margem)
+            case SATIATED:
+                return Color.web("#81C784"); // Verde Suave (Saciado / Descanso Pós-Refeição)
             case TRAPPED:
                 return Color.web("#90A4AE"); // Aço Acinzentado (Preso)
             case RETREATING:

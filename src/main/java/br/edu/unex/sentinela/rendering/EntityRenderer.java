@@ -249,8 +249,10 @@ public class EntityRenderer {
         boolean bossEnraged = isBoss && bossCtrl != null && bossCtrl.isEnraged();
         boolean bossRetreating = state == AIState.RETREATING;
         boolean isAlert = state == AIState.CHASE || state == AIState.AIMING || state == AIState.ROARING ||
-                          state == AIState.FIGHTING_ENEMY || state == AIState.TERRITORIAL_ATTACK;
-        boolean isSuspicious = state == AIState.SUSPICIOUS || state == AIState.ALERT || state == AIState.SNIFFING_TRACK;
+                          state == AIState.FIGHTING_ENEMY || state == AIState.TERRITORIAL_ATTACK ||
+                          state == AIState.CHARGING || state == AIState.KITING;
+        boolean isSuspicious = state == AIState.SUSPICIOUS || state == AIState.ALERT ||
+                               state == AIState.SNIFFING_TRACK || state == AIState.STALKING;
 
         String skinName = enemy.getDisplayName();
         String stateDesc = state.getDescription().toUpperCase();

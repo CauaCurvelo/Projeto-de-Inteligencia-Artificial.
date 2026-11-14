@@ -333,6 +333,25 @@ public class World {
                         }
                     }
                 }
+
+                // Flechas do caçador também acertam feras selvagens hostis em combate
+                if (proj.isActive()) {
+                    for (Enemy enemy : enemies) {
+                        if (enemy.getHp() <= 0 || enemy.getType() == EnemyType.HUNTER || enemy.getType() == EnemyType.HOUND) continue;
+                        double distE = Math.hypot(proj.getX() - enemy.getX(), proj.getY() - enemy.getY());
+                        if (distE < 22.0) {
+                            proj.deactivate();
+                            enemy.takeDamage(1, proj.getX(), proj.getY());
+                            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.85, 0, 1.1);
+                            for (int k = 0; k < 6; k++) {
+                                particles.add(new Particle(enemy.getX(), enemy.getY(),
+                                    (rand.nextDouble() - 0.5) * 70, (rand.nextDouble() - 0.5) * 70,
+                                    0.28, "#EF5350", 3.2));
+                            }
+                            break;
+                        }
+                    }
+                }
             }
 
             if (!proj.isActive()) {
@@ -426,7 +445,7 @@ public class World {
         Iterator<PassiveAnimal> passIt = passiveAnimals.iterator();
         while (passIt.hasNext()) {
             PassiveAnimal animal = passIt.next();
-            animal.update(deltaTime, player, enemies, tileMap, waterRipples);
+            animal.update(deltaTime, player, enemies, passiveAnimals, tileMap, waterRipples);
 
             // Ataque da Raposa contra a fauna passiva
             if (player.isAttacking() && !player.hasProcessedAttackHit()) {
@@ -476,7 +495,7 @@ public class World {
                 enemyIt.remove();
                 continue;
             }
-            enemy.update(deltaTime, player, foodItems, meatItems, passiveAnimals, bearTraps, scentTrail, projectiles, enemies, tileMap, timeProgress, currentWeather);
+            enemy.update(deltaTime, player, foodItems, meatItems, passiveAnimals, bearTraps, scentTrail, projectiles, enemies, tileMap, waterRipples, timeProgress, currentWeather);
 
             double distToPlayer = Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY());
             if (distToPlayer < 460.0) {
@@ -535,10 +554,12 @@ public class World {
                 }
             }
 
-            // Conexão física do golpe (durante o bote ou contato imediato próximo)
+            // Conexão física do golpe (durante o bote, investida de javali ou contato imediato próximo)
             boolean isContactAttack = (distToPlayer <= 25.0 && enemy.getAttackCooldown() <= 0);
-            if ((enemy.isLunging() || isContactAttack) && distToPlayer <= 42.0 && enemy.getHp() > 0 && enemy.getType() != EnemyType.HUNTER) {
-                if (player.takeDamage(enemy.getX(), enemy.getY(), 260.0)) {
+            boolean isLungeOrCharge = enemy.isLunging() || enemy.isCharging();
+            if ((isLungeOrCharge || isContactAttack) && distToPlayer <= 42.0 && enemy.getHp() > 0 && enemy.getType() != EnemyType.HUNTER) {
+                double impulse = enemy.isCharging() ? 350.0 : 260.0;
+                if (player.takeDamage(enemy.getX(), enemy.getY(), impulse)) {
                     enemy.triggerAttackCooldownAfterHit();
                     // Impact sparks customized by enemy type
                     String particleColor = "#E74C3C";

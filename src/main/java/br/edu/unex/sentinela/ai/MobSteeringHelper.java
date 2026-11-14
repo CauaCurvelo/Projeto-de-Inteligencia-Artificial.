@@ -146,7 +146,124 @@ public final class MobSteeringHelper {
         if (self.getType() == EnemyType.HUNTER && t == TileType.DIRT_PATH) return 4.0;
         if (self.getSkin() == EnemySkin.BOAR && (t == TileType.MUD || t == TileType.TALL_GRASS)) return 3.2;
         if (self.getSkin() == EnemySkin.WOLF && (t == TileType.GRASS || t == TileType.DIRT_PATH)) return 2.8;
+        if (self.getSkin() == EnemySkin.PANTHER && (t == TileType.TALL_GRASS || t == TileType.GRASS)) return 3.4;
+        if (self.getSkin() == EnemySkin.BEAR && (t == TileType.GRASS || t == TileType.MUD)) return 3.0;
         return (t == TileType.GRASS || t == TileType.DIRT_PATH || t == TileType.TALL_GRASS) ? 2.2 : 0.6;
+    }
+
+    /**
+     * Táticas de Flanqueamento de Matilha para Lobos:
+     * Se outro lobo já está em perseguição direta ao mesmo alvo, o segundo lobo abre ângulo lateral (flanco).
+     */
+    public static double[] computePackFlankingDirection(Enemy self, List<Enemy> allEnemies, double targetX, double targetY) {
+        if (self.getSkin() != EnemySkin.WOLF) {
+            double dx = targetX - self.getX();
+            double dy = targetY - self.getY();
+            double d = Math.hypot(dx, dy);
+            return d > 0.001 ? new double[]{dx / d, dy / d} : new double[]{1.0, 0.0};
+        }
+
+        double myDist = Math.hypot(targetX - self.getX(), targetY - self.getY());
+        boolean hasCloserPackMate = false;
+        double closerPackX = 0;
+        double closerPackY = 0;
+
+        for (Enemy other : allEnemies) {
+            if (other == self || other.getHp() <= 0 || other.getSkin() != EnemySkin.WOLF) continue;
+            double otherDist = Math.hypot(targetX - other.getX(), targetY - other.getY());
+            if (otherDist < myDist && otherDist < 260.0) {
+                hasCloserPackMate = true;
+                closerPackX = other.getX();
+                closerPackY = other.getY();
+                break;
+            }
+        }
+
+        double baseDx = targetX - self.getX();
+        double baseDy = targetY - self.getY();
+        double baseDist = Math.hypot(baseDx, baseDy);
+        if (baseDist < 0.001) return new double[]{1.0, 0.0};
+        double baseAngle = Math.atan2(baseDy, baseDx);
+
+        if (!hasCloserPackMate || baseDist < 50.0) {
+            return new double[]{baseDx / baseDist, baseDy / baseDist};
+        }
+
+        // Abre arco de flanqueamento (+35° ou -35°) para cercar o alvo
+        double angleToOther = Math.atan2(closerPackY - targetY, closerPackX - targetX);
+        double diff = baseAngle - angleToOther;
+        double flankOffset = (diff >= 0 ? 1.0 : -1.0) * (Math.PI * 0.28);
+        double flankAngle = baseAngle + flankOffset;
+
+        return new double[]{Math.cos(flankAngle), Math.sin(flankAngle)};
+    }
+
+    /**
+     * Hierarquia e intimidação na disputa de carcaças:
+     * Retorna true se o animal 'self' deve ceder a carne a 'other' por diferença de porte/força.
+     */
+    public static boolean shouldYieldMeat(Enemy self, Enemy other) {
+        if (other == null || other.getHp() <= 0) return false;
+        int myTier = self.getBehaviorProfile().getIntimidateTier();
+        int otherTier = other.getBehaviorProfile().getIntimidateTier();
+        if (otherTier > myTier) return true;
+        if (otherTier == myTier) {
+            return System.identityHashCode(self) < System.identityHashCode(other);
+        }
+        return false;
+    }
+
+    /**
+     * Localiza o tile de margem navegável mais próximo que faz fronteira imediata com a água,
+     * permitindo que o animal caminhe até a margem e beba água.
+     * Retorna {shoreCol, shoreRow, waterCol, waterRow} ou null se não houver água próxima.
+     */
+    public static int[] findNearestWaterShoreTile(TileMap tileMap, int curCol, int curRow, int searchRadius) {
+        int bestShoreC = Integer.MIN_VALUE;
+        int bestShoreR = Integer.MIN_VALUE;
+        int bestWaterC = Integer.MIN_VALUE;
+        int bestWaterR = Integer.MIN_VALUE;
+        double minDistSq = Double.MAX_VALUE;
+
+        int[][] dirs = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
+
+        for (int dc = -searchRadius; dc <= searchRadius; dc++) {
+            for (int dr = -searchRadius; dr <= searchRadius; dr++) {
+                int c = curCol + dc;
+                int r = curRow + dr;
+                TileType t = tileMap.getTileAt(c, r);
+                if (!t.isWalkable() || t == TileType.WATER) continue;
+
+                // Verifica se este tile caminhável tem vizinho de água direta
+                int waterAdjC = Integer.MIN_VALUE;
+                int waterAdjR = Integer.MIN_VALUE;
+                for (int[] d : dirs) {
+                    int nc = c + d[0];
+                    int nr = r + d[1];
+                    if (tileMap.getTileAt(nc, nr) == TileType.WATER) {
+                        waterAdjC = nc;
+                        waterAdjR = nr;
+                        break;
+                    }
+                }
+
+                if (waterAdjC != Integer.MIN_VALUE) {
+                    double distSq = dc * dc + dr * dr;
+                    if (distSq < minDistSq) {
+                        minDistSq = distSq;
+                        bestShoreC = c;
+                        bestShoreR = r;
+                        bestWaterC = waterAdjC;
+                        bestWaterR = waterAdjR;
+                    }
+                }
+            }
+        }
+
+        if (bestShoreC != Integer.MIN_VALUE) {
+            return new int[]{bestShoreC, bestShoreR, bestWaterC, bestWaterR};
+        }
+        return null;
     }
 
     /** Retorna o arbusto comestível mais próximo dentro do raio se ainda não houver outro animal nele. */

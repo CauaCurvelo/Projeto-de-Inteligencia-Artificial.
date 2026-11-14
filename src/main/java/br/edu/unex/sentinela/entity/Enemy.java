@@ -79,6 +79,20 @@ public class Enemy {
     private double lastCheckY = 0.0;
     private static final Random rand = new Random();
 
+    // Novas rotinas biológicas e ecologia por espécie
+    private double houndBarkCooldown = 0.0;
+    private double thirstTimer = 18.0 + rand.nextDouble() * 26.0;
+    private double drinkingTimer = 0.0;
+    private double drinkingWaterX = 0.0;
+    private double drinkingWaterY = 0.0;
+    private double satiationTimer = 0.0;
+    private double chargeCooldown = 0.0;
+    private double chargeDuration = 0.0;
+    private double chargeDirX = 0.0;
+    private double chargeDirY = 0.0;
+    private double kitingCooldown = 0.0;
+    private double waterRippleTimer = 0.0;
+
     // Animation state (Breathing, Walk Cycle, Footprints)
     private double walkPhase = rand.nextDouble() * 10.0;
     private double breathTimer = rand.nextDouble() * 6.0;
@@ -150,6 +164,13 @@ public class Enemy {
                        List<PassiveAnimal> preyList, List<BearTrap> trapList,
                        List<Footprint> scentTrail, List<Projectile> projectiles, List<Enemy> allEnemies,
                        TileMap tileMap, double timeProgress, WeatherType weather) {
+        update(deltaTime, player, foodList, meatList, preyList, trapList, scentTrail, projectiles, allEnemies, tileMap, null, timeProgress, weather);
+    }
+
+    public void update(double deltaTime, Player player, List<FoodItem> foodList, List<MeatItem> meatList,
+                       List<PassiveAnimal> preyList, List<BearTrap> trapList,
+                       List<Footprint> scentTrail, List<Projectile> projectiles, List<Enemy> allEnemies,
+                       TileMap tileMap, List<WaterRipple> waterRipples, double timeProgress, WeatherType weather) {
         if (trapTimer > 0) {
             trapTimer -= deltaTime;
             state = AIState.TRAPPED;
@@ -167,6 +188,11 @@ public class Enemy {
         if (attackCooldown > 0) attackCooldown -= deltaTime;
         if (patrolPauseTimer > 0) patrolPauseTimer -= deltaTime;
         if (forageCooldownTimer > 0) forageCooldownTimer -= deltaTime;
+        if (houndBarkCooldown > 0) houndBarkCooldown -= deltaTime;
+        if (thirstTimer > 0) thirstTimer -= deltaTime;
+        if (satiationTimer > 0) satiationTimer -= deltaTime;
+        if (chargeCooldown > 0) chargeCooldown -= deltaTime;
+        if (kitingCooldown > 0) kitingCooldown -= deltaTime;
 
         if (attackWindupTimer > 0) {
             attackWindupTimer -= deltaTime;
@@ -202,7 +228,11 @@ public class Enemy {
             knockbackVy = 0;
         }
 
-        this.currentVisionRange = baseVisionRange * weather.getVisionMultiplier();
+        // Ciclo circadiano de visão e sentidos ecológicos
+        double nightFactor = (timeProgress % 1.0);
+        boolean isNight = nightFactor > 0.45 && nightFactor < 0.90;
+        double visionScale = isNight ? behaviorProfile.getNightVisionMult() : 1.0;
+        this.currentVisionRange = baseVisionRange * weather.getVisionMultiplier() * visionScale;
         this.currentHearingSensitivity = baseHearingSensitivity * weather.getSoundMultiplier();
 
         double duskBoost = 1.0 + (timeProgress * 0.15);
@@ -217,11 +247,11 @@ public class Enemy {
         double currentActualSpeed = speed * duskBoost;
         if (skin == EnemySkin.CROCODILE) {
             if (currentTile == TileType.WATER) {
-                currentActualSpeed = baseSpeed * 1.50;
+                currentActualSpeed = baseSpeed * 1.45;
             } else if (currentTile == TileType.MUD) {
-                currentActualSpeed = baseSpeed * 0.90;
+                currentActualSpeed = baseSpeed * 1.05;
             } else {
-                currentActualSpeed = baseSpeed * 0.60;
+                currentActualSpeed = baseSpeed * 0.65;
             }
         } else if (currentTile == TileType.MUD) {
             currentActualSpeed *= variant.isMudAdapted() ? 0.92 : 0.55;
@@ -229,6 +259,10 @@ public class Enemy {
             currentActualSpeed *= 0.45;
         } else if (currentTile == TileType.DIRT_PATH) {
             currentActualSpeed *= 1.12;
+        }
+
+        if (state == AIState.STALKING) {
+            currentActualSpeed *= 0.65;
         }
 
         double distToPlayer = Math.hypot(player.getX() - x, player.getY() - y);
@@ -243,13 +277,13 @@ public class Enemy {
 
         switch (type) {
             case HUNTER:
-                updateHunter(canSeePlayer, canHearPlayer, player, allEnemies, tileMap, projectiles, trapList, deltaTime, curCol, curRow, distToPlayer);
+                updateHunter(canSeePlayer, canHearPlayer, player, allEnemies, tileMap, projectiles, trapList, waterRipples, deltaTime, curCol, curRow, distToPlayer);
                 break;
             case HOUND:
-                updateHound(canSeePlayer, canHearPlayer, player, allEnemies, scentTrail, tileMap, curCol, curRow);
+                updateHound(canSeePlayer, canHearPlayer, player, allEnemies, scentTrail, tileMap, waterRipples, deltaTime, curCol, curRow);
                 break;
             case RIVAL:
-                updateRival(canSeePlayer, canHearPlayer, player, foodList, meatList, preyList, allEnemies, tileMap, curCol, curRow, distToPlayer);
+                updateRival(canSeePlayer, canHearPlayer, player, foodList, meatList, preyList, allEnemies, tileMap, waterRipples, deltaTime, curCol, curRow, distToPlayer);
                 break;
             case BEAR_BOSS:
                 break;
@@ -298,8 +332,23 @@ public class Enemy {
         executeFluidMovement(deltaTime, currentActualSpeed, player, allEnemies, tileMap, scentTrail, currentTile);
     }
 
+    public void receiveHoundAlert(double targetX, double targetY, TileMap tileMap) {
+        if (state == AIState.PATROL || state == AIState.SUSPICIOUS || alertTimer <= 0) {
+            this.alertTimer = 6.0;
+            this.targetAimX = targetX;
+            this.targetAimY = targetY;
+            this.state = AIState.ALERT;
+            this.patrolPauseTimer = 0;
+            int cCol = (int) Math.floor(x / TileMap.TILE_SIZE);
+            int cRow = (int) Math.floor(y / TileMap.TILE_SIZE);
+            int tCol = (int) Math.floor(targetX / TileMap.TILE_SIZE);
+            int tRow = (int) Math.floor(targetY / TileMap.TILE_SIZE);
+            requestPath(tileMap, cCol, cRow, tCol, tRow, false);
+        }
+    }
+
     private void updateHunter(boolean canSee, boolean canHear, Player player, List<Enemy> allEnemies, TileMap tileMap,
-                              List<Projectile> projectiles, List<BearTrap> trapList, double dt,
+                              List<Projectile> projectiles, List<BearTrap> trapList, List<WaterRipple> ripples, double dt,
                               int curCol, int curRow, double distToPlayer) {
         trapDeployCooldown -= dt;
         if (state == AIState.PATROL && trapList != null && trapDeployCooldown <= 0 && trapList.size() < 14) {
@@ -309,6 +358,41 @@ public class Enemy {
                 trapDeployCooldown = 26.0 + rand.nextDouble() * 18.0;
             }
         }
+
+        // 1. Autodefesa e Proteção do Sabujo contra Feras Selvagens Hostis (Lobos, Ursos, Panteras, Javalis)
+        Enemy threateningBeast = null;
+        double minBeastDist = 200.0;
+        for (Enemy other : allEnemies) {
+            if (other == this || other.getHp() <= 0) continue;
+            if (other.getType() == EnemyType.HUNTER || other.getType() == EnemyType.HOUND) continue;
+            double d = Math.hypot(other.getX() - x, other.getY() - y);
+            if (d < minBeastDist && tileMap.hasLineOfSight(x, y, other.getX(), other.getY())) {
+                minBeastDist = d;
+                threateningBeast = other;
+            }
+        }
+
+        if (threateningBeast != null && (minBeastDist < 160.0 || threateningBeast.getState() == AIState.FIGHTING_ENEMY || threateningBeast.getState() == AIState.CHASE)) {
+            patrolPauseTimer = 0;
+            targetAimX = threateningBeast.getX();
+            targetAimY = threateningBeast.getY();
+
+            if (minBeastDist < 65.0) {
+                // Recuo tático com arco (Kiting)
+                state = AIState.KITING;
+                faceAngle = lerpAngle(faceAngle, Math.atan2(targetAimY - y, targetAimX - x), 0.25);
+            } else {
+                state = AIState.AIMING;
+                faceAngle = lerpAngle(faceAngle, Math.atan2(targetAimY - y, targetAimX - x), 0.25);
+                if (shootCooldown <= 0) {
+                    projectiles.add(new Projectile(x, y, threateningBeast.getX(), threateningBeast.getY()));
+                    shootCooldown = 1.65;
+                }
+            }
+            return;
+        }
+
+        // 2. Caça e Engajamento com a Raposa (Player)
         if (canSee) {
             patrolPauseTimer = 0;
             int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
@@ -322,7 +406,12 @@ public class Enemy {
                 alertTimer = 5.0;
                 targetAimX = player.getX();
                 targetAimY = player.getY();
-                if (distToPlayer < 245.0) {
+
+                if (distToPlayer < 65.0) {
+                    // Recuo tático (Kiting) da raposa
+                    state = AIState.KITING;
+                    faceAngle = lerpAngle(faceAngle, Math.atan2(player.getY() - y, player.getX() - x), 0.25);
+                } else if (distToPlayer < 245.0) {
                     state = AIState.AIMING;
                     double aimAngle = Math.atan2(player.getY() - y, player.getX() - x);
                     faceAngle = lerpAngle(faceAngle, aimAngle, 0.25);
@@ -346,6 +435,12 @@ public class Enemy {
             patrolPauseTimer = 0;
             requestPath(tileMap, curCol, curRow, (int) Math.floor(player.getX() / TileMap.TILE_SIZE), (int) Math.floor(player.getY() / TileMap.TILE_SIZE), false);
         } else {
+            // Rotina de beber água na margem se com sede
+            if (thirstTimer <= 0 && state == AIState.PATROL) {
+                if (checkWaterDrinkingRoutine(tileMap, ripples, dt, curCol, curRow)) {
+                    return;
+                }
+            }
             state = AIState.PATROL;
             if (isPathFinished()) {
                 handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
@@ -354,22 +449,32 @@ public class Enemy {
     }
 
     private void updateHound(boolean canSee, boolean canHear, Player player, List<Enemy> allEnemies,
-                             List<Footprint> scentTrail, TileMap tileMap, int curCol, int curRow) {
+                             List<Footprint> scentTrail, TileMap tileMap, List<WaterRipple> ripples,
+                             double dt, int curCol, int curRow) {
         if (canHear || canSee) {
             state = AIState.CHASE;
             alertTimer = 4.5;
             patrolPauseTimer = 0;
+            targetAimX = player.getX();
+            targetAimY = player.getY();
             requestPath(tileMap, curCol, curRow, (int) Math.floor(player.getX() / TileMap.TILE_SIZE), (int) Math.floor(player.getY() / TileMap.TILE_SIZE), false);
+
+            // Latido sonoro periódico de alarme e convocação para os caçadores humanos
+            if (houndBarkCooldown <= 0) {
+                houndBarkCooldown = 2.4 + rand.nextDouble() * 0.8;
+                br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.DOG_BARK, 0.85, 0, 1.1 + rand.nextDouble() * 0.2);
+                notifyHuntersInRadius(allEnemies, player.getX(), player.getY(), 440.0, tileMap);
+            }
             return;
         }
 
-        // Rivalidade territorial com Lobos selvagens
+        // Rivalidade territorial com Lobos selvagens (defesa mútua)
         if (alertTimer <= 0) {
             for (Enemy other : allEnemies) {
                 if (other == this || other.getHp() <= 0) continue;
                 if (other.getSkin() == EnemySkin.WOLF) {
                     double distToWolf = Math.hypot(other.getX() - x, other.getY() - y);
-                    if (distToWolf < 160.0) {
+                    if (distToWolf < 170.0) {
                         state = AIState.FIGHTING_ENEMY;
                         patrolPauseTimer = 0;
                         targetAimX = other.getX();
@@ -378,9 +483,10 @@ public class Enemy {
                         int wRow = (int) Math.floor(other.getY() / TileMap.TILE_SIZE);
                         requestPath(tileMap, curCol, curRow, wCol, wRow, false);
                         if (distToWolf <= 38.0 && attackCooldown <= 0) {
-                            attackCooldown = 1.25;
+                            attackCooldown = 1.15;
                             other.takeDamage(1, x, y);
-                            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.DOG_BARK, 0.75, 0, 1.2);
+                            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.DOG_BARK, 0.80, 0, 1.25);
+                            notifyHuntersInRadius(allEnemies, x, y, 440.0, tileMap);
                         }
                         return;
                     }
@@ -403,12 +509,36 @@ public class Enemy {
             int scentCol = (int) Math.floor(nearestScent.getX() / TileMap.TILE_SIZE);
             int scentRow = (int) Math.floor(nearestScent.getY() / TileMap.TILE_SIZE);
             requestPath(tileMap, curCol, curRow, scentCol, scentRow, false);
+
+            if (houndBarkCooldown <= 0 && rand.nextDouble() < 0.30) {
+                houndBarkCooldown = 3.8;
+                br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.DOG_BARK, 0.65, 0, 0.95);
+            }
             return;
+        }
+
+        // Rotina de beber água na margem do rio
+        if (thirstTimer <= 0 && state == AIState.PATROL) {
+            if (checkWaterDrinkingRoutine(tileMap, ripples, dt, curCol, curRow)) {
+                return;
+            }
         }
 
         state = AIState.PATROL;
         if (isPathFinished()) {
             handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
+        }
+    }
+
+    private void notifyHuntersInRadius(List<Enemy> allEnemies, double targetX, double targetY, double radius, TileMap tileMap) {
+        for (Enemy other : allEnemies) {
+            if (other == this || other.getHp() <= 0) continue;
+            if (other.getType() == EnemyType.HUNTER) {
+                double dist = Math.hypot(other.getX() - x, other.getY() - y);
+                if (dist <= radius) {
+                    other.receiveHoundAlert(targetX, targetY, tileMap);
+                }
+            }
         }
     }
 
@@ -429,16 +559,89 @@ public class Enemy {
 
     private void updateRival(boolean canSee, boolean canHear, Player player, List<FoodItem> foodList, List<MeatItem> meatList,
                              List<PassiveAnimal> preyList, List<Enemy> allEnemies,
-                             TileMap tileMap, int curCol, int curRow, double distToPlayer) {
-        // 1. Engajamento com a Raposa (Visão direta ou Audição atenta com persistência de alerta)
-        if (canSee || (canHear && distToPlayer < 220.0)) {
-            state = AIState.CHASE;
-            alertTimer = 5.0;
-            patrolPauseTimer = 0;
-            int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
-            int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
-            requestPath(tileMap, curCol, curRow, pCol, pRow, false);
+                             TileMap tileMap, List<WaterRipple> ripples, double dt, int curCol, int curRow, double distToPlayer) {
+        // Se estiver ativamente bebendo água na margem
+        if (state == AIState.DRINKING) {
+            drinkingTimer -= dt;
+            waterRippleTimer -= dt;
+            if (waterRippleTimer <= 0 && ripples != null) {
+                waterRippleTimer = 0.50;
+                ripples.add(new WaterRipple(drinkingWaterX, drinkingWaterY, 13.0, 0.70));
+            }
+            if (drinkingTimer <= 0) {
+                thirstTimer = 34.0 + rand.nextDouble() * 28.0;
+                state = AIState.PATROL;
+                patrolPauseTimer = 1.4;
+            }
             return;
+        }
+
+        // Se o javali estiver no meio da investida retilínea (Charging)
+        if (state == AIState.CHARGING) {
+            chargeDuration -= dt;
+            if (chargeDuration <= 0) {
+                chargeCooldown = 4.0 + rand.nextDouble() * 2.0;
+                state = AIState.PATROL;
+                patrolPauseTimer = 1.2;
+            }
+            return;
+        }
+
+        // 1. Interação com a Raposa (Player)
+        if (skin == EnemySkin.BOAR) {
+            // Javali é neutro-territorial: avisa e só investe se invadirem seu espaço imediato (< 85px) ou o atacarem
+            if (canSee && distToPlayer < 110.0) {
+                alertTimer = 4.0;
+                if (distToPlayer < 85.0 && chargeCooldown <= 0) {
+                    state = AIState.CHARGING;
+                    chargeDuration = 0.85;
+                    double cdx = player.getX() - x;
+                    double cdy = player.getY() - y;
+                    double cd = Math.hypot(cdx, cdy);
+                    chargeDirX = cd > 0.001 ? cdx / cd : Math.cos(faceAngle);
+                    chargeDirY = cd > 0.001 ? cdy / cd : Math.sin(faceAngle);
+                    faceAngle = Math.atan2(chargeDirY, chargeDirX);
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BOAR_GRUNT, 0.90, 0, 0.95);
+                    return;
+                } else {
+                    state = AIState.ALERT;
+                    faceAngle = lerpAngle(faceAngle, Math.atan2(player.getY() - y, player.getX() - x), 0.20);
+                    return;
+                }
+            }
+        } else if (skin == EnemySkin.PANTHER) {
+            // Pantera: Espreita Furtiva (Stalking) à média distância e Bote Rápido (Pounce) quando próxima
+            if (canSee) {
+                targetAimX = player.getX();
+                targetAimY = player.getY();
+                alertTimer = 5.0;
+                patrolPauseTimer = 0;
+                int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
+                int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
+
+                if (distToPlayer > 75.0 && distToPlayer < 200.0) {
+                    state = AIState.STALKING;
+                    requestPath(tileMap, curCol, curRow, pCol, pRow, false);
+                    return;
+                } else if (distToPlayer <= 75.0) {
+                    state = AIState.CHASE;
+                    requestPath(tileMap, curCol, curRow, pCol, pRow, false);
+                    return;
+                }
+            }
+        } else {
+            // Lobos, Ursos, Crocodilos e Texugos
+            if (canSee || (canHear && distToPlayer < 220.0)) {
+                state = AIState.CHASE;
+                alertTimer = 5.0;
+                patrolPauseTimer = 0;
+                targetAimX = player.getX();
+                targetAimY = player.getY();
+                int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
+                int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
+                requestPath(tileMap, curCol, curRow, pCol, pRow, false);
+                return;
+            }
         }
 
         if (alertTimer > 0) {
@@ -449,10 +652,35 @@ public class Enemy {
             return;
         }
 
-        // 2. Predadores caçam presas da fauna passiva (Coelho, Cervo, Sapo)
+        // 2. Disputa Territorial de Feras contra Caçadores e Cães Sabujos
+        for (Enemy other : allEnemies) {
+            if (other == this || other.getHp() <= 0) continue;
+            boolean isEnemyFaction = (other.getType() == EnemyType.HUNTER || other.getType() == EnemyType.HOUND);
+            if (isEnemyFaction && (skin == EnemySkin.WOLF || skin == EnemySkin.BEAR || skin == EnemySkin.PANTHER)) {
+                double distFaction = Math.hypot(other.getX() - x, other.getY() - y);
+                if (distFaction < 165.0) {
+                    state = AIState.FIGHTING_ENEMY;
+                    patrolPauseTimer = 0;
+                    targetAimX = other.getX();
+                    targetAimY = other.getY();
+                    int fCol = (int) Math.floor(other.getX() / TileMap.TILE_SIZE);
+                    int fRow = (int) Math.floor(other.getY() / TileMap.TILE_SIZE);
+                    requestPath(tileMap, curCol, curRow, fCol, fRow, false);
+
+                    if (distFaction <= 38.0 && attackCooldown <= 0) {
+                        attackCooldown = 1.20;
+                        other.takeDamage(1, x, y);
+                        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.WOLF_SNARL, 0.80, 0, 1.0);
+                    }
+                    return;
+                }
+            }
+        }
+
+        // 3. Predadores caçam presas da fauna passiva (se não estiverem saciados)
         boolean isPredator = (skin == EnemySkin.WOLF || skin == EnemySkin.PANTHER || skin == EnemySkin.BEAR ||
-                              skin == EnemySkin.CROCODILE || skin == EnemySkin.BOAR);
-        if (isPredator && preyList != null) {
+                              skin == EnemySkin.CROCODILE);
+        if (isPredator && preyList != null && satiationTimer <= 0) {
             PassiveAnimal nearestPrey = null;
             double minPreyDist = 220.0;
             for (PassiveAnimal prey : preyList) {
@@ -465,7 +693,7 @@ public class Enemy {
             }
 
             if (nearestPrey != null) {
-                state = AIState.HUNTING_PREY;
+                state = (skin == EnemySkin.PANTHER && minPreyDist > 75.0) ? AIState.STALKING : AIState.HUNTING_PREY;
                 patrolPauseTimer = 0;
                 targetAimX = nearestPrey.getX();
                 targetAimY = nearestPrey.getY();
@@ -479,6 +707,8 @@ public class Enemy {
                     if (dead) {
                         patrolPauseTimer = 2.0;
                         state = AIState.EATING;
+                        satiationTimer = 28.0 + rand.nextDouble() * 14.0;
+                        if (hp < maxHp) hp++;
                         currentPath = null;
                     }
                 }
@@ -486,41 +716,28 @@ public class Enemy {
             }
         }
 
-        // 3. Disputa territorial de Lobos contra Cães Sabujos
-        if (skin == EnemySkin.WOLF) {
-            for (Enemy other : allEnemies) {
-                if (other == this || other.getHp() <= 0) continue;
-                if (other.getType() == EnemyType.HOUND) {
-                    double distToHound = Math.hypot(other.getX() - x, other.getY() - y);
-                    if (distToHound < 160.0) {
-                        state = AIState.FIGHTING_ENEMY;
-                        patrolPauseTimer = 0;
-                        targetAimX = other.getX();
-                        targetAimY = other.getY();
-                        int hCol = (int) Math.floor(other.getX() / TileMap.TILE_SIZE);
-                        int hRow = (int) Math.floor(other.getY() / TileMap.TILE_SIZE);
-                        requestPath(tileMap, curCol, curRow, hCol, hRow, false);
-                        if (distToHound <= 38.0 && attackCooldown <= 0) {
-                            attackCooldown = 1.25;
-                            other.takeDamage(1, x, y);
-                            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.WOLF_SNARL, 0.75, 0, 1.0);
-                        }
-                        return;
-                    }
-                }
-            }
-        }
-
-        // 4. Carnívoros e onívoros disputam carcaças e carnes deixadas no solo
+        // 4. Carnívoros e onívoros disputam carcaças e carnes caídas (respeitando hierarquia de intimidação)
         if (meatList != null && (skin == EnemySkin.WOLF || skin == EnemySkin.BEAR || skin == EnemySkin.PANTHER || skin == EnemySkin.BOAR)) {
             MeatItem nearestMeat = null;
-            double minMeatDist = 180.0;
+            double minMeatDist = 190.0;
             for (MeatItem meat : meatList) {
                 if (meat.isEaten()) continue;
                 double dm = Math.hypot(meat.getX() - x, meat.getY() - y);
                 if (dm < minMeatDist) {
-                    minMeatDist = dm;
-                    nearestMeat = meat;
+                    // Verifica se há outro animal de porte superior na mesma carne
+                    boolean shouldYield = false;
+                    for (Enemy other : allEnemies) {
+                        if (other == this || other.getHp() <= 0) continue;
+                        double dOtherMeat = Math.hypot(meat.getX() - other.getX(), meat.getY() - other.getY());
+                        if (dOtherMeat < 80.0 && MobSteeringHelper.shouldYieldMeat(this, other)) {
+                            shouldYield = true;
+                            break;
+                        }
+                    }
+                    if (!shouldYield) {
+                        minMeatDist = dm;
+                        nearestMeat = meat;
+                    }
                 }
             }
 
@@ -536,6 +753,7 @@ public class Enemy {
                     nearestMeat.setEaten(true);
                     state = AIState.EATING;
                     patrolPauseTimer = 1.6;
+                    satiationTimer = 26.0 + rand.nextDouble() * 15.0;
                     currentPath = null;
                     if (hp < maxHp) hp++;
                 }
@@ -543,14 +761,14 @@ public class Enemy {
             }
         }
 
-        // Apenas onívoros forrageiam arbustos desocupados próximos; carnívoros (Lobo) nunca aglomeram em frutas
+        // 5. Onívoros forrageiam arbustos desocupados (Javali, Urso, Texugo)
         FoodItem nearestFood = (behaviorProfile.canForageFood() && forageCooldownTimer <= 0)
                 ? MobSteeringHelper.findUncrowdedFoodForForager(this, foodList, allEnemies, behaviorProfile.getFoodSeekRadiusPx())
                 : null;
 
         if (nearestFood != null) {
             double distFoodToPlayer = Math.hypot(player.getX() - nearestFood.getX(), player.getY() - nearestFood.getY());
-            if (distFoodToPlayer < 150.0 && distToPlayer < 210.0 && canSee) {
+            if (distFoodToPlayer < 140.0 && distToPlayer < 200.0 && canSee) {
                 state = AIState.CHASE;
                 alertTimer = 5.0;
                 patrolPauseTimer = 0;
@@ -564,17 +782,54 @@ public class Enemy {
                 nearestFood.setEaten(true);
                 state = AIState.EATING;
                 patrolPauseTimer = 1.25;
-                forageCooldownTimer = 22.0; // Evita acampar no mesmo arbusto depois de comer
+                forageCooldownTimer = 22.0;
                 currentPath = null;
             } else {
                 requestPath(tileMap, curCol, curRow, nearestFood.getCol(), nearestFood.getRow(), false);
             }
-        } else {
-            state = AIState.PATROL;
-            if (isPathFinished()) {
-                handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
+            return;
+        }
+
+        // 6. Rotina Biológica de Beber Água na Margem do Rio
+        if (thirstTimer <= 0 && state == AIState.PATROL) {
+            if (checkWaterDrinkingRoutine(tileMap, ripples, dt, curCol, curRow)) {
+                return;
             }
         }
+
+        state = (satiationTimer > 0) ? AIState.SATIATED : AIState.PATROL;
+        if (isPathFinished()) {
+            handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
+        }
+    }
+
+    private boolean checkWaterDrinkingRoutine(TileMap tileMap, List<WaterRipple> ripples, double dt, int curCol, int curRow) {
+        int[] shoreData = MobSteeringHelper.findNearestWaterShoreTile(tileMap, curCol, curRow, 9);
+        if (shoreData != null) {
+            int sCol = shoreData[0];
+            int sRow = shoreData[1];
+            int wCol = shoreData[2];
+            int wRow = shoreData[3];
+            double sX = sCol * TileMap.TILE_SIZE + 16.0;
+            double sY = sRow * TileMap.TILE_SIZE + 16.0;
+            double distToShore = Math.hypot(sX - x, sY - y);
+
+            if (distToShore <= 20.0) {
+                state = AIState.DRINKING;
+                drinkingTimer = 2.8 + rand.nextDouble() * 1.2;
+                drinkingWaterX = wCol * TileMap.TILE_SIZE + 16.0;
+                drinkingWaterY = wRow * TileMap.TILE_SIZE + 16.0;
+                faceAngle = Math.atan2(drinkingWaterY - y, drinkingWaterX - x);
+                if (ripples != null) {
+                    ripples.add(new WaterRipple(drinkingWaterX, drinkingWaterY, 14.0, 0.75));
+                }
+                return true;
+            } else {
+                requestPath(tileMap, curCol, curRow, sCol, sRow, false);
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -657,16 +912,45 @@ public class Enemy {
      */
     private void executeFluidMovement(double deltaTime, double maxSpeed, Player player, List<Enemy> allEnemies,
                                       TileMap tileMap, List<Footprint> scentTrail, TileType currentTile) {
-        if (state == AIState.AIMING || state == AIState.ROARING || patrolPauseTimer > 0) {
+        if (state == AIState.AIMING || state == AIState.ROARING || state == AIState.DRINKING || patrolPauseTimer > 0) {
             this.moving = false;
             this.vx *= 0.5;
             this.vy *= 0.5;
-            if (state != AIState.ROARING) {
+            if (state != AIState.ROARING && state != AIState.DRINKING) {
                 double[] drift = MobSteeringHelper.computePausedDispersionVelocity(this, allEnemies);
                 if (Math.hypot(drift[0], drift[1]) > 2.0) {
                     moveWithCollisionSlide(drift[0] * deltaTime, drift[1] * deltaTime, tileMap);
                 }
             }
+            return;
+        }
+
+        // Investida retilínea do javali (Charging)
+        if (state == AIState.CHARGING) {
+            this.moving = true;
+            double chargeSpeed = maxSpeed * 1.55;
+            this.vx = chargeDirX * chargeSpeed;
+            this.vy = chargeDirY * chargeSpeed;
+            this.walkPhase += chargeSpeed * deltaTime * 0.12;
+            this.faceAngle = Math.atan2(chargeDirY, chargeDirX);
+            moveWithCollisionSlide(this.vx * deltaTime, this.vy * deltaTime, tileMap);
+            return;
+        }
+
+        // Recuo tático do caçador com arco (Kiting)
+        if (state == AIState.KITING) {
+            this.moving = true;
+            double kiteSpeed = maxSpeed * 0.95;
+            double awayX = x - targetAimX;
+            double awayY = y - targetAimY;
+            double awayLen = Math.hypot(awayX, awayY);
+            if (awayLen > 0.001) {
+                this.vx = (awayX / awayLen) * kiteSpeed;
+                this.vy = (awayY / awayLen) * kiteSpeed;
+            }
+            this.walkPhase += kiteSpeed * deltaTime * 0.09;
+            this.faceAngle = Math.atan2(targetAimY - y, targetAimX - x);
+            moveWithCollisionSlide(this.vx * deltaTime, this.vy * deltaTime, tileMap);
             return;
         }
 
@@ -706,8 +990,14 @@ public class Enemy {
             double distToP = Math.hypot(player.getX() - x, player.getY() - y);
             if (distToP > 10.0 && distToP < 320.0 &&
                 Pathfinder.hasClearWorldCorridor(tileMap, x, y, player.getX(), player.getY(), isCroc)) {
-                desiredDirX = (player.getX() - x) / distToP;
-                desiredDirY = (player.getY() - y) / distToP;
+                if (skin == EnemySkin.WOLF) {
+                    double[] flankDir = MobSteeringHelper.computePackFlankingDirection(this, allEnemies, player.getX(), player.getY());
+                    desiredDirX = flankDir[0];
+                    desiredDirY = flankDir[1];
+                } else {
+                    desiredDirX = (player.getX() - x) / distToP;
+                    desiredDirY = (player.getY() - y) / distToP;
+                }
                 hasTarget = true;
             }
         } else if (isHuntingOrFighting) {
@@ -1033,4 +1323,10 @@ public class Enemy {
     public int getCurrentPathIndex() { return currentPathIndex; }
     public boolean isBoss() { return type == EnemyType.BEAR_BOSS; }
     public BossBehaviorController getBossController() { return bossController; }
+    public SpeciesBehaviorProfile getBehaviorProfile() { return behaviorProfile; }
+    public double getSatiationTimer() { return satiationTimer; }
+    public boolean isCharging() { return state == AIState.CHARGING; }
+    public boolean isStalking() { return state == AIState.STALKING; }
+    public boolean isDrinking() { return state == AIState.DRINKING; }
+    public boolean isKiting() { return state == AIState.KITING; }
 }
