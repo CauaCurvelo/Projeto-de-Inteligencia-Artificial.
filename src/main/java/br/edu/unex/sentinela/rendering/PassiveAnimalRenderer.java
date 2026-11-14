@@ -24,6 +24,14 @@ public class PassiveAnimalRenderer {
     public void renderPassiveAnimal(PassiveAnimal animal, double ax, double ay) {
         if (animal == null || animal.isDespawned()) return;
 
+        if (animal.isBurrowed()) {
+            gc.save();
+            gc.translate(ax, ay);
+            drawRabbitPeekingFromBurrow(animal.getPeekTimer());
+            gc.restore();
+            return;
+        }
+
         double hop = animal.getHopHeight();
         double fly = animal.getFlightHeight();
         double totalAltitude = hop + fly;
@@ -549,5 +557,107 @@ public class PassiveAnimalRenderer {
 
             gc.restore();
         }
+    }
+
+    private void drawRabbitPeekingFromBurrow(double peekTimer) {
+        // Ciclo rítmico de espreita: 
+        // 0.0s - 1.4s: Orelhas e olhos no escuro da toca (rabbit dentro da toca)
+        // 1.4s - 3.4s: Cabeça emerge gradualmente acima da borda, cheira o ar com bigodes vibrantes, orelhas alertas
+        // 3.4s - 4.6s: Desce de volta para a segurança
+        double cycle = peekTimer % 4.6;
+        double peekProg;
+        if (cycle < 1.4) {
+            peekProg = 0.0;
+        } else if (cycle < 2.0) {
+            peekProg = (cycle - 1.4) / 0.6;
+            peekProg = Math.sin(peekProg * Math.PI * 0.5); // Ease out
+        } else if (cycle < 3.2) {
+            peekProg = 1.0;
+        } else if (cycle < 3.8) {
+            peekProg = 1.0 - (cycle - 3.2) / 0.6;
+            peekProg = Math.sin(peekProg * Math.PI * 0.5);
+        } else {
+            peekProg = 0.0;
+        }
+
+        double headOffsetY = -peekProg * 4.5;
+        double earTwitch = Math.sin(peekTimer * 14.0) * 1.5;
+        double noseTwitch = Math.abs(Math.sin(peekTimer * 18.0)) * 0.7;
+
+        // Se estiver no fundo da toca, apenas o brilho sutil dos olhos no escuro
+        if (peekProg < 0.15) {
+            double eyeAlpha = 0.45 + 0.35 * Math.sin(peekTimer * 5.0);
+            gc.setFill(Color.color(1.0, 0.9, 0.7, eyeAlpha));
+            gc.fillOval(-3.5, -2.0, 2.0, 1.8);
+            gc.fillOval(1.5, -2.0, 2.0, 1.8);
+            return;
+        }
+
+        gc.save();
+        gc.translate(0, headOffsetY);
+
+        // 1. Orelhas compridas eretas surgindo da abertura da toca
+        double earLength = 7.0 + peekProg * 4.0;
+        // Orelha Esquerda
+        gc.save();
+        gc.translate(-3.0, -2.0);
+        gc.rotate(-12.0 + earTwitch);
+        gc.setFill(Color.web("#5D4037"));
+        gc.fillRoundRect(-1.8, -earLength, 3.6, earLength, 2.5, 2.5);
+        gc.setFill(Color.web("#8D6E63"));
+        gc.fillRoundRect(-1.3, -earLength + 0.8, 2.6, earLength - 1.6, 2, 2);
+        gc.setFill(Color.web("#F8BBD0", 0.90)); // Interior rosado
+        gc.fillRoundRect(-0.8, -earLength + 1.6, 1.6, earLength - 3.2, 1.5, 1.5);
+        gc.restore();
+
+        // Orelha Direita
+        gc.save();
+        gc.translate(3.0, -2.0);
+        gc.rotate(12.0 - earTwitch);
+        gc.setFill(Color.web("#5D4037"));
+        gc.fillRoundRect(-1.8, -earLength, 3.6, earLength, 2.5, 2.5);
+        gc.setFill(Color.web("#8D6E63"));
+        gc.fillRoundRect(-1.3, -earLength + 0.8, 2.6, earLength - 1.6, 2, 2);
+        gc.setFill(Color.web("#F8BBD0", 0.90));
+        gc.fillRoundRect(-0.8, -earLength + 1.6, 1.6, earLength - 3.2, 1.5, 1.5);
+        gc.restore();
+
+        // 2. Cabeça do coelho emergindo da abertura
+        double headW = 10.0 * peekProg;
+        double headH = 8.5 * peekProg;
+        gc.setFill(Color.web("#5D4037"));
+        gc.fillOval(-headW * 0.5, -headH * 0.5, headW, headH);
+        gc.setFill(Color.web("#795548"));
+        gc.fillOval(-headW * 0.45, -headH * 0.45, headW * 0.9, headH * 0.9);
+        gc.setFill(Color.web("#8D6E63"));
+        gc.fillOval(-headW * 0.35, -headH * 0.35, headW * 0.7, headH * 0.7);
+
+        // 3. Olhinhos vivos e brilhantes
+        if (peekProg > 0.4) {
+            gc.setFill(Color.web("#212121"));
+            gc.fillOval(-3.8, -1.8, 2.4, 2.4);
+            gc.fillOval(1.4, -1.8, 2.4, 2.4);
+            gc.setFill(Color.web("#FFFFFF"));
+            gc.fillOval(-3.0, -1.4, 0.9, 0.9);
+            gc.fillOval(2.2, -1.4, 0.9, 0.9);
+        }
+
+        // 4. Focinho e bigodes vibrando
+        if (peekProg > 0.5) {
+            gc.setFill(Color.web("#D7CCC8"));
+            gc.fillOval(-2.4, 0.6 - noseTwitch, 4.8, 3.2);
+            gc.setFill(Color.web("#F48FB1"));
+            gc.fillOval(-1.1, 1.2 - noseTwitch, 2.2, 1.6);
+
+            // Bigodinhos brancos
+            gc.setStroke(Color.web("#FFFFFF", 0.75));
+            gc.setLineWidth(0.7);
+            gc.strokeLine(-2.2, 1.5, -6.5, 0.2 + earTwitch * 0.4);
+            gc.strokeLine(-2.2, 2.2, -6.8, 2.8 - earTwitch * 0.4);
+            gc.strokeLine(2.2, 1.5, 6.5, 0.2 - earTwitch * 0.4);
+            gc.strokeLine(2.2, 2.2, 6.8, 2.8 + earTwitch * 0.4);
+        }
+
+        gc.restore();
     }
 }

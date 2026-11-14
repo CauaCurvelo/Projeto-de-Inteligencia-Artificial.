@@ -31,7 +31,8 @@ public class PassiveAnimal {
         FLYING_AWAY,
         DRINKING,
         FORAGING_BUSH,
-        SHELTERING
+        SHELTERING,
+        BURROWED
     }
 
     private final PassiveAnimalType type;
@@ -79,6 +80,13 @@ public class PassiveAnimal {
     private double frogTongueTargetX = 0.0;
     private double frogTongueTargetY = 0.0;
 
+    // Dinâmica de tocas de coelho (Burrows)
+    private boolean burrowed = false;
+    private double burrowTimer = 0.0;
+    private double burrowCooldown = 0.0;
+    private double peekTimer = 0.0;
+    private Burrow currentBurrow = null;
+
     public PassiveAnimal(PassiveAnimalType type, double x, double y) {
         this.type = type != null ? type : PassiveAnimalType.RABBIT;
         this.x = x;
@@ -111,6 +119,7 @@ public class PassiveAnimal {
         breathTimer += dt;
         rippleCooldown -= dt;
         if (frogTongueTimer > 0) frogTongueTimer -= dt;
+        burrowCooldown = Math.max(0.0, burrowCooldown - dt);
 
         // 1. Identificar a ameaça mais próxima (Jogador ou Predador)
         double nearestThreatDist = 99999.0;
@@ -164,7 +173,7 @@ public class PassiveAnimal {
             return;
         }
 
-        if (sensedThreat) {
+        if (sensedThreat && state != State.BURROWED) {
             if (type == PassiveAnimalType.BIRD) {
                 // Pássaro bate asas e voa para longe
                 state = State.FLYING_AWAY;
@@ -206,6 +215,9 @@ public class PassiveAnimal {
 
         // 3. Comportamento Específico por Estado
         switch (state) {
+            case BURROWED:
+                updateBurrowed(dt, player, predators, particles);
+                break;
             case DRINKING:
                 updateDrinking(dt, ripples);
                 break;
@@ -216,7 +228,7 @@ public class PassiveAnimal {
                 updateSheltering(dt, weather);
                 break;
             case FORAGING:
-                updateForaging(dt, allPassives, foodList, burrows, fireflies, particles, tileMap, ripples, weather, timeProgress);
+                updateForaging(dt, player, allPassives, foodList, burrows, fireflies, particles, tileMap, ripples, weather, timeProgress);
                 break;
             case ALERT:
                 vx *= 0.82;
@@ -229,10 +241,19 @@ public class PassiveAnimal {
                 }
                 break;
             case FLEEING:
-                updateFleeing(dt, threatX, threatY, allPassives, tileMap);
+                updateFleeing(dt, threatX, threatY, allPassives, burrows, particles, player, tileMap);
                 break;
             default:
                 break;
+        }
+
+        if (state == State.BURROWED) {
+            moving = false;
+            vx = 0;
+            vy = 0;
+            hopTimer = 0;
+            hopHeight = 0;
+            return;
         }
 
         // 4. Mecânica de Locomoção e Saltos (Coelhos e Sapos)
@@ -345,14 +366,146 @@ public class PassiveAnimal {
         }
     }
 
-    private void updateForaging(double dt, List<PassiveAnimal> allPassives, List<FoodItem> foodList,
+    private void updateBurrowed(double dt, Player player, List<Enemy> predators, List<Particle> particles) {
+        burrowTimer -= dt;
+        peekTimer += dt;
+        vx = 0;
+        vy = 0;
+        moving = false;
+
+        // 1. Invasão / Despejo: Se o jogador raposa invadir a mesma toca
+        if (player != null && player.isBurrowed()) {
+            double distToPlayer = Math.hypot(player.getX() - x, player.getY() - y);
+            if (distToPlayer < 24.0) {
+                flushOutFromBurrow(player.getX(), player.getY(), particles);
+                return;
+            }
+        }
+
+        // 2. Passos pesados do jogador correndo/andando acima da toca atrasam a saída do coelho
+        if (player != null && !player.isBurrowed()) {
+            double distToPlayer = Math.hypot(player.getX() - x, player.getY() - y);
+            if (distToPlayer < 50.0 && (player.isSprinting() || player.isMoving())) {
+                burrowTimer = Math.max(burrowTimer, 2.5);
+            }
+        }
+
+        // 3. Feras e predadores rondando a boca da toca
+        if (predators != null) {
+            for (Enemy enemy : predators) {
+                if (enemy.getHp() <= 0) continue;
+                double de = Math.hypot(enemy.getX() - x, enemy.getY() - y);
+                if (de < 55.0) {
+                    burrowTimer = Math.max(burrowTimer, 3.0);
+                    break;
+                }
+            }
+        }
+
+        // 4. Emerge com segurança quando o tempo terminar e não houver perigo imediato
+        if (burrowTimer <= 0) {
+            double nearestDanger = 9999.0;
+            if (player != null && !player.isBurrowed()) {
+                nearestDanger = Math.min(nearestDanger, Math.hypot(player.getX() - x, player.getY() - y));
+            }
+            if (predators != null) {
+                for (Enemy enemy : predators) {
+                    if (enemy.getHp() <= 0) continue;
+                    nearestDanger = Math.min(nearestDanger, Math.hypot(enemy.getX() - x, enemy.getY() - y));
+                }
+            }
+
+            if (nearestDanger < 55.0) {
+                burrowTimer = 2.0;
+                return;
+            }
+
+            emergeFromBurrow(particles);
+        }
+    }
+
+    public void enterBurrow(Burrow b, List<Particle> particles, double duration) {
+        state = State.BURROWED;
+        burrowed = true;
+        burrowTimer = duration;
+        peekTimer = 0.0;
+        currentBurrow = b;
+        x = b.getX();
+        y = b.getY();
+        vx = 0;
+        vy = 0;
+        moving = false;
+
+        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BURROW_ENTER, 0.70, 0, 1.25);
+        if (particles != null) {
+            for (int k = 0; k < 6; k++) {
+                particles.add(new Particle(x, y,
+                    (RAND.nextDouble() - 0.5) * 35.0,
+                    -10.0 - RAND.nextDouble() * 15.0,
+                    0.35, "#8D6E63", 2.6));
+            }
+        }
+    }
+
+    public void flushOutFromBurrow(double threatX, double threatY, List<Particle> particles) {
+        state = State.FLEEING;
+        burrowed = false;
+        burrowCooldown = 12.0;
+        fleeDuration = 4.0;
+        stateTimer = fleeDuration;
+
+        double away = Math.atan2(y - threatY, x - threatX);
+        if (Math.hypot(y - threatY, x - threatX) < 0.01) {
+            away = visualAngle + Math.PI;
+        }
+        visualAngle = away;
+        faceDx = Math.cos(away);
+        faceDy = Math.sin(away);
+        vx = faceDx * type.getBaseSpeed() * 1.35;
+        vy = faceDy * type.getBaseSpeed() * 1.35;
+        moving = true;
+        currentBurrow = null;
+
+        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BURROW_EXIT, 0.85, 0, 1.30);
+        if (particles != null) {
+            for (int k = 0; k < 8; k++) {
+                particles.add(new Particle(x, y,
+                    faceDx * 30.0 + (RAND.nextDouble() - 0.5) * 35.0,
+                    faceDy * 30.0 + (RAND.nextDouble() - 0.5) * 35.0,
+                    0.40, "#D7CCC8", 3.0));
+            }
+        }
+    }
+
+    public void emergeFromBurrow(List<Particle> particles) {
+        state = State.ALERT;
+        burrowed = false;
+        burrowCooldown = 14.0 + RAND.nextDouble() * 10.0;
+        stateTimer = 1.8;
+        currentBurrow = null;
+
+        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BURROW_EXIT, 0.65, 0, 1.15);
+        if (particles != null) {
+            for (int k = 0; k < 5; k++) {
+                particles.add(new Particle(x, y,
+                    (RAND.nextDouble() - 0.5) * 25.0,
+                    -8.0 - RAND.nextDouble() * 15.0,
+                    0.30, "#8D6E63", 2.2));
+            }
+        }
+    }
+
+    private void updateForaging(double dt, Player player, List<PassiveAnimal> allPassives, List<FoodItem> foodList,
                                 List<Burrow> burrows, List<Firefly> fireflies, List<Particle> particles,
                                 TileMap tileMap, List<WaterRipple> ripples, WeatherType weather, double timeProgress) {
-        // 1. Abrigo em tempestades/chuvas fortes para pequenas criaturas
-        if (weather == WeatherType.RAIN && type == PassiveAnimalType.RABBIT && burrows != null) {
+        // 1. Abrigo em tocas durante chuva para coelhos
+        if (weather == WeatherType.RAIN && type == PassiveAnimalType.RABBIT && burrows != null && burrowCooldown <= 0) {
             Burrow nearestBurrow = null;
             double minBurrowDist = 180.0;
             for (Burrow b : burrows) {
+                if (player != null && player.isBurrowed() && Math.hypot(b.getX() - player.getX(), b.getY() - player.getY()) < 18.0) {
+                    continue;
+                }
                 double db = Math.hypot(b.getX() - x, b.getY() - y);
                 if (db < minBurrowDist) {
                     minBurrowDist = db;
@@ -361,11 +514,8 @@ public class PassiveAnimal {
             }
             if (nearestBurrow != null) {
                 double db = Math.hypot(nearestBurrow.getX() - x, nearestBurrow.getY() - y);
-                if (db <= 22.0) {
-                    state = State.SHELTERING;
-                    vx = 0;
-                    vy = 0;
-                    moving = false;
+                if (db <= 14.0) {
+                    enterBurrow(nearestBurrow, particles, 14.0 + RAND.nextDouble() * 10.0);
                     return;
                 } else {
                     double ang = Math.atan2(nearestBurrow.getY() - y, nearestBurrow.getX() - x);
@@ -608,10 +758,11 @@ public class PassiveAnimal {
     }
 
     private void updateFleeing(double dt, double threatX, double threatY, List<PassiveAnimal> allPassives, TileMap tileMap) {
-        updateFleeing(dt, threatX, threatY, tileMap);
+        updateFleeing(dt, threatX, threatY, allPassives, null, null, null, tileMap);
     }
 
-    private void updateFleeing(double dt, double threatX, double threatY, TileMap tileMap) {
+    private void updateFleeing(double dt, double threatX, double threatY, List<PassiveAnimal> allPassives,
+                              List<Burrow> burrows, List<Particle> particles, Player player, TileMap tileMap) {
         // Se estiver em arrancada de desvio evasivo de quina, segue o vetor de juke
         if (evasiveJukeTimer > 0) {
             evasiveJukeTimer -= dt;
@@ -630,12 +781,35 @@ public class PassiveAnimal {
             return;
         }
 
+        // Toca de fuga para coelhos
+        Burrow targetBurrow = null;
+        if (type == PassiveAnimalType.RABBIT && burrows != null && burrowCooldown <= 0) {
+            double minBurrowDist = 180.0;
+            for (Burrow b : burrows) {
+                if (player != null && player.isBurrowed() && Math.hypot(b.getX() - player.getX(), b.getY() - player.getY()) < 18.0) {
+                    continue;
+                }
+                double db = Math.hypot(b.getX() - x, b.getY() - y);
+                if (db < minBurrowDist) {
+                    minBurrowDist = db;
+                    targetBurrow = b;
+                }
+            }
+
+            if (targetBurrow != null) {
+                if (minBurrowDist <= 14.0) {
+                    enterBurrow(targetBurrow, particles, 6.5 + RAND.nextDouble() * 3.5);
+                    return;
+                }
+            }
+        }
+
         // Sapo já na água: nada em alta velocidade na direção de maior fuga
         if (type == PassiveAnimalType.FROG) {
             int curC = (int) Math.floor(x / TileMap.TILE_SIZE);
             int curR = (int) Math.floor(y / TileMap.TILE_SIZE);
             if (tileMap.getTileAt(curC, curR) == TileType.WATER) {
-                double bestWaterAngle = computeBestFleeAngle(threatX, threatY, tileMap);
+                double bestWaterAngle = computeBestFleeAngle(threatX, threatY, null, tileMap);
                 double swimSpeed = type.getBaseSpeed() * 1.45;
                 targetHeading = bestWaterAngle;
                 visualAngle = lerpAngle(visualAngle, targetHeading, Math.min(1.0, dt * 14.0));
@@ -657,7 +831,7 @@ public class PassiveAnimal {
         }
 
         // Análise de feelers/whiskers para encontrar o melhor corredor livre de fuga
-        targetHeading = computeBestFleeAngle(threatX, threatY, tileMap);
+        targetHeading = computeBestFleeAngle(threatX, threatY, targetBurrow, tileMap);
 
         double turnRate = (type == PassiveAnimalType.RABBIT ? 20.0 : (type == PassiveAnimalType.DEER ? 13.0 : 16.0));
         visualAngle = lerpAngle(visualAngle, targetHeading, Math.min(1.0, dt * turnRate));
@@ -675,15 +849,24 @@ public class PassiveAnimal {
     }
 
     private double computeBestFleeAngle(double threatX, double threatY, TileMap tileMap) {
+        return computeBestFleeAngle(threatX, threatY, null, tileMap);
+    }
+
+    private double computeBestFleeAngle(double threatX, double threatY, Burrow targetBurrow, TileMap tileMap) {
         double baseAwayAngle = Math.atan2(y - threatY, x - threatX);
         boolean canWalkWater = (type == PassiveAnimalType.FROG);
         double r = getBodyRadius();
         double probeDist = (type == PassiveAnimalType.DEER) ? 62.0 : (type == PassiveAnimalType.RABBIT ? 46.0 : 36.0);
 
-        // Componente de zigue-zague do coelho
+        // Componente de navegação do coelho (atração para a toca com zigue-zague evasivo)
         double desiredAngle = baseAwayAngle;
         if (type == PassiveAnimalType.RABBIT) {
-            desiredAngle += zigZagAngle;
+            if (targetBurrow != null) {
+                double toBurrow = Math.atan2(targetBurrow.getY() - y, targetBurrow.getX() - x);
+                desiredAngle = lerpAngle(desiredAngle, toBurrow, 0.45);
+            } else {
+                desiredAngle += zigZagAngle;
+            }
         }
 
         // Whiskers em leque de 13 ângulos cobrindo frente, flancos e rotas tangenciais
@@ -881,6 +1064,7 @@ public class PassiveAnimal {
 
     public boolean isCatchable() {
         if (despawned) return false;
+        if (state == State.BURROWED) return false;
         if (type == PassiveAnimalType.BIRD && state == State.FLYING_AWAY) {
             return flightHeight <= BIRD_MAX_CATCHABLE_ALTITUDE;
         }
@@ -953,4 +1137,7 @@ public class PassiveAnimal {
     public double getFrogTongueTargetY() { return frogTongueTargetY; }
     public double getDrinkingWaterX() { return drinkingWaterX; }
     public double getDrinkingWaterY() { return drinkingWaterY; }
+    public boolean isBurrowed() { return state == State.BURROWED; }
+    public double getPeekTimer() { return peekTimer; }
+    public Burrow getCurrentBurrow() { return currentBurrow; }
 }

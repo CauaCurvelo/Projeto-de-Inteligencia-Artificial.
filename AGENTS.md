@@ -407,3 +407,21 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - `triggerForestDisturbance`: mordidas e combates estrondosos espantam todos os pássaros num raio de `190px`, que alçam voo imediato batendo asas e alertam herbívoros próximos.
   - Cervos mantêm coesão de rebanho com atração suave ao centroide e dispersão mútua; ao avistar perigo, um cervo avisa todo o rebanho em um raio de `200px` para uma fuga coordenada.
 
+## Feature: Dinâmica Completa de Coelhos em Tocas (Burrow Integration)
+- **Fuga e Refúgio de Coelhos nas Tocas ([PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java)):**
+  - Coelhos em fuga de predadores ou da raposa do jogador rastreiam tocas (`Burrow`) num raio de até `180px`.
+  - Ao atingirem o limiar de entrada (`dist <= 14px`), mergulham de cabeça na toca com partículas de terra levantada (`enterBurrow`), transitando para o estado `State.BURROWED`.
+  - Durante chuva (`WeatherType.RAIN`), coelhos procuram ativamente tocas secas e confortáveis para se abrigar por `14..24s`.
+  - Enquanto estão entocados, tornam-se intocáveis a danos diretos de passagem (`isCatchable() == false`).
+- **Animação Procedural 2.5D de Espreita da Toca ([PassiveAnimalRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/PassiveAnimalRenderer.java)):**
+  - Quando `animal.isBurrowed()`, o corpo padrão é suprimido e desenha-se o ciclo procedural de espreita `drawRabbitPeekingFromBurrow(peekTimer)`:
+    - **No fundo da toca:** Olhinhos brilhantes reluzindo sutilmente na escuridão da abertura subterrânea.
+    - **Emergindo para espiar:** Cabeça peluda surge aos poucos na borda; orelhas compridas eretas com interior rosa tremelicam de alerta (`Math.sin(peekTimer * 14.0)`); nariz rosa fofo funga farejando o ar com bigodes brancos vibrando.
+    - Se houver passos pesados de corrida acima da toca (`player.isSprinting()`), o coelho retrai a cabeça assustado e atrasa a saída.
+- **Mecânica de Emboscada e Desentocamento pela Raposa ([World.java](src/main/java/br/edu/unex/sentinela/world/World.java), [PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java)):**
+  - **Emboscada:** O jogador pode esperar pacientemente na vegetação alta perto da toca até o coelho colocar o corpo para fora e sair com segurança (`emergeFromBurrow`).
+  - **Invasão da Toca:** Se a raposa entrar na mesma toca (`player.isBurrowed()`), o coelho é surpreendido dentro do túnel e expulso em pânico disparado para fora (`flushOutFromBurrow`).
+  - **Bote na Boca da Toca:** Se o jogador der uma mordida (`player.isAttacking()`) na abertura da toca com o coelho entocado, ele não morre magicamente no subterrâneo; a mordida desentoca o coelho (`flushOutFromBurrow`), gerando faíscas de terra, som de bote e uma caçada em disparada imediata!
+- **Ecologia e Spawn Natural ([World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - Coelhos gerados pelo ecossistema têm 40% de chance de nascer já abrigados dentro de tocas naturais próximas, tornando o mundo vivo e repleto de tocas habitadas para exploração.
+

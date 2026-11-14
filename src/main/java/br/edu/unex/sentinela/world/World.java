@@ -484,33 +484,42 @@ public class World {
                 double attackY = player.getY() + Math.sin(player.getVisualAngle()) * 18.0;
                 double distToAnimal = Math.hypot(animal.getX() - attackX, animal.getY() - attackY);
 
-                if (distToAnimal <= attackRange && animal.isCatchable()) {
-                    player.markAttackHitProcessed();
-                    boolean dead = animal.takeDamage(1);
-                    triggerForestDisturbance(animal.getX(), animal.getY(), 190.0);
-                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.8, 0, 1.15);
-                    for (int k = 0; k < 5; k++) {
-                        particles.add(new Particle(animal.getX(), animal.getY(),
-                            Math.cos(player.getVisualAngle()) * 50 + (rand.nextDouble() * 40 - 20),
-                            Math.sin(player.getVisualAngle()) * 50 + (rand.nextDouble() * 40 - 20),
-                            0.25, "#D7CCC8", 2.8));
+                if (distToAnimal <= attackRange) {
+                    if (animal.isBurrowed()) {
+                        player.markAttackHitProcessed();
+                        animal.flushOutFromBurrow(attackX, attackY, particles);
+                        triggerForestDisturbance(animal.getX(), animal.getY(), 160.0);
+                        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.8, 0, 1.25);
+                        continue;
                     }
-                    if (player.isSwimming()) {
-                        waterRipples.add(new WaterRipple(animal.getX(), animal.getY(), 22.0, 0.90));
-                        for (int s = 0; s < 4; s++) {
+                    if (animal.isCatchable()) {
+                        player.markAttackHitProcessed();
+                        boolean dead = animal.takeDamage(1);
+                        triggerForestDisturbance(animal.getX(), animal.getY(), 190.0);
+                        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.8, 0, 1.15);
+                        for (int k = 0; k < 5; k++) {
                             particles.add(new Particle(animal.getX(), animal.getY(),
-                                (rand.nextDouble() - 0.5) * 60.0, -18.0 - rand.nextDouble() * 26.0,
-                                0.35, "#81D4FA", 2.6));
+                                Math.cos(player.getVisualAngle()) * 50 + (rand.nextDouble() * 40 - 20),
+                                Math.sin(player.getVisualAngle()) * 50 + (rand.nextDouble() * 40 - 20),
+                                0.25, "#D7CCC8", 2.8));
                         }
-                    }
-                    if (dead) {
-                        meatItems.addAll(animal.createMorselDrops());
-                        score += 50;
-                        GameEventBus.get().post(new GameEvent(GameEvent.Type.PASSIVE_HUNTED));
-                        if (animal.getType() == br.edu.unex.sentinela.entity.PassiveAnimalType.BIRD) {
-                            GameEventBus.get().post(new GameEvent(GameEvent.Type.BIRD_CAUGHT));
+                        if (player.isSwimming()) {
+                            waterRipples.add(new WaterRipple(animal.getX(), animal.getY(), 22.0, 0.90));
+                            for (int s = 0; s < 4; s++) {
+                                particles.add(new Particle(animal.getX(), animal.getY(),
+                                    (rand.nextDouble() - 0.5) * 60.0, -18.0 - rand.nextDouble() * 26.0,
+                                    0.35, "#81D4FA", 2.6));
+                            }
                         }
-                        recordBestiaryDefeatForPassive(animal);
+                        if (dead) {
+                            meatItems.addAll(animal.createMorselDrops());
+                            score += 50;
+                            GameEventBus.get().post(new GameEvent(GameEvent.Type.PASSIVE_HUNTED));
+                            if (animal.getType() == br.edu.unex.sentinela.entity.PassiveAnimalType.BIRD) {
+                                GameEventBus.get().post(new GameEvent(GameEvent.Type.BIRD_CAUGHT));
+                            }
+                            recordBestiaryDefeatForPassive(animal);
+                        }
                     }
                 }
             }
@@ -822,7 +831,22 @@ public class World {
                 }
             }
 
-            passiveAnimals.add(new PassiveAnimal(type, wx, wy));
+            PassiveAnimal pa = new PassiveAnimal(type, wx, wy);
+            if (type == PassiveAnimalType.RABBIT && !burrows.isEmpty() && rand.nextDouble() < 0.40) {
+                Burrow closeBurrow = null;
+                double closestDist = 160.0;
+                for (Burrow b : burrows) {
+                    double db = Math.hypot(b.getX() - wx, b.getY() - wy);
+                    if (db < closestDist) {
+                        closestDist = db;
+                        closeBurrow = b;
+                    }
+                }
+                if (closeBurrow != null) {
+                    pa.enterBurrow(closeBurrow, null, 10.0 + rand.nextDouble() * 12.0);
+                }
+            }
+            passiveAnimals.add(pa);
             break;
         }
     }
