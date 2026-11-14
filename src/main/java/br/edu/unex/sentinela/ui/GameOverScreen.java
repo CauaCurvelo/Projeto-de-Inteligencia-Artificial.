@@ -56,7 +56,7 @@ public class GameOverScreen extends StackPane {
         summary.setTextFill(Color.web("#CBD5E1"));
         UiTypography.bind(summary, UiTypography.TypoRole.LABEL);
 
-        Button btnPlayAgain = UiTheme.createPrimaryButton("JOGAR DE NOVO", UiBadge.Icon.PLAY);
+        Button btnPlayAgain = UiTheme.createPrimaryButton("[R] JOGAR DE NOVO", UiBadge.Icon.PLAY);
         btnPlayAgain.setMaxWidth(Double.MAX_VALUE);
         btnPlayAgain.setPrefHeight(44);
         btnPlayAgain.setOnAction(e -> manager.startGame());
@@ -79,6 +79,14 @@ public class GameOverScreen extends StackPane {
         );
 
         getChildren().add(UiTheme.createModalBackdrop(panel));
+
+        setFocusTraversable(true);
+        setOnKeyPressed(e -> {
+            if (e.getCode() == javafx.scene.input.KeyCode.R || e.getCode() == javafx.scene.input.KeyCode.ENTER) {
+                e.consume();
+                manager.startGame();
+            }
+        });
     }
 
     private HBox buildMetricsStrip(World world) {

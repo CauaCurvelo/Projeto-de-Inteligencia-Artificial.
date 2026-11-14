@@ -173,29 +173,24 @@ public class TileMap {
                                   + Math.sin(lakeAngle * 3.0 + lakeCellSeed * 6.28) * 2.2;
                 double effectiveLakeRadius = baseLakeRadius + lakeWarp;
 
-                // Verificação de travessia de trilha / pontes sobre o lago ou rio
-                int bridgeCell = (int) Math.floor(ru / 50.0);
-                double bridgePos = (bridgeCell + 0.25 + rawHash(bridgeCell, 7, 1777L) * 0.5) * 50.0;
-                boolean isRusticBridge = Math.abs(ru - bridgePos) <= 1.3 && riverDist <= (baseRiverWidth + 3.0);
-                boolean isTrailCrossing = (radialDist > 14.0 && (trail1 < 0.95 || trail2 < 0.95)
-                        && (riverDist <= baseRiverWidth + 2.5 || (distToLake <= effectiveLakeRadius + 1.5 && distToLake >= effectiveLakeRadius * 0.45)));
+                // Pontes sobre o rio: extremamente raras (espaçadas a cada ~190 tiles e com chance controlada)
+                // NUNCA geradas atravessando lagos
+                int bridgeCell = (int) Math.floor(ru / 190.0);
+                double bridgeRoll = rawHash(bridgeCell, 7, 1777L);
+                boolean hasBridge = bridgeRoll > 0.48; // Apenas ~52% dos segmentos de 190 tiles possuem ponte
+                double bridgePos = (bridgeCell + 0.30 + bridgeRoll * 0.40) * 190.0;
+                boolean isRusticBridge = hasBridge
+                        && Math.abs(ru - bridgePos) <= 1.0
+                        && riverDist <= (baseRiverWidth + 2.2)
+                        && distToLake > (effectiveLakeRadius + 4.0);
 
-                if (isRusticBridge || isTrailCrossing) {
+                if (isRusticBridge) {
                     chunk[r][c] = TileType.DIRT_PATH;
                     continue;
                 }
 
                 // Processa o Grande Lago Fluvial se o ponto estiver dentro do raio da bacia lacustre
                 if (distToLake < effectiveLakeRadius) {
-                    // Ilhota lacustre arborizada no centro de grandes lagos
-                    if (baseLakeRadius >= 10.5 && distToLake < effectiveLakeRadius * 0.35) {
-                        double islandNoise = fbm(worldCol * 0.14, worldRow * 0.14, 2081L);
-                        if (islandNoise > 0.60) {
-                            chunk[r][c] = (biome == BiomeType.SWAMP || rawHash(worldCol, worldRow, 2087L) > 0.40)
-                                    ? TileType.TALL_GRASS : TileType.GRASS;
-                            continue;
-                        }
-                    }
                     if (biome == BiomeType.SNOW) {
                         // Grandes pistas de gelo e calotas congeladas nos lagos do bioma glacial
                         double freezeNoise = fbm(worldCol * 0.08, worldRow * 0.08, 4013L);
@@ -254,16 +249,6 @@ public class TileMap {
                 double mudHalfWidth = riverHalfWidth + (biome == BiomeType.SWAMP ? 1.9 : 1.1) + bankNoise;
                 double marshHalfWidth = mudHalfWidth + (biome == BiomeType.SWAMP ? 2.2 : 1.4);
 
-                // Ilhotas fluviais e bancos de areia/vegetação em trechos largos
-                if (riverHalfWidth > 3.0 && riverDist < riverHalfWidth * 0.40) {
-                    double isletNoise = fbm(worldCol * 0.16, worldRow * 0.16, 929L);
-                    if (isletNoise > 0.65) {
-                        chunk[r][c] = (biome == BiomeType.SWAMP || rawHash(worldCol, worldRow, 937L) > 0.45) 
-                                ? TileType.TALL_GRASS : TileType.GRASS;
-                        continue;
-                    }
-                }
-
                 if (riverDist < riverHalfWidth) {
                     if (biome == BiomeType.SNOW && (riverDist > riverHalfWidth * 0.55 || fbm(ru * 0.06, 4.2, 4027L) > 0.60)) {
                         chunk[r][c] = TileType.ICE; // Calota de gelo nas margens e remansos fluviais congelados
@@ -289,12 +274,13 @@ public class TileMap {
                 double tribDist = Math.abs(trv - tribCenterV);
                 double tribWidth = (biome == BiomeType.SWAMP ? 1.6 : 1.25) + (fbm(tru * 0.04, 1.2, 971L) - 0.5) * 0.4;
 
-                int tribBridgeCell = (int) Math.floor(tru / 44.0);
-                double tribBridgePos = (tribBridgeCell + 0.35 + rawHash(tribBridgeCell, 11, 1888L) * 0.4) * 44.0;
-                boolean isTribBridge = Math.abs(tru - tribBridgePos) <= 1.1 && tribDist <= (tribWidth + 1.8);
-                boolean isTribTrailCrossing = (radialDist > 14.0 && (trail1 < 0.90 || trail2 < 0.90) && tribDist <= tribWidth + 1.6);
+                int tribBridgeCell = (int) Math.floor(tru / 180.0);
+                double tribBridgeRoll = rawHash(tribBridgeCell, 11, 1888L);
+                boolean hasTribBridge = (tribBridgeRoll > 0.52);
+                double tribBridgePos = (tribBridgeCell + 0.35 + tribBridgeRoll * 0.30) * 180.0;
+                boolean isTribBridge = hasTribBridge && Math.abs(tru - tribBridgePos) <= 1.0 && tribDist <= (tribWidth + 1.4);
 
-                if (isTribBridge || isTribTrailCrossing) {
+                if (isTribBridge) {
                     chunk[r][c] = TileType.DIRT_PATH;
                     continue;
                 }
@@ -322,10 +308,7 @@ public class TileMap {
                 double adjMoisture = moisture + biome.getMudBias();
                 if (adjElevation < 0.24 && adjMoisture > 0.52) {
                     if (biome == BiomeType.SWAMP) {
-                        double bogIsland = fbm(worldCol * 0.12, worldRow * 0.12, 521L);
-                        if (bogIsland > 0.58) {
-                            chunk[r][c] = rawHash(worldCol, worldRow, 523L) > 0.50 ? TileType.TALL_GRASS : TileType.MUD;
-                        } else if (adjElevation < 0.18) {
+                        if (adjElevation < 0.18) {
                             chunk[r][c] = TileType.WATER;
                         } else {
                             chunk[r][c] = TileType.MUD;

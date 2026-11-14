@@ -23,13 +23,7 @@ public class ScreenManager extends StackPane {
     private final StackPane contentLayer = new StackPane();
     private BestiaryScreen activeBestiaryScreen;
     private Runnable onViewChanged;
-
-    private final EventHandler<KeyEvent> sceneEscHandler = event -> {
-        if (event.getCode() == KeyCode.ESCAPE && !event.isConsumed()) {
-            event.consume();
-            handleEscKey();
-        }
-    };
+    private final EventHandler<KeyEvent> sceneKeyFilter;
 
     public void setOnViewChanged(Runnable onViewChanged) {
         this.onViewChanged = onViewChanged;
@@ -38,15 +32,29 @@ public class ScreenManager extends StackPane {
     public ScreenManager(World world) {
         this.world = world;
 
+        this.sceneKeyFilter = event -> {
+            if (event.isConsumed()) return;
+            KeyCode code = event.getCode();
+            if (code == KeyCode.ESCAPE) {
+                event.consume();
+                handleEscKey();
+            } else if (code == KeyCode.R || code == KeyCode.ENTER) {
+                if (currentState == ScreenState.GAME_OVER || world.isGameOver()) {
+                    event.consume();
+                    startGame();
+                }
+            }
+        };
+
         getChildren().addAll(contentLayer, toast);
 
         sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (oldScene != null) {
-                oldScene.removeEventHandler(KeyEvent.KEY_PRESSED, sceneEscHandler);
+                oldScene.removeEventFilter(KeyEvent.KEY_PRESSED, sceneKeyFilter);
             }
             if (newScene != null) {
                 UiTheme.applyGlobalTheme(newScene);
-                newScene.addEventHandler(KeyEvent.KEY_PRESSED, sceneEscHandler);
+                newScene.addEventFilter(KeyEvent.KEY_PRESSED, sceneKeyFilter);
             }
         });
 
@@ -88,6 +96,7 @@ public class ScreenManager extends StackPane {
             previousState = ScreenState.PLAYING;
             currentState = ScreenState.GAME_OVER;
             updateScreenView();
+            requestFocus();
         }
     }
 

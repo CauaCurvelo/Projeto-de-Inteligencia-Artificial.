@@ -314,3 +314,14 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - **Comportamento e Derrapagem da IA/Inimigos:** Inimigos em perseguição no gelo sofrem redução de tração de curva (`steerRate = 2.6`), derrapando amplamente em quinas e curvas. O Urso Polar (`BossArchetype.POLAR_BEAR`) e animais de variante ártica mantêm alta aderência (`steerRate = 9.5` e velocidade `1.25x`), dominando o terreno glacial.
   - **Renderização Visual 2.5D de Gelo Cristalino:** Base de azul turquesa translúcido (`#BAE6FD` / `#0284C7`), reflexos especulares polidos diagonais (`#FFFFFF`), micro-fissuras e rachaduras internas fraturadas, geada nas bordas e reflexo cintilante/shimmer animado em alta qualidade gráfica.
   - **Design de Som & Partículas:** Partículas cristalinas de pó e lascas de gelo azul-celeste e branco emitidas sob as patas ao deslizar e derrapar (`#E0F7FA`, `#BAE6FD`), acompanhadas pela síntese procedural em tempo real de raspagem de garras/lâminas afiadas no gelo liso (`STEP_ICE`).
+
+## Refactor / Polish: Rios e Lagos Limpos (Sem Ilhas), Pontes Raras e Atalho [R] para Reinício Rápido
+- **Remoção de Ilhas e Desobstrução Hídrica ([TileMap.java](src/main/java/br/edu/unex/sentinela/world/TileMap.java)):**
+  - Removidas todas as ilhotas e bancos de vegetação que surgiam no meio dos grandes lagos e em trechos largos de rios e brejos pantanosos. Cursos d'água e espelhos lacustres agora fluem de forma contínua, limpa e desimpedida.
+- **Pontes Raras e Preservação de Lagos ([TileMap.java](src/main/java/br/edu/unex/sentinela/world/TileMap.java)):**
+  - Pontes sobre o rio principal e riacho secundário tornaram-se significativamente raras: espaçadas em intervalos amplos (~180–190 tiles) e condicionadas a probabilidade moderada (~50%).
+  - Bloqueio estrito de travessias cortando lagos: trilhas e pontes nunca mais cortam ou atravessam o interior de corpos lacustres.
+- **Atalho [R] e [ENTER] para Reinício Imediato no Game Over ([ScreenManager.java](src/main/java/br/edu/unex/sentinela/ui/ScreenManager.java), [GameOverScreen.java](src/main/java/br/edu/unex/sentinela/ui/GameOverScreen.java)):**
+  - Adicionado `sceneKeyFilter` global em `ScreenManager` com captura prioritária via `addEventFilter(KeyEvent.KEY_PRESSED)`.
+  - Ao morrer ou com a tela de `GAME_OVER` ativa, pressionar a tecla **`R`** ou **`ENTER`** no teclado reinicia imediatamente uma nova corrida (`startGame()`), com foco garantido e botão atualizado para `[R] JOGAR DE NOVO`.
+
