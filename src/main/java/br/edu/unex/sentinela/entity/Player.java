@@ -351,7 +351,7 @@ public class Player {
     public boolean isMoving() { return moving; }
     public void setMoving(boolean moving) { this.moving = moving; }
     private void tryTriggerPrimaryAttack(boolean attackPressed) {
-        if (!attackPressed || attackCooldown > 0 || isBurrowed || isSwimming) {
+        if (!attackPressed || attackCooldown > 0 || isBurrowed) {
             return;
         }
 
@@ -416,6 +416,7 @@ public class Player {
     public boolean isTrapped() { return trappedTimer > 0; }
     public boolean isInvulnerable() { return invulnerabilityTimer > 0; }
     public boolean isAttacking() { return isAttacking; }
+    public double getAttackTimer() { return attackTimer; }
     public boolean hasProcessedAttackHit() { return attackHitProcessed; }
     public void markAttackHitProcessed() { this.attackHitProcessed = true; }
     public double getNoiseRadius() { return isBurrowed ? 0.0 : noiseRadius; }

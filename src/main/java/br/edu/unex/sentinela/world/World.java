@@ -386,6 +386,13 @@ public class World {
             playerWaterRippleTimer = 0.0;
             waterRipples.add(new WaterRipple(player.getX(), player.getY(), 18.0, 0.70));
         }
+        if (player.isSwimming() && player.isAttacking() && player.getAttackTimer() > 0.17) {
+            waterRipples.add(new WaterRipple(
+                player.getX() + Math.cos(player.getVisualAngle()) * 16.0,
+                player.getY() + Math.sin(player.getVisualAngle()) * 16.0,
+                24.0, 0.88
+            ));
+        }
 
         // Gotas de chuva atingindo água geram micro-ondulações ocasionais
         if (rainIntensity > 0.20 && rand.nextDouble() < (0.12 * rainIntensity)) {
@@ -478,6 +485,14 @@ public class World {
                             Math.sin(player.getVisualAngle()) * 50 + (rand.nextDouble() * 40 - 20),
                             0.25, "#D7CCC8", 2.8));
                     }
+                    if (player.isSwimming()) {
+                        waterRipples.add(new WaterRipple(animal.getX(), animal.getY(), 22.0, 0.90));
+                        for (int s = 0; s < 4; s++) {
+                            particles.add(new Particle(animal.getX(), animal.getY(),
+                                (rand.nextDouble() - 0.5) * 60.0, -18.0 - rand.nextDouble() * 26.0,
+                                0.35, "#81D4FA", 2.6));
+                        }
+                    }
                     if (dead) {
                         meatItems.addAll(animal.createMorselDrops());
                         score += 50;
@@ -533,6 +548,15 @@ public class World {
                             Math.sin(player.getVisualAngle()) * 80 + (rand.nextDouble() * 50 - 25),
                             0.30, "#FFD700", 3.5
                         ));
+                    }
+
+                    if (player.isSwimming()) {
+                        waterRipples.add(new WaterRipple(enemy.getX(), enemy.getY(), 24.0, 0.92));
+                        for (int s = 0; s < 5; s++) {
+                            particles.add(new Particle(enemy.getX(), enemy.getY(),
+                                (rand.nextDouble() - 0.5) * 70.0, -20.0 - rand.nextDouble() * 30.0,
+                                0.35, "#81D4FA", 2.8));
+                        }
                     }
 
                     if (defeated) {

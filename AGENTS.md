@@ -289,3 +289,13 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - **Prevenção de Despawn no Campo de Visão:** Tanto o streaming de animais passivos quanto a reciclagem de inimigos distantes agora verificam `!camera.isPointInView(...)`, impedindo que criaturas sumam repentinamente na frente dos olhos do jogador.
   - **Efeito Pop-up Elástico em Frutinhas:** Frutos silvestres (`FoodItem`) possuem curva elástica de popup ao germinar/respawnar no mundo (`getPopScale()` com overshoot até 1.20x e acomodação em 1.0x), brilho suave de broto esmeralda no solo e emissão de micro-partículas vegetais de folhagem/pólen.
   - **Efeito de Queda/Bounce em Carnes Caídas:** Pedaços de carne caídos (`MeatItem`) possuem animação física de lançamento e quique (`getDropHopY()` e `getDropScale()`), caindo de forma dinâmica no solo quando um animal é abatido.
+- **Ataque em Meio Aquático para o Jogador ([Player.java](src/main/java/br/edu/unex/sentinela/entity/Player.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - Removido o bloqueio restritivo `|| isSwimming` de `tryTriggerPrimaryAttack`, permitindo que a Raposa ataque e morda presas e inimigos enquanto nada em rios e lagos, em paridade com os outros predadores do ecossistema.
+  - Feedback tátil e audiovisual aquático: botes e golpes na água geram ondulações concêntricas de choque (`WaterRipple`) e borrifos de espuma/gotículas celestes (`#81D4FA`).
+- **Overhaul da Geração de Rios e Bacia Hidrográfica ([TileMap.java](src/main/java/br/edu/unex/sentinela/world/TileMap.java)):**
+  - **Meandros Hidrográficos Multi-Escala:** substituição da curvatura senoidal simples por meandros compostos em 3 camadas (macro-curvatura de bacia a 20 tiles, ondas intermediárias e perturbações fractais Perlin/fBm nas margens).
+  - **Largura Variável Orgânica:** rio com largura dinâmica variando entre 1.7 e 4.5 tiles (chegando a mais de 7 tiles no pântano), alternando entre remansos profundos e gargantas rápidas.
+  - **Ilhotas Fluviais e Bancos de Vegetação:** trechos largos do rio geram ilhotas centrais de areia, cascalho e juncos ribeirinhos (`TileType.TALL_GRASS`), permitindo rotas alternativas de travessia.
+  - **Várzea e Margens Estratificadas:** transição natural entre água profunda, barrancos de lama úmida (`TileType.MUD`) e vegetação densa de várzea.
+  - **Riacho Afluente Secundário (Tributary):** afluente menor serpenteando pelo relevo e confluindo na bacia principal.
+  - **Pontes e Cruzamentos Integrados:** conexões perfeitas de trilhas de terra batida (`DIRT_PATH`) sobre a água como pontes e vaus rústicos contínuos a cada ~50 tiles, e clareira inicial circular sem cortes em caixa quadrada.

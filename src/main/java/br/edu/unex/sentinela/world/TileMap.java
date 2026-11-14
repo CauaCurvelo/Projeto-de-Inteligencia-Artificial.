@@ -19,6 +19,11 @@ public class TileMap {
     private final double riverOffset;
     private final double riverPhaseA;
     private final double riverPhaseB;
+    private final double tribCos;
+    private final double tribSin;
+    private final double tribOffset;
+    private final double tribPhaseA;
+    private final double tribPhaseB;
     private final double trailAngleA;
     private final double trailOffsetA;
     private final double trailAngleB;
@@ -39,6 +44,15 @@ public class TileMap {
         this.riverOffset = side * (36.0 + rawHash(19, 41, 929L) * 26.0);
         this.riverPhaseA = rawHash(3, 53, 937L) * Math.PI * 2.0;
         this.riverPhaseB = rawHash(71, 17, 941L) * Math.PI * 2.0;
+
+        // Riacho afluente secundário convergindo no relevo
+        double tribAngle = riverAngle + (rawHash(47, 89, 993L) >= 0.5 ? 1.0 : -1.0) * (0.65 + rawHash(53, 19, 997L) * 0.5);
+        this.tribCos = Math.cos(tribAngle);
+        this.tribSin = Math.sin(tribAngle);
+        double tribSide = rawHash(79, 31, 1009L) >= 0.5 ? 1.0 : -1.0;
+        this.tribOffset = tribSide * (26.0 + rawHash(83, 43, 1013L) * 26.0);
+        this.tribPhaseA = rawHash(89, 67, 1019L) * Math.PI * 2.0;
+        this.tribPhaseB = rawHash(97, 73, 1021L) * Math.PI * 2.0;
 
         this.trailAngleA = riverAngle + (0.45 + rawHash(17, 61, 953L) * 0.9);
         this.trailOffsetA = (rawHash(43, 11, 967L) - 0.5) * 18.0;
@@ -109,8 +123,9 @@ public class TileMap {
                 int worldCol = chunkX * CHUNK_SIZE + c;
                 int worldRow = chunkY * CHUNK_SIZE + r;
 
-                // 1. Initial Spawn clearing guarantee (around 0,0) - clear, beautiful natural meadow
-                if (Math.abs(worldCol) <= 12 && Math.abs(worldRow) <= 12) {
+                // 1. Clareira inicial do jogador (ao redor de 0,0) - Prado limpo circular sem quinas artificiais
+                double spawnDist = Math.hypot(worldCol, worldRow);
+                if (spawnDist <= 11.5) {
                     chunk[r][c] = TileType.GRASS;
                     continue;
                 }
@@ -122,34 +137,32 @@ public class TileMap {
                 double moisture = fbm(worldCol * 0.030, worldRow * 0.030, 303);
                 double forestClumping = fbm(worldCol * 0.055, worldRow * 0.055, 707);
 
-                // 3. Rio sinuoso parametrizado por seed (mantém clareira inicial seca e varia direção)
+                // 3. Sistema Hidrográfico Orgânico: Rio Principal com Meandros Multi-Escala
                 double ru = worldCol * riverCos + worldRow * riverSin;
                 double rv = -worldCol * riverSin + worldRow * riverCos;
-                double riverCenterV = riverOffset
-                        + Math.sin(ru * 0.017 + riverPhaseA) * 15.0
-                        + Math.cos(ru * 0.008 + riverPhaseB) * 9.0;
+
+                // Meandros fluviais compostos (Macro-curvatura, ondas intermediárias e perturbação de margem)
+                double meanderMacro = Math.sin(ru * 0.012 + riverPhaseA) * 20.0;
+                double meanderMed = Math.cos(ru * 0.026 + riverPhaseB) * 11.0;
+                double meanderDetail = (fbm(ru * 0.065, 3.8, 821L) - 0.5) * 7.5;
+                double riverCenterV = riverOffset + meanderMacro + meanderMed + meanderDetail;
                 double riverDist = Math.abs(rv - riverCenterV);
-                int bridgeCell = (int) Math.floor(ru / 48.0);
-                double bridgePos = (bridgeCell + 0.25 + rawHash(bridgeCell, 7, 1777L) * 0.5) * 48.0;
-                boolean isBridge = Math.abs(ru - bridgePos) <= 1.2 && riverDist <= 4.6;
 
-                if (isBridge) {
-                    chunk[r][c] = TileType.DIRT_PATH;
-                    continue;
-                }
+                // Largura orgânica dinâmica: remansos largos, enseadas e trechos de garganta
+                double widthNoise = fbm(ru * 0.032, 7.2, 853L); // 0.0 .. 1.0
+                double baseRiverWidth = (biome == BiomeType.SWAMP) ? 3.5 : (biome == BiomeType.SNOW ? 2.1 : 2.6);
+                double riverHalfWidth = baseRiverWidth + (widthNoise - 0.45) * 1.8; // Varia entre 1.7 e 4.4 tiles
 
-                double riverHalfWidth = (biome == BiomeType.SWAMP) ? 2.3 : (biome == BiomeType.SNOW ? 1.5 : 1.7);
-                double bankHalfWidth = (biome == BiomeType.SWAMP) ? 3.9 : 2.9;
-                if (riverDist < riverHalfWidth) {
-                    chunk[r][c] = TileType.WATER;
-                    continue;
-                } else if (riverDist < bankHalfWidth) {
-                    chunk[r][c] = (biome == BiomeType.SWAMP || biome == BiomeType.SNOW || moisture > 0.48)
-                            ? TileType.MUD : TileType.TALL_GRASS;
-                    continue;
-                }
+                // Margens e várzeas estratificadas
+                double bankNoise = (fbm(worldCol * 0.08, worldRow * 0.08, 941L) - 0.5) * 0.8;
+                double mudHalfWidth = riverHalfWidth + (biome == BiomeType.SWAMP ? 1.9 : 1.1) + bankNoise;
+                double marshHalfWidth = mudHalfWidth + (biome == BiomeType.SWAMP ? 2.2 : 1.4);
 
-                // 4. Trilhas naturais orgânicas conectando os biomas sem repetir sempre o mesmo caminho
+                // Pontes rústicas e travessias de trilhas sobre o rio
+                int bridgeCell = (int) Math.floor(ru / 50.0);
+                double bridgePos = (bridgeCell + 0.25 + rawHash(bridgeCell, 7, 1777L) * 0.5) * 50.0;
+                boolean isRusticBridge = Math.abs(ru - bridgePos) <= 1.3 && riverDist <= (riverHalfWidth + 2.2);
+
                 double radialDist = Math.hypot(worldCol, worldRow);
                 double tu1 = worldCol * Math.cos(trailAngleA) + worldRow * Math.sin(trailAngleA);
                 double tv1 = -worldCol * Math.sin(trailAngleA) + worldRow * Math.cos(trailAngleA);
@@ -158,6 +171,64 @@ public class TileMap {
                 double tu2 = worldCol * Math.cos(trailAngleB) + worldRow * Math.sin(trailAngleB);
                 double tv2 = -worldCol * Math.sin(trailAngleB) + worldRow * Math.cos(trailAngleB);
                 double trail2 = Math.abs(tv2 - (trailOffsetB + Math.sin(tu2 * 0.024 + riverPhaseB) * 13.0));
+
+                boolean isTrailCrossing = (radialDist > 14.0 && (trail1 < 0.95 || trail2 < 0.95) && riverDist <= riverHalfWidth + 2.0);
+
+                if (isRusticBridge || isTrailCrossing) {
+                    chunk[r][c] = TileType.DIRT_PATH;
+                    continue;
+                }
+
+                // Ilhotas fluviais e bancos de areia/vegetação em trechos largos
+                if (riverHalfWidth > 3.0 && riverDist < riverHalfWidth * 0.40) {
+                    double isletNoise = fbm(worldCol * 0.16, worldRow * 0.16, 929L);
+                    if (isletNoise > 0.65) {
+                        chunk[r][c] = (biome == BiomeType.SWAMP || rawHash(worldCol, worldRow, 937L) > 0.45) 
+                                ? TileType.TALL_GRASS : TileType.GRASS;
+                        continue;
+                    }
+                }
+
+                if (riverDist < riverHalfWidth) {
+                    chunk[r][c] = TileType.WATER;
+                    continue;
+                } else if (riverDist < mudHalfWidth) {
+                    chunk[r][c] = (biome == BiomeType.SNOW || biome == BiomeType.SWAMP || moisture > 0.42)
+                            ? TileType.MUD : TileType.TALL_GRASS;
+                    continue;
+                } else if (riverDist < marshHalfWidth) {
+                    chunk[r][c] = (biome == BiomeType.SWAMP || moisture > 0.40) ? TileType.TALL_GRASS : TileType.GRASS;
+                    continue;
+                }
+
+                // 3b. Riacho Afluente Secundário (Tributary Stream)
+                double tru = worldCol * tribCos + worldRow * tribSin;
+                double trv = -worldCol * tribSin + worldRow * tribCos;
+                double tribCenterV = tribOffset + Math.sin(tru * 0.021 + tribPhaseA) * 14.0
+                                     + Math.cos(tru * 0.042 + tribPhaseB) * 6.5
+                                     + (fbm(tru * 0.08, 2.1, 967L) - 0.5) * 5.0;
+                double tribDist = Math.abs(trv - tribCenterV);
+                double tribWidth = (biome == BiomeType.SWAMP ? 1.6 : 1.25) + (fbm(tru * 0.04, 1.2, 971L) - 0.5) * 0.4;
+
+                int tribBridgeCell = (int) Math.floor(tru / 44.0);
+                double tribBridgePos = (tribBridgeCell + 0.35 + rawHash(tribBridgeCell, 11, 1888L) * 0.4) * 44.0;
+                boolean isTribBridge = Math.abs(tru - tribBridgePos) <= 1.1 && tribDist <= (tribWidth + 1.8);
+                boolean isTribTrailCrossing = (radialDist > 14.0 && (trail1 < 0.90 || trail2 < 0.90) && tribDist <= tribWidth + 1.6);
+
+                if (isTribBridge || isTribTrailCrossing) {
+                    chunk[r][c] = TileType.DIRT_PATH;
+                    continue;
+                }
+
+                if (tribDist < tribWidth) {
+                    chunk[r][c] = TileType.WATER;
+                    continue;
+                } else if (tribDist < tribWidth + 1.2) {
+                    chunk[r][c] = (biome == BiomeType.SWAMP || moisture > 0.48) ? TileType.MUD : TileType.TALL_GRASS;
+                    continue;
+                }
+
+                // 4. Trilhas naturais orgânicas conectando os biomas sem repetir sempre o mesmo caminho
                 if (radialDist > 15.0 && (trail1 < 0.72 || trail2 < 0.72)) {
                     chunk[r][c] = TileType.DIRT_PATH;
                     continue;
