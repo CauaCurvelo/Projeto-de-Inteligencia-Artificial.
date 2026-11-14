@@ -157,7 +157,17 @@ public class World {
     private void spawnFoodNearPlayer() {
         int playerCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
         int playerRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
-        ecosystemSpawner.spawnFoodNearPlayer(tileMap, foodItems, playerCol, playerRow);
+        FoodItem newFood = ecosystemSpawner.spawnFoodNearPlayer(tileMap, foodItems, playerCol, playerRow);
+        if (newFood != null) {
+            // Emite partículas de broto vegetal e pólen ao germinar
+            for (int i = 0; i < 5; i++) {
+                double px = newFood.getX() + (rand.nextDouble() - 0.5) * 16.0;
+                double py = newFood.getY() + (rand.nextDouble() - 0.5) * 12.0;
+                double vx = (rand.nextDouble() - 0.5) * 18.0;
+                double vy = -12.0 - rand.nextDouble() * 20.0;
+                particles.add(new Particle(px, py, vx, vy, 0.45, "#81C784", 2.2));
+            }
+        }
     }
 
     public void update(double deltaTime, InputManager inputManager) {
@@ -227,7 +237,7 @@ public class World {
         if (enemyReinforcementTimer >= 18.0) {
             enemyReinforcementTimer = 0.0;
             if (enemies.size() < 24) {
-                ecosystemSpawner.spawnReinforcementNearPlayer(tileMap, enemies, player, survivalTime);
+                ecosystemSpawner.spawnReinforcementNearPlayer(tileMap, enemies, player, survivalTime, camera);
             }
         }
 
@@ -235,7 +245,7 @@ public class World {
         bossSpawnTimer += deltaTime;
         if (bossSpawnTimer >= 40.0) {
             bossSpawnTimer = 0.0;
-            ecosystemSpawner.spawnApexBossNearPlayer(tileMap, enemies, player, survivalTime);
+            ecosystemSpawner.spawnApexBossNearPlayer(tileMap, enemies, player, survivalTime, camera);
         }
 
         // Update Player
@@ -248,6 +258,7 @@ public class World {
         }
 
         for (FoodItem food : foodItems) {
+            food.update(deltaTime);
             if (!food.isEaten()) {
                 double dist = Math.hypot(player.getX() - food.getX(), player.getY() - food.getY());
                 if (dist < 20.0) {
@@ -436,7 +447,10 @@ public class World {
         passiveAnimalStreamTimer += deltaTime;
         if (passiveAnimalStreamTimer >= 4.0) {
             passiveAnimalStreamTimer = 0.0;
-            passiveAnimals.removeIf(a -> Math.hypot(a.getX() - player.getX(), a.getY() - player.getY()) > 660.0);
+            passiveAnimals.removeIf(a -> {
+                double dist = Math.hypot(a.getX() - player.getX(), a.getY() - player.getY());
+                return dist > 1100.0 && (camera == null || !camera.isPointInView(a.getX(), a.getY(), 60.0));
+            });
             while (passiveAnimals.size() < 14) {
                 spawnPassiveAnimalNearPlayer();
             }
@@ -629,6 +643,9 @@ public class World {
 
         // Despawn enemies that got left too far behind (preserva bosses próximos à sua arena territorial)
         enemies.removeIf(e -> {
+            if (camera != null && camera.isPointInView(e.getX(), e.getY(), 70.0)) {
+                return false; // Nunca despawna visivelmente na tela
+            }
             double distEntity = Math.hypot(e.getX() - player.getX(), e.getY() - player.getY());
             if (e.getType() == EnemyType.BEAR_BOSS && e.getBossController() != null) {
                 double distHome = Math.hypot(e.getBossController().getHomeX() - player.getX(), e.getBossController().getHomeY() - player.getY());
@@ -642,12 +659,12 @@ public class World {
 
         int safetyAttempts = 0;
         while (enemies.size() < 12 && safetyAttempts < 8) {
-            ecosystemSpawner.spawnReinforcementNearPlayer(tileMap, enemies, player, survivalTime);
+            ecosystemSpawner.spawnReinforcementNearPlayer(tileMap, enemies, player, survivalTime, camera);
             safetyAttempts++;
         }
 
         if (burrows.size() < 7) {
-            ecosystemSpawner.spawnBurrowInSector(tileMap, burrows, pCol, pRow, rand.nextDouble() * Math.PI * 2.0, 12, 32);
+            ecosystemSpawner.spawnBurrowInSector(tileMap, burrows, pCol, pRow, rand.nextDouble() * Math.PI * 2.0, 12, 32, camera);
         }
     }
 
@@ -706,30 +723,41 @@ public class World {
     private void spawnPassiveAnimalNearPlayer() {
         int playerCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
         int playerRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
-        double angle = rand.nextDouble() * Math.PI * 2.0;
-        double distTiles = 8.0 + rand.nextDouble() * 20.0;
-        int col = playerCol + (int) Math.round(Math.cos(angle) * distTiles);
-        int row = playerRow + (int) Math.round(Math.sin(angle) * distTiles);
+        double margin = 80.0;
 
-        TileType tile = tileMap.getTileAt(col, row);
-        BiomeType biome = tileMap.getBiomeAt(col, row);
+        for (int attempt = 0; attempt < 50; attempt++) {
+            double angle = rand.nextDouble() * Math.PI * 2.0;
+            double minOffscreen = (camera != null) ? camera.getMinOffscreenDistance(angle, margin) : 580.0;
+            double distTiles = Math.ceil(minOffscreen / TileMap.TILE_SIZE) + 1.0 + rand.nextDouble() * 14.0;
+            int col = playerCol + (int) Math.round(Math.cos(angle) * distTiles);
+            int row = playerRow + (int) Math.round(Math.sin(angle) * distTiles);
 
-        PassiveAnimalType type;
-        if (tile == TileType.WATER || biome == BiomeType.SWAMP) {
-            type = rand.nextDouble() < 0.65 ? PassiveAnimalType.FROG : PassiveAnimalType.BIRD;
-        } else if (biome == BiomeType.DENSE_FOREST) {
-            type = rand.nextDouble() < 0.60 ? PassiveAnimalType.DEER : (rand.nextBoolean() ? PassiveAnimalType.RABBIT : PassiveAnimalType.BIRD);
-        } else if (biome == BiomeType.MEADOW) {
-            type = rand.nextDouble() < 0.60 ? PassiveAnimalType.RABBIT : PassiveAnimalType.BIRD;
-        } else {
-            type = rand.nextBoolean() ? PassiveAnimalType.RABBIT : PassiveAnimalType.DEER;
+            double wx = col * TileMap.TILE_SIZE + TileMap.TILE_SIZE / 2.0;
+            double wy = row * TileMap.TILE_SIZE + TileMap.TILE_SIZE / 2.0;
+
+            if (camera != null && camera.isPointInView(wx, wy, 60.0)) {
+                continue; // Garante 100% que a fauna passiva NUNCA spawna na tela!
+            }
+
+            TileType tile = tileMap.getTileAt(col, row);
+            BiomeType biome = tileMap.getBiomeAt(col, row);
+
+            PassiveAnimalType type;
+            if (tile == TileType.WATER || biome == BiomeType.SWAMP) {
+                type = rand.nextDouble() < 0.65 ? PassiveAnimalType.FROG : PassiveAnimalType.BIRD;
+            } else if (biome == BiomeType.DENSE_FOREST) {
+                type = rand.nextDouble() < 0.60 ? PassiveAnimalType.DEER : (rand.nextBoolean() ? PassiveAnimalType.RABBIT : PassiveAnimalType.BIRD);
+            } else if (biome == BiomeType.MEADOW) {
+                type = rand.nextDouble() < 0.60 ? PassiveAnimalType.RABBIT : PassiveAnimalType.BIRD;
+            } else {
+                type = rand.nextBoolean() ? PassiveAnimalType.RABBIT : PassiveAnimalType.DEER;
+            }
+
+            if (type != PassiveAnimalType.FROG && !tile.isWalkable()) continue;
+
+            passiveAnimals.add(new PassiveAnimal(type, wx, wy));
+            break;
         }
-
-        if (type != PassiveAnimalType.FROG && !tile.isWalkable()) return;
-
-        double wx = col * TileMap.TILE_SIZE + TileMap.TILE_SIZE / 2.0;
-        double wy = row * TileMap.TILE_SIZE + TileMap.TILE_SIZE / 2.0;
-        passiveAnimals.add(new PassiveAnimal(type, wx, wy));
     }
 
     private void streamFireflies(double dt) {

@@ -91,6 +91,8 @@ public class Camera {
 
     public double getX() { return x; }
     public double getY() { return y; }
+    public double getCenterX() { return x + (getVisibleWidth() / 2.0); }
+    public double getCenterY() { return y + (getVisibleHeight() / 2.0); }
     public double getDeltaX() { return deltaX; }
     public double getDeltaY() { return deltaY; }
     public double getVisibleWidth() { return viewportWidth / zoom; }
@@ -99,4 +101,30 @@ public class Camera {
     public double getViewportHeight() { return viewportHeight; }
     public double getZoom() { return zoom; }
     public void setZoom(double zoom) { this.zoom = zoom; }
+
+    /**
+     * Verifica se uma coordenada do mundo (wx, wy) está dentro da área visível da câmera,
+     * considerando uma margem de segurança ao redor das bordas da tela.
+     */
+    public boolean isPointInView(double wx, double wy, double margin) {
+        double left = x - margin;
+        double right = x + getVisibleWidth() + margin;
+        double top = y - margin;
+        double bottom = y + getVisibleHeight() + margin;
+        return wx >= left && wx <= right && wy >= top && wy <= bottom;
+    }
+
+    /**
+     * Calcula a distância mínima necessária a partir do centro da câmera ao longo de um ângulo
+     * para que um ponto fique completamente fora da tela (além da margem de segurança).
+     */
+    public double getMinOffscreenDistance(double angle, double margin) {
+        double halfW = (getVisibleWidth() / 2.0) + margin;
+        double halfH = (getVisibleHeight() / 2.0) + margin;
+        double cosA = Math.abs(Math.cos(angle));
+        double sinA = Math.abs(Math.sin(angle));
+        double distW = cosA > 0.0001 ? halfW / cosA : Double.MAX_VALUE;
+        double distH = sinA > 0.0001 ? halfH / sinA : Double.MAX_VALUE;
+        return Math.min(distW, distH);
+    }
 }

@@ -70,31 +70,39 @@ public class EcosystemSpawner {
     }
 
     public void spawnReinforcementNearPlayer(TileMap tileMap, List<Enemy> enemies, Player player, double survivalTime) {
+        spawnReinforcementNearPlayer(tileMap, enemies, player, survivalTime, null);
+    }
+
+    public void spawnReinforcementNearPlayer(TileMap tileMap, List<Enemy> enemies, Player player, double survivalTime, Camera camera) {
         int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
         int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
         double scale = 1.0 + (survivalTime / 240.0);
 
         double angle = rand.nextDouble() * Math.PI * 2.0;
-        int sampleCol = pCol + (int) Math.round(Math.cos(angle) * 24.0);
-        int sampleRow = pRow + (int) Math.round(Math.sin(angle) * 24.0);
+        int sampleCol = pCol + (int) Math.round(Math.cos(angle) * 26.0);
+        int sampleRow = pRow + (int) Math.round(Math.sin(angle) * 26.0);
         BiomeType sectorBiome = tileMap.getBiomeAt(sampleCol, sampleRow);
         int roll = rand.nextInt(100);
 
         if (roll < 22) {
             if (rand.nextBoolean() && enemies.size() + 2 <= 24) {
-                spawnHunterAndHoundPair(tileMap, enemies, pCol, pRow, angle, 20, 32, scale);
+                spawnHunterAndHoundPair(tileMap, enemies, pCol, pRow, angle, 20, 36, scale, camera);
             } else {
-                spawnByHabitat(tileMap, enemies, EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, pCol, pRow, angle, 20, 32, scale);
+                spawnByHabitat(tileMap, enemies, EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, pCol, pRow, angle, 20, 36, scale, camera);
             }
         } else if (roll < 42) {
-            spawnByHabitat(tileMap, enemies, EnemyType.HOUND, EnemySkin.HOUND_TRACKER, pCol, pRow, angle, 19, 30, scale);
+            spawnByHabitat(tileMap, enemies, EnemyType.HOUND, EnemySkin.HOUND_TRACKER, pCol, pRow, angle, 20, 34, scale, camera);
         } else {
             EnemySkin skin = EcosystemPlacementHelper.pickWeightedRivalSkin(sectorBiome, rand);
-            spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, skin, pCol, pRow, angle, 17, 30, scale);
+            spawnByHabitat(tileMap, enemies, EnemyType.RIVAL, skin, pCol, pRow, angle, 18, 34, scale, camera);
         }
     }
 
     public void spawnApexBossNearPlayer(TileMap tileMap, List<Enemy> enemies, Player player, double survivalTime) {
+        spawnApexBossNearPlayer(tileMap, enemies, player, survivalTime, null);
+    }
+
+    public void spawnApexBossNearPlayer(TileMap tileMap, List<Enemy> enemies, Player player, double survivalTime, Camera camera) {
         long activeBosses = enemies.stream()
             .filter(e -> e.getType() == EnemyType.BEAR_BOSS && e.getHp() > 0)
             .count();
@@ -106,13 +114,13 @@ public class EcosystemSpawner {
 
         BiomeType playerBiome = tileMap.getBiomeAt(pCol, pRow);
         BossArchetype preferred = BossArchetype.forBiome(playerBiome);
-        if (spawnBossInNativeBiome(tileMap, enemies, preferred.toSkin(), pCol, pRow, 22, 46, scale) != null) {
+        if (spawnBossInNativeBiome(tileMap, enemies, preferred.toSkin(), pCol, pRow, 24, 48, scale, camera) != null) {
             return;
         }
 
         for (EnemySkin candidateSkin : new EnemySkin[]{EnemySkin.CROCODILE, EnemySkin.PANTHER, EnemySkin.BEAR, EnemySkin.POLAR_BEAR}) {
             if (candidateSkin != preferred.toSkin()
-                    && spawnBossInNativeBiome(tileMap, enemies, candidateSkin, pCol, pRow, 24, 52, scale) != null) {
+                    && spawnBossInNativeBiome(tileMap, enemies, candidateSkin, pCol, pRow, 26, 54, scale, camera) != null) {
                 return;
             }
         }
@@ -120,6 +128,11 @@ public class EcosystemSpawner {
 
     private Enemy spawnBossInNativeBiome(TileMap tileMap, List<Enemy> enemies, EnemySkin bossSkin,
                                          int centerCol, int centerRow, int minRadiusTiles, int maxRadiusTiles, double scale) {
+        return spawnBossInNativeBiome(tileMap, enemies, bossSkin, centerCol, centerRow, minRadiusTiles, maxRadiusTiles, scale, null);
+    }
+
+    private Enemy spawnBossInNativeBiome(TileMap tileMap, List<Enemy> enemies, EnemySkin bossSkin,
+                                         int centerCol, int centerRow, int minRadiusTiles, int maxRadiusTiles, double scale, Camera camera) {
         BiomeType targetBiome = BossArchetype.fromSkin(bossSkin).getNativeBiome();
         int bestCol = Integer.MIN_VALUE;
         int bestRow = Integer.MIN_VALUE;
@@ -127,9 +140,21 @@ public class EcosystemSpawner {
 
         for (int attempt = 0; attempt < 180; attempt++) {
             double angle = rand.nextDouble() * Math.PI * 2.0;
-            double distTiles = minRadiusTiles + rand.nextDouble() * (maxRadiusTiles - minRadiusTiles);
+            int effectiveMin = minRadiusTiles;
+            if (camera != null) {
+                double minOffscreen = camera.getMinOffscreenDistance(angle, 80.0);
+                effectiveMin = Math.max(minRadiusTiles, (int) Math.ceil(minOffscreen / TileMap.TILE_SIZE) + 1);
+            }
+            int effectiveMax = Math.max(maxRadiusTiles, effectiveMin + 14);
+            double distTiles = effectiveMin + rand.nextDouble() * (effectiveMax - effectiveMin);
             int c = centerCol + (int) Math.round(Math.cos(angle) * distTiles);
             int r = centerRow + (int) Math.round(Math.sin(angle) * distTiles);
+
+            double wx = c * TileMap.TILE_SIZE + 16.0;
+            double wy = r * TileMap.TILE_SIZE + 16.0;
+            if (camera != null && camera.isPointInView(wx, wy, 70.0)) {
+                continue; // Garante que chefes nunca aparecem na tela do jogador
+            }
 
             if (!EcosystemPlacementHelper.isTileClearAndUncrowded(
                     tileMap, enemies, c, r, MIN_ENEMY_SEPARATION, CROWD_CHECK_RADIUS, MAX_CROWD_NEIGHBORS)
@@ -163,22 +188,34 @@ public class EcosystemSpawner {
 
     private void spawnHunterAndHoundPair(TileMap tileMap, List<Enemy> enemies, int centerCol, int centerRow,
                                          double baseAngle, int minRadiusTiles, int maxRadiusTiles, double scale) {
+        spawnHunterAndHoundPair(tileMap, enemies, centerCol, centerRow, baseAngle, minRadiusTiles, maxRadiusTiles, scale, null);
+    }
+
+    private void spawnHunterAndHoundPair(TileMap tileMap, List<Enemy> enemies, int centerCol, int centerRow,
+                                         double baseAngle, int minRadiusTiles, int maxRadiusTiles, double scale, Camera camera) {
         Enemy hunter = spawnByHabitat(tileMap, enemies, EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER,
-                                      centerCol, centerRow, baseAngle, minRadiusTiles, maxRadiusTiles, scale);
+                                      centerCol, centerRow, baseAngle, minRadiusTiles, maxRadiusTiles, scale, camera);
         if (hunter == null) return;
 
         int hCol = (int) Math.floor(hunter.getX() / TileMap.TILE_SIZE);
         int hRow = (int) Math.floor(hunter.getY() / TileMap.TILE_SIZE);
-        for (int tries = 0; tries < 20; tries++) {
+        for (int tries = 0; tries < 25; tries++) {
             double offsetAngle = rand.nextDouble() * Math.PI * 2.0;
-            double offsetDist = 2.4 + rand.nextDouble() * 1.4; // 76..122 px do caçador (sem empilhar)
+            double offsetDist = 2.4 + rand.nextDouble() * 1.5; // 76..125 px do caçador (sem empilhar)
             int c = hCol + (int) Math.round(Math.cos(offsetAngle) * offsetDist);
             int r = hRow + (int) Math.round(Math.sin(offsetAngle) * offsetDist);
+            double houndWx = c * TileMap.TILE_SIZE + 16.0;
+            double houndWy = r * TileMap.TILE_SIZE + 16.0;
+
+            if (camera != null && camera.isPointInView(houndWx, houndWy, 60.0)) {
+                continue;
+            }
+
             if (EcosystemPlacementHelper.isTileClearAndUncrowded(
                     tileMap, enemies, c, r, MIN_ENEMY_SEPARATION, CROWD_CHECK_RADIUS, MAX_CROWD_NEIGHBORS, hunter, 72.0)) {
                 Enemy hound = new Enemy(
                     EnemyType.HOUND, EnemySkin.HOUND_TRACKER, hunter.getVariant(),
-                    c * TileMap.TILE_SIZE + 16.0, r * TileMap.TILE_SIZE + 16.0, scale, scale
+                    houndWx, houndWy, scale, scale
                 );
                 enemies.add(hound);
                 break;
@@ -189,17 +226,35 @@ public class EcosystemSpawner {
     public Enemy spawnByHabitat(TileMap tileMap, List<Enemy> enemies, EnemyType type, EnemySkin skin,
                                 int centerCol, int centerRow, double preferredAngle,
                                 int minRadiusTiles, int maxRadiusTiles, double scale) {
+        return spawnByHabitat(tileMap, enemies, type, skin, centerCol, centerRow, preferredAngle, minRadiusTiles, maxRadiusTiles, scale, null);
+    }
+
+    public Enemy spawnByHabitat(TileMap tileMap, List<Enemy> enemies, EnemyType type, EnemySkin skin,
+                                int centerCol, int centerRow, double preferredAngle,
+                                int minRadiusTiles, int maxRadiusTiles, double scale, Camera camera) {
         int bestCol = Integer.MIN_VALUE;
         int bestRow = Integer.MIN_VALUE;
         int bestScore = -1;
 
-        for (int attempt = 0; attempt < 55; attempt++) {
+        for (int attempt = 0; attempt < 65; attempt++) {
             double angleSpread = (attempt < 18) ? 0.65 : Math.PI;
             double angle = preferredAngle + (rand.nextDouble() * 2.0 - 1.0) * angleSpread;
-            double distTiles = minRadiusTiles + rand.nextDouble() * (maxRadiusTiles - minRadiusTiles);
+            int effectiveMin = minRadiusTiles;
+            if (camera != null) {
+                double minOffscreen = camera.getMinOffscreenDistance(angle, 80.0);
+                effectiveMin = Math.max(minRadiusTiles, (int) Math.ceil(minOffscreen / TileMap.TILE_SIZE) + 1);
+            }
+            int effectiveMax = Math.max(maxRadiusTiles, effectiveMin + 14);
+            double distTiles = effectiveMin + rand.nextDouble() * (effectiveMax - effectiveMin);
 
             int c = centerCol + (int) Math.round(Math.cos(angle) * distTiles);
             int r = centerRow + (int) Math.round(Math.sin(angle) * distTiles);
+
+            double wx = c * TileMap.TILE_SIZE + 16.0;
+            double wy = r * TileMap.TILE_SIZE + 16.0;
+            if (camera != null && camera.isPointInView(wx, wy, 60.0)) {
+                continue; // Garante que inimigos nunca spawnam dentro da visão da câmera
+            }
 
             if (!EcosystemPlacementHelper.isTileClearAndUncrowded(
                     tileMap, enemies, c, r, MIN_ENEMY_SEPARATION, CROWD_CHECK_RADIUS, MAX_CROWD_NEIGHBORS)) {
@@ -247,12 +302,17 @@ public class EcosystemSpawner {
         return true;
     }
 
-    public void spawnFoodNearPlayer(TileMap tileMap, List<FoodItem> foodItems, int playerCol, int playerRow) {
-        spawnFoodNearPlayer(tileMap, foodItems, playerCol, playerRow, 7.0, 32.0, 128.0);
+    public FoodItem spawnFoodNearPlayer(TileMap tileMap, List<FoodItem> foodItems, int playerCol, int playerRow) {
+        return spawnFoodNearPlayer(tileMap, foodItems, playerCol, playerRow, 7.0, 32.0, 128.0, true);
     }
 
-    private void spawnFoodNearPlayer(TileMap tileMap, List<FoodItem> foodItems, int playerCol, int playerRow,
+    public FoodItem spawnFoodNearPlayer(TileMap tileMap, List<FoodItem> foodItems, int playerCol, int playerRow,
                                      double minDistTiles, double maxDistTiles, double minSpacingPx) {
+        return spawnFoodNearPlayer(tileMap, foodItems, playerCol, playerRow, minDistTiles, maxDistTiles, minSpacingPx, false);
+    }
+
+    public FoodItem spawnFoodNearPlayer(TileMap tileMap, List<FoodItem> foodItems, int playerCol, int playerRow,
+                                     double minDistTiles, double maxDistTiles, double minSpacingPx, boolean animateSpawn) {
         for (int tries = 0; tries < 55; tries++) {
             double angle = rand.nextDouble() * Math.PI * 2.0;
             double dist = minDistTiles + rand.nextDouble() * (maxDistTiles - minDistTiles);
@@ -279,25 +339,43 @@ public class EcosystemSpawner {
                     }
                 }
                 if (!tooClose) {
-                    foodItems.add(new FoodItem(c, r, FoodVariant.pickForBiome(biome, rand)));
-                    break;
+                    FoodItem created = new FoodItem(c, r, FoodVariant.pickForBiome(biome, rand), animateSpawn);
+                    foodItems.add(created);
+                    return created;
                 }
             }
         }
+        return null;
     }
 
     public void spawnBurrowInSector(TileMap tileMap, List<Burrow> burrows, int centerCol, int centerRow,
                                     double sectorAngle, int minDist, int maxDist) {
-        for (int tries = 0; tries < 28; tries++) {
+        spawnBurrowInSector(tileMap, burrows, centerCol, centerRow, sectorAngle, minDist, maxDist, null);
+    }
+
+    public void spawnBurrowInSector(TileMap tileMap, List<Burrow> burrows, int centerCol, int centerRow,
+                                    double sectorAngle, int minDist, int maxDist, Camera camera) {
+        for (int tries = 0; tries < 32; tries++) {
             double angle = sectorAngle + (rand.nextDouble() - 0.5) * (Math.PI / 3.0);
-            double dist = minDist + rand.nextDouble() * (maxDist - minDist);
+            int effectiveMin = minDist;
+            if (camera != null) {
+                double minOffscreen = camera.getMinOffscreenDistance(angle, 70.0);
+                effectiveMin = Math.max(minDist, (int) Math.ceil(minOffscreen / TileMap.TILE_SIZE) + 1);
+            }
+            int effectiveMax = Math.max(maxDist, effectiveMin + 12);
+            double dist = effectiveMin + rand.nextDouble() * (effectiveMax - effectiveMin);
             int c = centerCol + (int) Math.round(Math.cos(angle) * dist);
             int r = centerRow + (int) Math.round(Math.sin(angle) * dist);
 
+            double wx = c * TileMap.TILE_SIZE + 16;
+            double wy = r * TileMap.TILE_SIZE + 16;
+
+            if (camera != null && camera.isPointInView(wx, wy, 50.0)) {
+                continue;
+            }
+
             TileType t = tileMap.getTileAt(c, r);
             if (t == TileType.GRASS || t == TileType.TALL_GRASS) {
-                double wx = c * TileMap.TILE_SIZE + 16;
-                double wy = r * TileMap.TILE_SIZE + 16;
                 boolean tooClose = false;
                 for (Burrow b : burrows) {
                     if (Math.hypot(b.getX() - wx, b.getY() - wy) < 170.0) {

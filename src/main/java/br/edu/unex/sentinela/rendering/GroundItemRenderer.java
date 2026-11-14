@@ -100,6 +100,25 @@ public class GroundItemRenderer {
     }
 
     public void drawBerryBush(FoodItem food, double fx, double fy, double sunOffsetX, double sunOffsetY) {
+        double popScale = (food != null) ? food.getPopScale() : 1.0;
+        double spawnProg = (food != null) ? food.getSpawnProgress() : 1.0;
+        boolean popping = (popScale < 0.999 || spawnProg < 0.999);
+
+        if (popping) {
+            gc.save();
+            gc.translate(fx, fy);
+            gc.scale(popScale, popScale);
+            gc.translate(-fx, -fy);
+            gc.setGlobalAlpha(Math.min(1.0, spawnProg * 1.5));
+
+            // Efeito visual orgânico de broto/nascimento no solo durante o popup
+            double haloR = 15.0 * Math.sin(spawnProg * Math.PI);
+            if (haloR > 0.5) {
+                gc.setFill(Color.web("#81C784", 0.35 * Math.sin(spawnProg * Math.PI)));
+                gc.fillOval(fx - haloR, fy - haloR * 0.5, haloR * 2.0, haloR);
+            }
+        }
+
         FoodVariant variant = (food != null) ? food.getVariant() : FoodVariant.WILD_APPLE;
         Color leafDark = Color.web(variant.getBushDarkHex());
         Color leafMid = leafDark.deriveColor(4, 0.95, 1.42, 1.0);
@@ -143,6 +162,10 @@ public class GroundItemRenderer {
             drawSingleBerry(fx + 3, fy - 5, 4.8, berryDark, berryMid, berrySpec);
             drawSingleBerry(fx + 5, fy + 0, 4.5, berryDark, berryMid, berrySpec);
             drawSingleBerry(fx - 2, fy + 2, 4.8, berryDark, berryMid, berrySpec);
+        }
+
+        if (popping) {
+            gc.restore();
         }
     }
 
@@ -200,10 +223,21 @@ public class GroundItemRenderer {
         MeatTier tier = (meat != null) ? meat.getTier() : MeatTier.SMALL_CUT;
         EnemySkin skin = (meat != null) ? meat.getSourceSkin() : null;
         boolean expiringSoon = meat != null && meat.getLifeTime() < 6.0;
+        double hopY = (meat != null) ? meat.getDropHopY() : 0.0;
+        double dropScale = (meat != null) ? meat.getDropScale() : 1.0;
+        boolean hasDropFx = (Math.abs(hopY) > 0.05 || dropScale < 0.999);
+        boolean needSave = expiringSoon || hasDropFx;
 
-        if (expiringSoon) {
+        if (needSave) {
             gc.save();
-            gc.setGlobalAlpha(0.45 + 0.55 * (0.5 + 0.5 * Math.sin(animTime * 12.0)));
+            if (expiringSoon) {
+                gc.setGlobalAlpha(0.45 + 0.55 * (0.5 + 0.5 * Math.sin(animTime * 12.0)));
+            }
+            if (hasDropFx) {
+                gc.translate(mx, my + hopY);
+                gc.scale(dropScale, dropScale);
+                gc.translate(-mx, -my);
+            }
         }
 
         switch (tier) {
@@ -225,7 +259,7 @@ public class GroundItemRenderer {
                 break;
         }
 
-        if (expiringSoon) {
+        if (needSave) {
             gc.restore();
         }
     }

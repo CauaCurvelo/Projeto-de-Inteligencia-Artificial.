@@ -12,6 +12,7 @@ public class MeatItem {
     private final EnemySkin sourceSkin;
     private boolean eaten = false;
     private double lifeTime;
+    private double dropAge = 0.0;
 
     public MeatItem(double x, double y) {
         this(x, y, MeatTier.SMALL_CUT, null);
@@ -26,10 +27,23 @@ public class MeatItem {
     }
 
     public void update(double deltaTime) {
+        dropAge += deltaTime;
         lifeTime -= deltaTime;
         if (lifeTime <= 0) {
             eaten = true;
         }
+    }
+
+    public double getDropHopY() {
+        if (dropAge >= 0.38) return 0.0;
+        double t = dropAge / 0.38;
+        return -Math.sin(t * Math.PI) * 9.0;
+    }
+
+    public double getDropScale() {
+        if (dropAge >= 0.38) return 1.0;
+        double t = dropAge / 0.38;
+        return Math.min(1.15, t * 1.30);
     }
 
     public double getX() { return x; }
