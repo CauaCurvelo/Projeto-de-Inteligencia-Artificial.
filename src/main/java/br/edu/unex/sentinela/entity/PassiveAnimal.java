@@ -173,9 +173,28 @@ public class PassiveAnimal {
         }
 
         // 5. Mecânica de Saltos (Coelhos e Sapos)
-        if (type == PassiveAnimalType.RABBIT || type == PassiveAnimalType.FROG) {
-            hopTimer += dt * (state == State.FLEEING ? 9.5 : 4.5);
-            hopHeight = Math.max(0.0, Math.sin(hopTimer) * (type == PassiveAnimalType.RABBIT ? 7.0 : 4.5));
+        if (moving) {
+            if (type == PassiveAnimalType.FROG) {
+                // Sapos saltam em impulsos discretos: fase aérea com pernas esticadas e pausa no solo com pernas dobradas
+                hopTimer += dt * (state == State.FLEEING ? 8.0 : 4.5);
+                double cycle = hopTimer % (Math.PI * 2.0);
+                if (cycle < Math.PI) {
+                    hopHeight = Math.sin(cycle) * (state == State.FLEEING ? 8.5 : 5.0);
+                } else {
+                    hopHeight = 0.0;
+                    vx *= 0.40;
+                    vy *= 0.40;
+                }
+            } else if (type == PassiveAnimalType.RABBIT) {
+                hopTimer += dt * (state == State.FLEEING ? 9.5 : 5.0);
+                double sinH = Math.sin(hopTimer);
+                hopHeight = sinH > 0.0 ? sinH * (state == State.FLEEING ? 7.0 : 4.0) : 0.0;
+            } else {
+                hopHeight = 0.0;
+            }
+        } else {
+            hopTimer = 0.0;
+            hopHeight = 0.0;
         }
 
         // 6. Aplicação de Movimento e Colisão

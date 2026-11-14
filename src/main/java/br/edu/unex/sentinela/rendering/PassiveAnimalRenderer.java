@@ -289,34 +289,43 @@ public class PassiveAnimalRenderer {
     }
 
     private void drawFrogTopDown(double walk, double breath, double hop, boolean moving, boolean alert, double breathTimer) {
-        boolean inHop = hop > 0.4 || moving;
+        // Estica as pernas traseiras estritamente quando está no ar durante o salto (hop > 1.2)
+        boolean inHop = hop > 1.2;
         double throatPulse = 0.5 + 0.5 * Math.sin(breathTimer * 6.5);
 
         // 1. Pernas Traseiras Anfíbias Articuladas
-        gc.setStroke(Color.web("#1B5E20"));
-        gc.setLineWidth(2.4);
-
         if (inHop) {
-            double legKick = Math.sin(walk * 2.0) * 3.0;
-            gc.strokeLine(-4.0, -4.5, -12.0 - legKick, -5.5);
-            gc.strokeLine(-12.0 - legKick, -5.5, -17.0 - legKick, -3.5);
-            gc.strokeLine(-4.0, 4.5, -12.0 - legKick, 5.5);
-            gc.strokeLine(-12.0 - legKick, 5.5, -17.0 - legKick, 3.5);
+            // Esticadas para trás com propulsão elástica no pulo
+            double legKick = Math.min(6.0, hop * 0.9);
+            gc.setStroke(Color.web("#1B5E20"));
+            gc.setLineWidth(2.4);
+            gc.strokeLine(-4.0, -4.5, -11.0 - legKick, -5.5);
+            gc.strokeLine(-11.0 - legKick, -5.5, -17.0 - legKick * 1.2, -3.5);
+            gc.strokeLine(-4.0, 4.5, -11.0 - legKick, 5.5);
+            gc.strokeLine(-11.0 - legKick, 5.5, -17.0 - legKick * 1.2, 3.5);
 
             gc.setFill(Color.web("#2E7D32"));
-            gc.fillPolygon(new double[]{-16.0 - legKick, -20.0 - legKick, -19.0 - legKick},
+            gc.fillPolygon(new double[]{-16.0 - legKick * 1.2, -20.5 - legKick * 1.2, -19.0 - legKick * 1.2},
                            new double[]{-3.5, -6.0, -1.0}, 3);
-            gc.fillPolygon(new double[]{-16.0 - legKick, -20.0 - legKick, -19.0 - legKick},
+            gc.fillPolygon(new double[]{-16.0 - legKick * 1.2, -20.5 - legKick * 1.2, -19.0 - legKick * 1.2},
                            new double[]{3.5, 6.0, 1.0}, 3);
         } else {
-            gc.strokeLine(-3.0, -4.5, -7.0, -8.5);
-            gc.strokeLine(-7.0, -8.5, -4.0, -9.5);
-            gc.strokeLine(-3.0, 4.5, -7.0, 8.5);
-            gc.strokeLine(-7.0, 8.5, -4.0, 9.5);
+            // Dobradas em "Z" anatômico ao lado dos quadris em repouso no solo
+            gc.setStroke(Color.web("#1B5E20"));
+            gc.setLineWidth(2.4);
+            gc.strokeLine(-2.5, -4.5, -6.5, -7.5);
+            gc.strokeLine(-6.5, -7.5, -3.0, -8.5);
+            gc.strokeLine(-2.5, 4.5, -6.5, 7.5);
+            gc.strokeLine(-6.5, 7.5, -3.0, 8.5);
 
+            // Coxas musculosas dobradas
             gc.setFill(Color.web("#2E7D32"));
-            gc.fillOval(-5.5, -11.0, 4.0, 3.0);
-            gc.fillOval(-5.5, 8.0, 4.0, 3.0);
+            gc.fillOval(-6.0, -7.8, 5.0, 3.8);
+            gc.fillOval(-6.0, 4.0, 5.0, 3.8);
+
+            // Pés palmados apoiados no solo
+            gc.fillOval(-4.5, -9.8, 3.8, 2.8);
+            gc.fillOval(-4.5, 7.0, 3.8, 2.8);
         }
 
         // 2. Patas Dianteiras Pequenas
