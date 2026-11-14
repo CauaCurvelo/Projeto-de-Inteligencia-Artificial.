@@ -19,7 +19,8 @@ import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
 
 /**
- * Vitrine animada em Obsidian Spotlight com suporte a Jogador, Inimigos/Chefes e Fauna Passiva,
+ * Vitrine animada em Obsidian Spotlight com suporte a Jogador, Inimigos/Chefes
+ * e Fauna Passiva,
  * com silhueta misteriosa para criaturas ainda não desbloqueadas por abate.
  */
 public class CreaturePreviewRenderer extends Canvas {
@@ -55,11 +56,13 @@ public class CreaturePreviewRenderer extends Canvas {
     }
 
     public void start() {
-        if (timer != null) timer.start();
+        if (timer != null)
+            timer.start();
     }
 
     public void stop() {
-        if (timer != null) timer.stop();
+        if (timer != null)
+            timer.stop();
     }
 
     private void setupTimer() {
@@ -68,7 +71,8 @@ public class CreaturePreviewRenderer extends Canvas {
 
             @Override
             public void handle(long now) {
-                if (lastNs == 0) lastNs = now;
+                if (lastNs == 0)
+                    lastNs = now;
                 double dt = Math.min(0.05, (now - lastNs) * 1e-9);
                 lastNs = now;
                 animTime += dt;
@@ -102,8 +106,7 @@ public class CreaturePreviewRenderer extends Canvas {
                 0, 0, w * 0.5, h * 0.48, w * 0.54, false, CycleMethod.NO_CYCLE,
                 new Stop(0.0, isUnlocked ? Color.web("#182520") : Color.web("#111827")),
                 new Stop(0.65, isUnlocked ? Color.web("#0D1412") : Color.web("#0B0F17")),
-                new Stop(1.0, Color.web("#070B0A"))
-        );
+                new Stop(1.0, Color.web("#070B0A")));
         gc.setFill(bg);
         gc.fillRoundRect(0, 0, w, h, 14, 14);
 
@@ -111,7 +114,8 @@ public class CreaturePreviewRenderer extends Canvas {
         gc.setLineWidth(1.0);
         gc.strokeRoundRect(0.5, 0.5, w - 1.0, h - 1.0, 14, 14);
 
-        if (currentCreature == null) return;
+        if (currentCreature == null)
+            return;
 
         double cx = w * 0.5;
         double cy = h * 0.51;
@@ -122,10 +126,14 @@ public class CreaturePreviewRenderer extends Canvas {
             spriteScale = 1.52;
         } else if (isPassive) {
             PassiveAnimalType pt = currentCreature.getPassiveType();
-            if (pt == PassiveAnimalType.DEER) spriteScale = 1.62;
-            else if (pt == PassiveAnimalType.RABBIT) spriteScale = 2.40;
-            else if (pt == PassiveAnimalType.FROG) spriteScale = 2.50;
-            else if (pt == PassiveAnimalType.BIRD) spriteScale = 2.35;
+            if (pt == PassiveAnimalType.DEER)
+                spriteScale = 1.62;
+            else if (pt == PassiveAnimalType.RABBIT)
+                spriteScale = 2.40;
+            else if (pt == PassiveAnimalType.FROG)
+                spriteScale = 2.50;
+            else if (pt == PassiveAnimalType.BIRD)
+                spriteScale = 2.35;
         }
 
         // Pedestal discreto iluminado
@@ -139,7 +147,8 @@ public class CreaturePreviewRenderer extends Canvas {
         gc.translate(cx, cy);
         gc.scale(spriteScale, spriteScale);
 
-        // Se a criatura ainda não foi derrotada pelo jogador, exibe em silhueta misteriosa
+        // Se a criatura ainda não foi derrotada pelo jogador, exibe em silhueta
+        // misteriosa
         if (!isUnlocked) {
             gc.setGlobalAlpha(0.20);
         }

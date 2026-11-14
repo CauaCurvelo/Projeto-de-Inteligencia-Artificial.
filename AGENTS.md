@@ -360,3 +360,21 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
 - **Medalhões Vetoriais Exclusivos ([UiTrophyEmblem.java](src/main/java/br/edu/unex/sentinela/ui/UiTrophyEmblem.java), [AchievementVisualCatalog.java](src/main/java/br/edu/unex/sentinela/ui/AchievementVisualCatalog.java)):**
   - Adicionados emblemas desenhados proceduralmente em Canvas para as novas conquistas: floco de gelo cristalino (`SNOWFLAKE`), escudo heráldico de sobrevivência (`SHIELD`), pluma silvestre (`FEATHER`) e rosa dos ventos / bússola de exploração (`COMPASS`).
 
+## Feature / Polish: Inteligência de Fuga da Fauna Passiva, Sensores Feeler/Whiskers e Deslizamento em Paredes
+- **Navegação Preditiva por Whiskers em Leque ([PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java)):**
+  - Implementado sistema de **13 sensores de feixe (whiskers)** em leque cobrindo 0°, ±20°, ±40°, ±60°, ±80°, ±105° e ±130° com amostragem a 3 profundidades (perto, média e longe: 36px a 62px à frente).
+  - A presa detecta antecipadamente paredões rochosos, árvores, troncos e águas profundas antes de tocá-los, calculando a melhor rota de fuga ponderando desobstrução, afastamento do predador e inércia do movimento.
+  - Curvas orgânicas com interpolação angular suave (`turnRate` de 13.0 a 20.0), permitindo contornar escarpamentos e renques de árvores sem solavancos.
+- **Detecção de Quinas e Juke Evasivo Reflexo ([PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java)):**
+  - Monitoramento contínuo de avanço físico real (`stuckTimer`): se a presa for encurralada contra um beco sem saída ou quina fechada e seu deslocamento cair por mais de 0.16s, ela dispara um **Juke Evasivo Reflexo**.
+  - O juke varre 360° em busca do corredor de maior vazão, bloqueia temporariamente a nova trajetória (`evasiveJukeTimer = 0.38s`) e aplica um impulso de arrancada (`1.25x` a `1.35x` da velocidade), escapando da armadilha sem oscilar.
+- **Deslizamento Físico em Paredes (Wall Sliding) e Raio Anatômico ([PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java)):**
+  - `moveWithCollisionSlide`: substituição da checagem em ponto único por raio de colisão anatômico (`r` de 4.5px a 10.0px) com verificação em 5 pontos do perímetro.
+  - Decomposição de movimento independente em X e Y, permitindo que a presa continue correndo e deslize suavemente pela superfície de obstáculos diagonais e quinas sem travar.
+- **Aprimoramento de Comportamento por Espécie ([PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java)):**
+  - **Sapos (`FROG`):** Na água nadam em linha contínua sem interrupção de pulo (`hopHeight = 0`), gerando ondulações suaves. Em terra, priorizam fortemente rotas que levem a remansos e canais de água.
+  - **Coelhos (`RABBIT`):** Mantêm zigue-zague ágil em campo aberto, buscam cobertura em vegetação alta (`TALL_GRASS`) e executam curvas fechadas imediatas ao avistar obstáculos.
+  - **Cervos (`DEER`):** Longo alcance de visão preventiva com sensores estendidos para 62px, permitindo correr em alta velocidade pelas trilhas e clareiras sem bater em árvores.
+- **Segurança de Spawn no Mundo ([World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - Validação rigorosa em `spawnPassiveAnimalNearPlayer`: verificação de quadrante livre de obstáculos ao redor do ponto de criação, impedindo que qualquer animal passivo ou ave nasça preso em granito, árvores ou água profunda.
+

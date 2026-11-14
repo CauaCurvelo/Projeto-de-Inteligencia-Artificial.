@@ -791,7 +791,19 @@ public class World {
                 type = rand.nextBoolean() ? PassiveAnimalType.RABBIT : PassiveAnimalType.DEER;
             }
 
-            if (type != PassiveAnimalType.FROG && !tile.isWalkable()) continue;
+            // Validação estrita de terreno para nunca criar animais presos em árvores/rochedos ou aves submersas
+            if (type == PassiveAnimalType.FROG) {
+                if (!tile.isWalkable() && tile != TileType.WATER) continue;
+            } else {
+                if (!tile.isWalkable()) continue;
+            }
+
+            if (tile != TileType.WATER) {
+                if (!tileMap.isWalkable(wx - 8.0, wy - 8.0) || !tileMap.isWalkable(wx + 8.0, wy + 8.0)
+                        || !tileMap.isWalkable(wx - 8.0, wy + 8.0) || !tileMap.isWalkable(wx + 8.0, wy - 8.0)) {
+                    continue;
+                }
+            }
 
             passiveAnimals.add(new PassiveAnimal(type, wx, wy));
             break;

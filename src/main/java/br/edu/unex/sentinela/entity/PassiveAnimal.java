@@ -41,6 +41,11 @@ public class PassiveAnimal {
 
     private State state = State.FORAGING;
     private double stateTimer = 0.0;
+    private double fleeDuration = 0.0;
+    private double stuckTimer = 0.0;
+    private double evasiveJukeTimer = 0.0;
+    private double evasiveHeading = 0.0;
+    private double targetHeading = 0.0;
     private double animPhase = 0.0;
     private double hopTimer = 0.0;
     private double hopHeight = 0.0;
@@ -57,6 +62,7 @@ public class PassiveAnimal {
         this.hp = this.type.getMaxHp();
         this.stateTimer = 1.0 + RAND.nextDouble() * 2.0;
         this.visualAngle = RAND.nextDouble() * Math.PI * 2.0 - Math.PI;
+        this.targetHeading = this.visualAngle;
         this.faceDx = Math.cos(visualAngle);
         this.faceDy = Math.sin(visualAngle);
         this.breathTimer = RAND.nextDouble() * 5.0;
@@ -128,21 +134,31 @@ public class PassiveAnimal {
                 visualAngle = awayAngle;
                 return;
             } else {
-                state = State.FLEEING;
-                // Cervo emite sinal de alerta e assusta outros animais passivos no raio de 150px
+                if (state != State.FLEEING) {
+                    state = State.FLEEING;
+                    fleeDuration = 3.2 + RAND.nextDouble() * 1.6;
+                } else {
+                    fleeDuration = Math.max(fleeDuration, 2.0);
+                }
+                // Cervo emite sinal de alerta e assusta outros animais passivos no raio de 160px
                 if (type == PassiveAnimalType.DEER && allPassives != null) {
                     for (PassiveAnimal other : allPassives) {
                         if (other == this || other.isDespawned()) continue;
                         double dOther = Math.hypot(other.getX() - x, other.getY() - y);
-                        if (dOther < 150.0 && other.getState() != State.FLEEING) {
+                        if (dOther < 160.0 && other.getState() != State.FLEEING) {
                             other.triggerAlertFlee(threatX, threatY);
                         }
                     }
                 }
             }
-        } else if (state == State.FLEEING && stateTimer <= 0) {
-            state = State.ALERT;
-            stateTimer = 1.2 + RAND.nextDouble() * 1.5;
+        } else if (state == State.FLEEING) {
+            fleeDuration -= dt;
+            if (fleeDuration <= 0) {
+                state = State.ALERT;
+                stateTimer = 1.3 + RAND.nextDouble() * 1.2;
+                vx *= 0.40;
+                vy *= 0.40;
+            }
         } else if (state == State.ALERT && stateTimer <= 0) {
             state = State.FORAGING;
             stateTimer = 2.0 + RAND.nextDouble() * 3.0;
@@ -154,8 +170,8 @@ public class PassiveAnimal {
                 updateForaging(dt, tileMap);
                 break;
             case ALERT:
-                vx *= 0.85;
-                vy *= 0.85;
+                vx *= 0.82;
+                vy *= 0.82;
                 if (sensedThreat) {
                     double targetAngle = Math.atan2(threatY - y, threatX - x);
                     visualAngle = lerpAngle(visualAngle, targetAngle, Math.min(1.0, dt * 12.0));
@@ -170,40 +186,32 @@ public class PassiveAnimal {
                 break;
         }
 
-        // 4. Velocidade, Rotação e Ciclos de Animação
+        // 4. Mecânica de Locomoção e Saltos (Coelhos e Sapos)
         double curSpeed = Math.hypot(vx, vy);
         moving = curSpeed > 2.0;
 
         if (moving) {
-            double moveAngle = Math.atan2(vy, vx);
-            double turnRate = (state == State.FLEEING ? 16.0 : 8.0);
-            visualAngle = lerpAngle(visualAngle, moveAngle, Math.min(1.0, dt * turnRate));
-            faceDx = Math.cos(visualAngle);
-            faceDy = Math.sin(visualAngle);
-            walkPhase += curSpeed * dt * (type == PassiveAnimalType.DEER ? 0.11 : 0.15);
-        } else {
-            if (type == PassiveAnimalType.BIRD && state == State.FORAGING) {
-                peckTimer += dt * 3.8;
-            }
-        }
-
-        // 5. Mecânica de Saltos (Coelhos e Sapos)
-        if (moving) {
             if (type == PassiveAnimalType.FROG) {
-                // Sapos saltam em impulsos discretos: fase aérea com pernas esticadas e pausa no solo com pernas dobradas
-                hopTimer += dt * (state == State.FLEEING ? 8.0 : 4.5);
-                double cycle = hopTimer % (Math.PI * 2.0);
-                if (cycle < Math.PI) {
-                    hopHeight = Math.sin(cycle) * (state == State.FLEEING ? 8.5 : 5.0);
+                int col = (int) Math.floor(x / TileMap.TILE_SIZE);
+                int row = (int) Math.floor(y / TileMap.TILE_SIZE);
+                boolean inWater = (tileMap.getTileAt(col, row) == TileType.WATER);
+                if (inWater) {
+                    hopHeight = 0.0; // Na água desliza e nada sem pausas no solo
                 } else {
-                    hopHeight = 0.0;
-                    vx *= 0.40;
-                    vy *= 0.40;
+                    hopTimer += dt * (state == State.FLEEING ? 8.2 : 4.5);
+                    double cycle = hopTimer % (Math.PI * 2.0);
+                    if (cycle < Math.PI) {
+                        hopHeight = Math.sin(cycle) * (state == State.FLEEING ? 8.5 : 5.0);
+                    } else {
+                        hopHeight = 0.0;
+                        vx *= 0.45;
+                        vy *= 0.45;
+                    }
                 }
             } else if (type == PassiveAnimalType.RABBIT) {
-                hopTimer += dt * (state == State.FLEEING ? 9.5 : 5.0);
+                hopTimer += dt * (state == State.FLEEING ? 9.6 : 5.0);
                 double sinH = Math.sin(hopTimer);
-                hopHeight = sinH > 0.0 ? sinH * (state == State.FLEEING ? 7.0 : 4.0) : 0.0;
+                hopHeight = sinH > 0.0 ? sinH * (state == State.FLEEING ? 7.2 : 4.0) : 0.0;
             } else {
                 hopHeight = 0.0;
             }
@@ -212,8 +220,17 @@ public class PassiveAnimal {
             hopHeight = 0.0;
         }
 
-        // 6. Aplicação de Movimento e Colisão
-        moveWithCollision(dt, tileMap);
+        // 5. Aplicação Física com Detecção de Obstáculos, Deslizamento em Quinas e Anti-Travamento
+        moveWithCollisionSlide(dt, tileMap);
+
+        // 6. Atualização de Rotação Visual e Fases de Animação
+        double postSpeed = Math.hypot(vx, vy);
+        moving = postSpeed > 2.0;
+        if (moving) {
+            walkPhase += postSpeed * dt * (type == PassiveAnimalType.DEER ? 0.11 : 0.15);
+        } else if (type == PassiveAnimalType.BIRD && state == State.FORAGING) {
+            peckTimer += dt * 3.8;
+        }
 
         // 7. Geração de Ondulações na Água
         if (ripples != null && rippleCooldown <= 0) {
@@ -221,8 +238,7 @@ public class PassiveAnimal {
             int row = (int) Math.floor(y / TileMap.TILE_SIZE);
             TileType curTile = tileMap.getTileAt(col, row);
             if (curTile == TileType.WATER) {
-                double speedLen = Math.hypot(vx, vy);
-                if (speedLen > 15.0 || hopHeight > 2.0) {
+                if (postSpeed > 15.0 || hopHeight > 2.0) {
                     ripples.add(new WaterRipple(x, y, type == PassiveAnimalType.DEER ? 18.0 : 12.0, 0.70));
                     rippleCooldown = type == PassiveAnimalType.FROG ? 0.35 : 0.22;
                 }
@@ -232,20 +248,38 @@ public class PassiveAnimal {
 
     private void updateForaging(double dt, TileMap tileMap) {
         if (stateTimer <= 0) {
-            stateTimer = 1.5 + RAND.nextDouble() * 2.5;
-            if (RAND.nextDouble() < 0.45) {
+            stateTimer = 1.6 + RAND.nextDouble() * 2.4;
+            if (RAND.nextDouble() < 0.42) {
                 // Parada para debicar/pastar
                 vx = 0;
                 vy = 0;
             } else {
-                // Caminhada lenta
-                double ang = RAND.nextDouble() * Math.PI * 2.0;
-                double speed = type.getBaseSpeed() * 0.30;
-                vx = Math.cos(ang) * speed;
-                vy = Math.sin(ang) * speed;
-                faceDx = Math.signum(vx);
-                faceDy = vy / speed;
+                // Caminhada lenta inteligente: procura direção desobstruída
+                double speed = type.getBaseSpeed() * 0.28;
+                boolean canWalkWater = (type == PassiveAnimalType.FROG);
+                double r = getBodyRadius();
+                double chosenAngle = RAND.nextDouble() * Math.PI * 2.0;
+
+                for (int t = 0; t < 8; t++) {
+                    double ang = RAND.nextDouble() * Math.PI * 2.0;
+                    if (evaluatePathClearance(x, y, ang, 36.0, r, tileMap, canWalkWater) >= 0.70) {
+                        chosenAngle = ang;
+                        break;
+                    }
+                }
+
+                vx = Math.cos(chosenAngle) * speed;
+                vy = Math.sin(chosenAngle) * speed;
+                visualAngle = chosenAngle;
+                faceDx = Math.cos(chosenAngle);
+                faceDy = Math.sin(chosenAngle);
             }
+        } else if (stuckTimer > 0.08 && moving) {
+            // Se encostou em um obstáculo durante o pastoreio ocioso, para imediatamente sem forçar a parede
+            vx = 0;
+            vy = 0;
+            stateTimer = 1.2 + RAND.nextDouble() * 1.5;
+            stuckTimer = 0.0;
         }
     }
 
@@ -259,105 +293,278 @@ public class PassiveAnimal {
                 visualAngle = awayAngle;
             } else {
                 state = State.FLEEING;
-                stateTimer = 2.5 + RAND.nextDouble() * 1.5;
+                fleeDuration = 3.2 + RAND.nextDouble() * 1.5;
+                stateTimer = fleeDuration;
             }
         }
     }
 
     private void updateFleeing(double dt, double threatX, double threatY, TileMap tileMap) {
+        // Se estiver em arrancada de desvio evasivo de quina, segue o vetor de juke
+        if (evasiveJukeTimer > 0) {
+            evasiveJukeTimer -= dt;
+            double burstSpeed = type.getBaseSpeed() * (type == PassiveAnimalType.DEER ? 1.35 : 1.25);
+            vx = Math.cos(evasiveHeading) * burstSpeed;
+            vy = Math.sin(evasiveHeading) * burstSpeed;
+            faceDx = Math.cos(evasiveHeading);
+            faceDy = Math.sin(evasiveHeading);
+            return;
+        }
+
+        // Se estiver bloqueado contra paredes/quinas por mais de 0.16s, executa juke reflexo imediato
+        if (stuckTimer >= 0.16) {
+            triggerCornerEscape(tileMap);
+            stuckTimer = 0.0;
+            return;
+        }
+
+        // Sapo já na água: nada em alta velocidade na direção de maior fuga
         if (type == PassiveAnimalType.FROG) {
-            // Sapo busca se salvar pulando na água mais próxima
             int curC = (int) Math.floor(x / TileMap.TILE_SIZE);
             int curR = (int) Math.floor(y / TileMap.TILE_SIZE);
             if (tileMap.getTileAt(curC, curR) == TileType.WATER) {
-                // Já está na água! Nada em linha reta para longe com bônus aquático
-                double away = Math.atan2(y - threatY, x - threatX);
-                double swimSpeed = type.getBaseSpeed() * 1.35;
-                vx = Math.cos(away) * swimSpeed;
-                vy = Math.sin(away) * swimSpeed;
-                if (Math.abs(vx) > 5.0) faceDx = Math.signum(vx);
-                faceDy = vy / swimSpeed;
+                double bestWaterAngle = computeBestFleeAngle(threatX, threatY, tileMap);
+                double swimSpeed = type.getBaseSpeed() * 1.45;
+                targetHeading = bestWaterAngle;
+                visualAngle = lerpAngle(visualAngle, targetHeading, Math.min(1.0, dt * 14.0));
+                vx = Math.cos(visualAngle) * swimSpeed;
+                vy = Math.sin(visualAngle) * swimSpeed;
+                faceDx = Math.cos(visualAngle);
+                faceDy = Math.sin(visualAngle);
                 return;
             }
+        }
 
-            int bestWaterC = -1;
-            int bestWaterR = -1;
-            double minWDist = 140.0;
-            for (int dc = -4; dc <= 4; dc++) {
-                for (int dr = -4; dr <= 4; dr++) {
-                    if (tileMap.getTileAt(curC + dc, curR + dr) == TileType.WATER) {
-                        double wx = (curC + dc) * TileMap.TILE_SIZE + 16.0;
-                        double wy = (curR + dr) * TileMap.TILE_SIZE + 16.0;
-                        double d = Math.hypot(wx - x, wy - y);
-                        if (d < minWDist) {
-                            minWDist = d;
-                            bestWaterC = curC + dc;
-                            bestWaterR = curR + dr;
-                        }
-                    }
+        // Zigue-zague arisco orgânico do coelho em campo aberto
+        if (type == PassiveAnimalType.RABBIT) {
+            zigZagTimer -= dt;
+            if (zigZagTimer <= 0) {
+                zigZagTimer = 0.22 + RAND.nextDouble() * 0.18;
+                zigZagAngle = (RAND.nextDouble() - 0.5) * 0.90;
+            }
+        }
+
+        // Análise de feelers/whiskers para encontrar o melhor corredor livre de fuga
+        targetHeading = computeBestFleeAngle(threatX, threatY, tileMap);
+
+        double turnRate = (type == PassiveAnimalType.RABBIT ? 20.0 : (type == PassiveAnimalType.DEER ? 13.0 : 16.0));
+        visualAngle = lerpAngle(visualAngle, targetHeading, Math.min(1.0, dt * turnRate));
+
+        double fleeSpeed = type.getBaseSpeed() * (type == PassiveAnimalType.DEER ? 1.25 : 1.12);
+        double targetVx = Math.cos(visualAngle) * fleeSpeed;
+        double targetVy = Math.sin(visualAngle) * fleeSpeed;
+
+        double accel = 16.0;
+        vx += (targetVx - vx) * Math.min(1.0, dt * accel);
+        vy += (targetVy - vy) * Math.min(1.0, dt * accel);
+
+        faceDx = Math.cos(visualAngle);
+        faceDy = Math.sin(visualAngle);
+    }
+
+    private double computeBestFleeAngle(double threatX, double threatY, TileMap tileMap) {
+        double baseAwayAngle = Math.atan2(y - threatY, x - threatX);
+        boolean canWalkWater = (type == PassiveAnimalType.FROG);
+        double r = getBodyRadius();
+        double probeDist = (type == PassiveAnimalType.DEER) ? 62.0 : (type == PassiveAnimalType.RABBIT ? 46.0 : 36.0);
+
+        // Componente de zigue-zague do coelho
+        double desiredAngle = baseAwayAngle;
+        if (type == PassiveAnimalType.RABBIT) {
+            desiredAngle += zigZagAngle;
+        }
+
+        // Whiskers em leque de 13 ângulos cobrindo frente, flancos e rotas tangenciais
+        double[] angleOffsets = {
+            0.0,
+            0.35, -0.35,
+            0.70, -0.70,
+            1.05, -1.05,
+            1.40, -1.40,
+            1.75, -1.75,
+            2.10, -2.10
+        };
+
+        double bestAngle = desiredAngle;
+        double bestScore = -1e9;
+
+        for (double offset : angleOffsets) {
+            double candAngle = desiredAngle + offset;
+            double clearance = evaluatePathClearance(x, y, candAngle, probeDist, r, tileMap, canWalkWater);
+            if (clearance <= 0.0) continue; // Obstáculo sólido imediato
+
+            // Pontuação por distância desobstruída
+            double score = clearance * 5.0;
+
+            // Alinhamento vetorial com o afastamento do predador
+            double awayAlignment = Math.cos(candAngle - baseAwayAngle);
+            score += awayAlignment * 3.5;
+
+            // Continuidade de momento (evita oscilação brusca esquerda/direita)
+            double headingAlignment = Math.cos(candAngle - visualAngle);
+            score += headingAlignment * 1.6;
+
+            // Análise do terreno no destino do feeler
+            double farX = x + Math.cos(candAngle) * probeDist;
+            double farY = y + Math.sin(candAngle) * probeDist;
+            int col = (int) Math.floor(farX / TileMap.TILE_SIZE);
+            int row = (int) Math.floor(farY / TileMap.TILE_SIZE);
+            TileType endTile = tileMap.getTileAt(col, row);
+
+            if (type == PassiveAnimalType.FROG) {
+                if (endTile == TileType.WATER) {
+                    score += 6.5; // Sapos buscam vorazmente o refúgio na água
+                }
+            } else {
+                if (endTile == TileType.WATER) {
+                    score -= 5.5; // Presas terrestres evitam lagos e rios fundos
+                }
+                if (type == PassiveAnimalType.RABBIT && endTile == TileType.TALL_GRASS) {
+                    score += 2.0; // Coelhos preferem camuflagem na vegetação densa
                 }
             }
 
-            if (bestWaterC != -1) {
-                double targetWaterX = bestWaterC * TileMap.TILE_SIZE + 16.0;
-                double targetWaterY = bestWaterR * TileMap.TILE_SIZE + 16.0;
-                double toWaterAngle = Math.atan2(targetWaterY - y, targetWaterX - x);
-                double hopSpeed = type.getBaseSpeed() * 1.20;
-                vx = Math.cos(toWaterAngle) * hopSpeed;
-                vy = Math.sin(toWaterAngle) * hopSpeed;
-                if (Math.abs(vx) > 5.0) faceDx = Math.signum(vx);
-                faceDy = vy / hopSpeed;
-                return;
+            if (score > bestScore) {
+                bestScore = score;
+                bestAngle = candAngle;
             }
         }
 
-        zigZagTimer -= dt;
-        if (zigZagTimer <= 0) {
-            zigZagTimer = 0.25 + RAND.nextDouble() * 0.20;
-            // Zigue-zague angular arisco
-            zigZagAngle = (RAND.nextDouble() - 0.5) * (type == PassiveAnimalType.RABBIT ? 1.4 : 0.8);
+        if (bestScore <= -1e8) {
+            return findEmergencyClearanceAngle(tileMap, canWalkWater, r);
         }
 
-        double baseAwayAngle = Math.atan2(y - threatY, x - threatX);
-        double finalAngle = baseAwayAngle + zigZagAngle;
-
-        double fleeSpeed = type.getBaseSpeed() * (type == PassiveAnimalType.DEER ? 1.25 : 1.10);
-        vx = Math.cos(finalAngle) * fleeSpeed;
-        vy = Math.sin(finalAngle) * fleeSpeed;
-
-        if (Math.abs(vx) > 5.0) {
-            faceDx = Math.signum(vx);
-        }
-        faceDy = vy / fleeSpeed;
+        return bestAngle;
     }
 
-    private void moveWithCollision(double dt, TileMap tileMap) {
-        double nextX = x + vx * dt;
-        double nextY = y + vy * dt;
+    private double findEmergencyClearanceAngle(TileMap tileMap, boolean canWalkWater, double r) {
+        double maxDist = -1.0;
+        double bestAng = visualAngle + Math.PI; // Rotação de 180° por padrão
+        for (int i = 0; i < 16; i++) {
+            double ang = i * (Math.PI * 2.0 / 16.0);
+            double cl = evaluatePathClearance(x, y, ang, 36.0, r, tileMap, canWalkWater);
+            if (cl > maxDist) {
+                maxDist = cl;
+                bestAng = ang;
+            }
+        }
+        return bestAng;
+    }
+
+    private void triggerCornerEscape(TileMap tileMap) {
+        boolean canWalkWater = (type == PassiveAnimalType.FROG);
+        double r = getBodyRadius();
+        double bestAng = findEmergencyClearanceAngle(tileMap, canWalkWater, r);
+        evasiveHeading = bestAng;
+        evasiveJukeTimer = 0.38; // Trava a rota evasiva por 380ms para sair da quina
+        visualAngle = bestAng;
+        faceDx = Math.cos(bestAng);
+        faceDy = Math.sin(bestAng);
+        double burstSpeed = type.getBaseSpeed() * (type == PassiveAnimalType.DEER ? 1.35 : 1.25);
+        vx = Math.cos(bestAng) * burstSpeed;
+        vy = Math.sin(bestAng) * burstSpeed;
+    }
+
+    private double evaluatePathClearance(double startX, double startY, double angle, double dist, double radius, TileMap tileMap, boolean canWalkWater) {
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+        double rNear = radius + 6.0;
+        double rMid = radius + dist * 0.52;
+        double rFar = radius + dist;
+
+        if (!isPositionWalkable(startX + cos * rNear, startY + sin * rNear, radius, tileMap, canWalkWater)) {
+            return 0.0; // Bloqueado imediatamente em frente
+        }
+        if (!isPositionWalkable(startX + cos * rMid, startY + sin * rMid, radius, tileMap, canWalkWater)) {
+            return 0.35; // Bloqueado a meio caminho
+        }
+        if (!isPositionWalkable(startX + cos * rFar, startY + sin * rFar, radius, tileMap, canWalkWater)) {
+            return 0.70; // Bloqueado no final do raio
+        }
+        return 1.0; // Caminho 100% livre
+    }
+
+    private void moveWithCollisionSlide(double dt, TileMap tileMap) {
+        double prevX = x;
+        double prevY = y;
+        double stepX = vx * dt;
+        double stepY = vy * dt;
+        double nextX = x + stepX;
+        double nextY = y + stepY;
 
         boolean canWalkWater = (type == PassiveAnimalType.FROG);
-        boolean isWalkableX = canWalkOnTile(tileMap, nextX, y, canWalkWater);
-        boolean isWalkableY = canWalkOnTile(tileMap, x, nextY, canWalkWater);
+        double r = getBodyRadius();
 
-        if (isWalkableX) {
+        // 1. Passada completa desobstruída
+        if (isPositionWalkable(nextX, nextY, r, tileMap, canWalkWater)) {
             x = nextX;
-        } else {
-            vx = -vx * 0.5;
+            y = nextY;
+            stuckTimer = Math.max(0.0, stuckTimer - dt * 2.0);
+            return;
         }
 
-        if (isWalkableY) {
-            y = nextY;
+        // 2. Deslizamento em eixos individuais (Wall Sliding)
+        boolean moved = false;
+        if (isPositionWalkable(nextX, y, r, tileMap, canWalkWater)) {
+            x = nextX;
+            moved = true;
         } else {
-            vy = -vy * 0.5;
+            vx *= 0.15; // Amortece componente perpendicular contra a parede
+        }
+
+        if (isPositionWalkable(x, nextY, r, tileMap, canWalkWater)) {
+            y = nextY;
+            moved = true;
+        } else {
+            vy *= 0.15;
+        }
+
+        // 3. Resolução de quinas e micro-passos diagonais
+        if (!moved) {
+            if (isPositionWalkable(x + stepX * 0.5, y, r, tileMap, canWalkWater)) {
+                x += stepX * 0.5;
+                moved = true;
+            } else if (isPositionWalkable(x, y + stepY * 0.5, r, tileMap, canWalkWater)) {
+                y += stepY * 0.5;
+                moved = true;
+            }
+        }
+
+        // 4. Detecção de travamento (Stuck Detection)
+        double actualDist = Math.hypot(x - prevX, y - prevY);
+        double expectedDist = Math.hypot(stepX, stepY);
+        if (state == State.FLEEING && (actualDist < expectedDist * 0.25 || actualDist < 0.8)) {
+            stuckTimer += dt;
+        } else {
+            stuckTimer = Math.max(0.0, stuckTimer - dt * 1.5);
         }
     }
 
-    private boolean canWalkOnTile(TileMap tileMap, double wx, double wy, boolean canWalkWater) {
+    public double getBodyRadius() {
+        switch (type) {
+            case DEER: return 10.0;
+            case RABBIT: return 6.0;
+            case FROG: return 5.0;
+            case BIRD: return 4.5;
+            default: return 6.0;
+        }
+    }
+
+    private boolean isSinglePointWalkable(double wx, double wy, TileMap tileMap, boolean canWalkWater) {
         int col = (int) Math.floor(wx / TileMap.TILE_SIZE);
         int row = (int) Math.floor(wy / TileMap.TILE_SIZE);
         TileType t = tileMap.getTileAt(col, row);
         if (canWalkWater && t == TileType.WATER) return true;
         return t.isWalkable();
+    }
+
+    private boolean isPositionWalkable(double cx, double cy, double r, TileMap tileMap, boolean canWalkWater) {
+        if (!isSinglePointWalkable(cx, cy, tileMap, canWalkWater)) return false;
+        if (!isSinglePointWalkable(cx - r, cy, tileMap, canWalkWater)) return false;
+        if (!isSinglePointWalkable(cx + r, cy, tileMap, canWalkWater)) return false;
+        if (!isSinglePointWalkable(cx, cy - r, tileMap, canWalkWater)) return false;
+        if (!isSinglePointWalkable(cx, cy + r, tileMap, canWalkWater)) return false;
+        return true;
     }
 
     public boolean isCatchable() {
@@ -378,7 +585,8 @@ public class PassiveAnimal {
             return true;
         }
         state = State.FLEEING;
-        stateTimer = 4.0;
+        fleeDuration = 4.0;
+        stateTimer = fleeDuration;
         return false;
     }
 
