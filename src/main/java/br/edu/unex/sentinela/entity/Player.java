@@ -87,6 +87,12 @@ public class Player {
 
     public void update(double dx, double dy, boolean sprint, boolean attackPressed, double deltaTime, TileMap tileMap,
                        List<Footprint> scentTrail, List<Particle> particles, List<Burrow> burrows) {
+        update(dx, dy, sprint, attackPressed, deltaTime, tileMap, scentTrail, particles, burrows, 0.0, 0.0, 0.0);
+    }
+
+    public void update(double dx, double dy, boolean sprint, boolean attackPressed, double deltaTime, TileMap tileMap,
+                       List<Footprint> scentTrail, List<Particle> particles, List<Burrow> burrows,
+                       double windVx, double windVy, double windIntensity) {
         breathTimer += deltaTime;
         if (invulnerabilityTimer > 0) invulnerabilityTimer -= deltaTime;
         if (adrenalineTimer > 0) adrenalineTimer -= deltaTime;
@@ -180,6 +186,33 @@ public class Player {
         }
 
         if (hunger < 0) hunger = 0;
+
+        // Camuflagem acústica: o barulho do vento nas árvores abafa os passos da raposa
+        if (windIntensity > 0.05 && noiseRadius > 0.0) {
+            double acousticMask = Math.max(0.45, 1.0 - windIntensity * 0.45);
+            noiseRadius *= acousticMask;
+        }
+
+        // Física vetorial do vento na movimentação
+        if (inputActive && windIntensity > 0.05) {
+            double moveDist = Math.hypot(dx, dy);
+            if (moveDist > 0.001) {
+                double moveDirX = dx / moveDist;
+                double moveDirY = dy / moveDist;
+                double windSpeed = Math.hypot(windVx, windVy);
+                if (windSpeed > 0.001) {
+                    double normWindX = windVx / windSpeed;
+                    double normWindY = windVy / windSpeed;
+                    double dot = moveDirX * normWindX + moveDirY * normWindY;
+                    double windSpeedFactor = 1.0 + Math.max(-0.08, Math.min(0.12, dot * 0.12 * windIntensity));
+                    currentSpeed *= windSpeedFactor;
+
+                    if (isSprinting && dot < -0.3) {
+                        stamina = Math.max(0.0, stamina - deltaTime * 3.5 * windIntensity);
+                    }
+                }
+            }
+        }
 
         // Física vetorial de inércia e derrapagem no Gelo
         double targetVx = inputActive ? dx * currentSpeed : 0.0;
@@ -341,11 +374,15 @@ public class Player {
     }
 
     public boolean takeDamage(double fromX, double fromY, double knockbackForce) {
+        return takeDamage(fromX, fromY, knockbackForce, 1);
+    }
+
+    public boolean takeDamage(double fromX, double fromY, double knockbackForce, int damageAmount) {
         if (invulnerabilityTimer > 0 || isBurrowed) {
             return false;
         }
 
-        lives--;
+        lives = Math.max(0, lives - Math.max(1, damageAmount));
         invulnerabilityTimer = 0.95;
         adrenalineTimer = 1.3;
 

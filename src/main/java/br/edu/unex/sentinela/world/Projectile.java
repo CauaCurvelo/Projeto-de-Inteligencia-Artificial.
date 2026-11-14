@@ -26,10 +26,14 @@ public class Projectile {
     }
 
     public void update(double deltaTime, TileMap tileMap) {
+        update(deltaTime, tileMap, 0.0, 0.0);
+    }
+
+    public void update(double deltaTime, TileMap tileMap, double windVx, double windVy) {
         if (!active) return;
 
-        double stepX = vx * deltaTime;
-        double stepY = vy * deltaTime;
+        double stepX = (vx + windVx * 38.0) * deltaTime;
+        double stepY = (vy + windVy * 38.0) * deltaTime;
         x += stepX;
         y += stepY;
         distanceTraveled += Math.hypot(stepX, stepY);

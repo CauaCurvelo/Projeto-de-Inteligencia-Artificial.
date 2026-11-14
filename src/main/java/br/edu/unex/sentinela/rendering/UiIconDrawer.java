@@ -331,7 +331,24 @@ public class UiIconDrawer {
         double s = size / 20.0;
         gc.scale(s, s);
 
-        if (weather == WeatherType.RAIN) {
+        if (weather == WeatherType.STORM) {
+            // Nuvem escura tempestuosa
+            gc.setFill(Color.web("#37474F"));
+            gc.fillOval(-8, -6, 10, 8);
+            gc.fillOval(-3, -8, 11, 9);
+            // Gotas inclinadas de vendaval
+            gc.setStroke(Color.web("#80D8FF"));
+            gc.setLineWidth(1.5);
+            gc.strokeLine(-6, 3, -8, 8);
+            gc.strokeLine(4, 3, 2, 8);
+            // Raio zigue-zague elétrico dourado saindo do centro da nuvem
+            gc.setFill(Color.web("#FFD54F"));
+            gc.fillPolygon(
+                new double[]{-1, 3, 0, 2, -3, -1},
+                new double[]{0, 0, 4, 9, 4, 4},
+                6
+            );
+        } else if (weather == WeatherType.RAIN) {
             gc.setFill(Color.web("#90A4AE"));
             gc.fillOval(-8, -6, 10, 8);
             gc.fillOval(-3, -8, 11, 9);

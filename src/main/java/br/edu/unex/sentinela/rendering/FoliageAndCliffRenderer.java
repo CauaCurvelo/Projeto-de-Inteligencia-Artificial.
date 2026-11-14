@@ -294,11 +294,18 @@ public class FoliageAndCliffRenderer {
         renderTreeCanopy(sx, sy, ts, col, row, animTime, quality, BiomeType.MEADOW);
     }
 
-    /**
-     * Passo 4: Renderiza a copa volumétrica 2.5D via sprite pré-renderizado específico do bioma (1 blit por árvore).
-     */
     public void renderTreeCanopy(double sx, double sy, int ts, int col, int row, double animTime,
                                  GraphicsQuality quality, BiomeType biome) {
+        renderTreeCanopy(sx, sy, ts, col, row, animTime, quality, biome, 0.0, 0.0, 0.0);
+    }
+
+    /**
+     * Passo 4: Renderiza a copa volumétrica 2.5D via sprite pré-renderizado específico do bioma (1 blit por árvore).
+     * O balanço oscila com frequência e amplitude proporcionais à força do vento, inclinando organicamente.
+     */
+    public void renderTreeCanopy(double sx, double sy, int ts, int col, int row, double animTime,
+                                 GraphicsQuality quality, BiomeType biome,
+                                 double windVx, double windVy, double windIntensity) {
         ensureCanopySprites();
         int biomeIdx = (biome != null ? biome : BiomeType.MEADOW).ordinal();
 
@@ -308,10 +315,15 @@ public class FoliageAndCliffRenderer {
 
         double jitterX = (h1 - 0.5) * 6.0;
         double jitterY = (h2 - 0.5) * 6.0;
-        double sway = (quality == GraphicsQuality.HIGH) ? Math.sin(animTime * 1.6 + col * 0.8 + row * 0.6) * 1.4 : 0.0;
 
-        double cx = sx + ts * 0.5 + jitterX + sway;
-        double cy = sy + ts * 0.5 + jitterY - 4.0;
+        double swaySpeed = 1.6 + windIntensity * 3.2;
+        double swayAmp = (quality == GraphicsQuality.HIGH ? 1.4 : 0.8) + windIntensity * 4.5;
+        double swayOsc = Math.sin(animTime * swaySpeed + col * 0.8 + row * 0.6) * swayAmp;
+        double windOffX = windVx * 6.0;
+        double windOffY = windVy * 3.0;
+
+        double cx = sx + ts * 0.5 + jitterX + windOffX + swayOsc;
+        double cy = sy + ts * 0.5 + jitterY - 4.0 + windOffY;
         double scale = 0.84 + h3 * 0.20;
         double drawSize = 64.0 * scale;
 

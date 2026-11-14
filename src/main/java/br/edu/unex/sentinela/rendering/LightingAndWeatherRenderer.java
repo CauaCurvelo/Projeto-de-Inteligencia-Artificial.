@@ -4,7 +4,9 @@ import br.edu.unex.sentinela.settings.GameSettings;
 import br.edu.unex.sentinela.settings.GraphicsQuality;
 import br.edu.unex.sentinela.world.BiomeType;
 import br.edu.unex.sentinela.world.Camera;
+import br.edu.unex.sentinela.world.LightningStrike;
 import br.edu.unex.sentinela.world.WeatherDrop;
+import br.edu.unex.sentinela.world.WindSystem;
 import br.edu.unex.sentinela.world.World;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
@@ -86,13 +88,14 @@ public class LightingAndWeatherRenderer {
             double camDeltaY = cam.getDeltaY();
             double safeDt = Math.max(0.001, deltaTime);
 
-            // Calcula a inclinação e alongamento relativo da gota conforme a velocidade da câmera
-            // Impede que a chuva pareça lenta ao correr para cima ou para os lados
-            double apparentVx = -45.0 - (camDeltaX / safeDt);
-            double apparentVy = 620.0 - (camDeltaY / safeDt);
+            // Calcula a inclinação e alongamento relativo da gota conforme o vetor de vento e a câmera
+            double windVx = world.getWindVx();
+            double windVy = world.getWindVy();
+            double apparentVx = (windVx * 260.0 - 45.0) - (camDeltaX / safeDt);
+            double apparentVy = (620.0 + windVy * 110.0) - (camDeltaY / safeDt);
             double streakScale = 0.024;
-            double streakDx = Math.max(-12.0, Math.min(12.0, apparentVx * streakScale));
-            double streakDy = Math.max(7.0, Math.min(26.0, apparentVy * streakScale));
+            double streakDx = Math.max(-28.0, Math.min(28.0, apparentVx * streakScale));
+            double streakDy = Math.max(7.0, Math.min(32.0, apparentVy * streakScale));
 
             gc.setStroke(currentRainColor);
             gc.setLineWidth(1.3);
@@ -110,9 +113,10 @@ public class LightingAndWeatherRenderer {
                 }
             }
 
-            // Atmosfera nublada azul-acinzentada fria com fade-in suave
-            double cloudAlpha = 0.18 * rainIntensity;
-            gc.setFill(Color.color(0.06, 0.12, 0.24, cloudAlpha));
+            // Atmosfera nublada azul-acinzentada fria com reforço gradual de tempestade
+            double stormInt = world.getStormIntensity();
+            double cloudAlpha = Math.min(0.55, 0.18 * rainIntensity + 0.25 * stormInt);
+            gc.setFill(Color.color(0.04, 0.08, 0.18, cloudAlpha));
             gc.fillRect(0, 0, visibleW, visibleH);
 
         }
@@ -123,6 +127,160 @@ public class LightingAndWeatherRenderer {
             gc.setFill(quality == GraphicsQuality.LOW ? FOG_LOW_COLOR : FOG_GRAD);
             gc.fillRect(0, 0, visibleW, visibleH);
             gc.restore();
+        }
+
+        Camera cam = world.getCamera();
+        double camX = (cam != null) ? cam.getX() : 0.0;
+        double camY = (cam != null) ? cam.getY() : 0.0;
+
+        // Vento diegético (linhas de corrente de ar e folhas voadoras)
+        renderWindVisuals(world, camX, camY, visibleW, visibleH);
+
+        // Raios procedurais e avisos eletrostáticos no solo
+        renderLightningStrikes(world, camX, camY, visibleW, visibleH);
+
+        // Flash de tela relâmpago
+        double flash = world.getLightningFlash();
+        if (flash > 0.01) {
+            gc.setFill(Color.color(0.92, 0.96, 1.0, Math.min(0.85, flash * 0.85)));
+            gc.fillRect(0, 0, visibleW, visibleH);
+        }
+    }
+
+    private void renderWindVisuals(World world, double camX, double camY, double visibleW, double visibleH) {
+        WindSystem wind = world.getWindSystem();
+        if (wind == null) return;
+
+        // 1. Linhas aerodinâmicas de corrente de ar (WindStreaks)
+        var streaks = wind.getStreaks();
+        if (streaks != null && !streaks.isEmpty()) {
+            gc.setLineWidth(1.3);
+            for (WindSystem.WindStreak s : streaks) {
+                double sx = s.x - camX;
+                double sy = s.y - camY;
+                if (sx < -80 || sx > visibleW + 80 || sy < -80 || sy > visibleH + 80) continue;
+                double a = s.getAlpha();
+                if (a <= 0.01) continue;
+
+                gc.setStroke(Color.color(0.92, 0.96, 1.0, a));
+                double endX = sx + Math.cos(s.angle) * s.length;
+                double endY = sy + Math.sin(s.angle) * s.length;
+                gc.strokeLine(sx, sy, endX, endY);
+            }
+        }
+
+        // 2. Folhas e pétalas voadoras rodopiando em 3D (WindLeaves)
+        var leaves = wind.getLeaves();
+        if (leaves != null && !leaves.isEmpty()) {
+            for (WindSystem.WindLeaf l : leaves) {
+                double sx = l.x - camX;
+                double sy = l.y - camY - l.z;
+                if (sx < -40 || sx > visibleW + 40 || sy < -40 || sy > visibleH + 40) continue;
+                double a = l.getAlpha();
+                if (a <= 0.01) continue;
+
+                gc.save();
+                gc.translate(sx, sy);
+                gc.rotate(l.rot);
+                gc.scale(Math.cos(l.flutterPhase), 1.0);
+                gc.setFill(l.color.deriveColor(0, 1.0, 1.0, a));
+                gc.fillOval(-l.size * 0.5, -l.size * 0.28, l.size, l.size * 0.56);
+                gc.restore();
+            }
+        }
+    }
+
+    private void renderLightningStrikes(World world, double camX, double camY, double visibleW, double visibleH) {
+        var strikes = world.getActiveLightningStrikes();
+        if (strikes == null || strikes.isEmpty()) return;
+
+        for (LightningStrike strike : strikes) {
+            double sx = strike.getX() - camX;
+            double sy = strike.getY() - camY;
+
+            if (sx < -100 || sx > visibleW + 100 || sy < -100 || sy > visibleH + 100) {
+                if (!strike.isStriking()) continue;
+            }
+
+            if (strike.isWarning()) {
+                double p = strike.getWarningProgress();
+                double radius = 38.0 * (1.0 - p * 0.22);
+
+                // Círculo elétrico de aviso no solo
+                gc.setStroke(Color.web("#00E5FF", 0.40 + p * 0.50));
+                gc.setLineWidth(1.8);
+                gc.strokeOval(sx - radius, sy - radius * 0.55, radius * 2.0, radius * 1.1);
+
+                gc.setStroke(Color.web("#FFD54F", 0.30 + p * 0.60));
+                gc.setLineWidth(1.2);
+                gc.strokeOval(sx - radius * 0.65, sy - radius * 0.35, radius * 1.3, radius * 0.7);
+
+                // Faíscas convergentes de carga estática
+                for (double[] spark : strike.getSparkOffsets()) {
+                    double angle = spark[0];
+                    double baseDist = spark[1];
+                    double speed = spark[2];
+                    double curDist = baseDist * (1.0 - p * 0.75);
+
+                    double spX = sx + Math.cos(angle + p * speed) * curDist;
+                    double spY = sy + Math.sin(angle + p * speed) * (curDist * 0.55);
+
+                    Color spColor = (p > 0.65 && ((int) (p * 24) % 2 == 0)) ? Color.web("#FFF59D", 0.95) : Color.web("#80D8FF", 0.85);
+                    gc.setFill(spColor);
+                    gc.fillOval(spX - 1.5, spY - 1.5, 3.0, 3.0);
+                }
+            } else if (strike.isStriking()) {
+                // Relâmpago procedural descendo do céu
+                var mainPoints = strike.getMainBoltPoints();
+                if (mainPoints != null && mainPoints.size() > 1) {
+                    // 1. Halo elétrico ciano espesso
+                    gc.setStroke(Color.web("#00E5FF", 0.65));
+                    gc.setLineWidth(6.0);
+                    for (int i = 0; i < mainPoints.size() - 1; i++) {
+                        double[] p1 = mainPoints.get(i);
+                        double[] p2 = mainPoints.get(i + 1);
+                        gc.strokeLine(p1[0] - camX, p1[1] - camY, p2[0] - camX, p2[1] - camY);
+                    }
+
+                    // 2. Núcleo branco incandescente
+                    gc.setStroke(Color.web("#FFFFFF", 0.98));
+                    gc.setLineWidth(2.6);
+                    for (int i = 0; i < mainPoints.size() - 1; i++) {
+                        double[] p1 = mainPoints.get(i);
+                        double[] p2 = mainPoints.get(i + 1);
+                        gc.strokeLine(p1[0] - camX, p1[1] - camY, p2[0] - camX, p2[1] - camY);
+                    }
+                }
+
+                // Galhos laterais bifurcados
+                var branches = strike.getBranchBolts();
+                if (branches != null) {
+                    gc.setStroke(Color.web("#80D8FF", 0.85));
+                    gc.setLineWidth(1.4);
+                    for (var branch : branches) {
+                        for (int i = 0; i < branch.size() - 1; i++) {
+                            double[] p1 = branch.get(i);
+                            double[] p2 = branch.get(i + 1);
+                            gc.strokeLine(p1[0] - camX, p1[1] - camY, p2[0] - camX, p2[1] - camY);
+                        }
+                    }
+                }
+
+                // Explosão luminosa de impacto no solo
+                gc.setFill(Color.web("#FFFFFF", 0.95));
+                gc.fillOval(sx - 24, sy - 12, 48, 24);
+                gc.setFill(Color.web("#00E5FF", 0.55));
+                gc.fillOval(sx - 44, sy - 22, 88, 44);
+            } else if (strike.isLingering()) {
+                double progress = strike.getLingerProgress();
+                // Solo chamuscado e cinzas
+                gc.setFill(Color.color(0.08, 0.08, 0.10, progress * 0.60));
+                gc.fillOval(sx - 18, sy - 9, 36, 18);
+
+                // Brasas e micro faíscas residuais
+                gc.setFill(Color.color(1.0, 0.60, 0.10, progress * 0.75));
+                gc.fillOval(sx - 1.5, sy - 4 - (1.0 - progress) * 16.0, 3.0, 3.0);
+            }
         }
     }
 

@@ -171,12 +171,26 @@ public class Enemy {
                        List<PassiveAnimal> preyList, List<BearTrap> trapList,
                        List<Footprint> scentTrail, List<Projectile> projectiles, List<Enemy> allEnemies,
                        TileMap tileMap, List<WaterRipple> waterRipples, double timeProgress, WeatherType weather) {
+        update(deltaTime, player, foodList, meatList, preyList, trapList, scentTrail, projectiles, allEnemies,
+               tileMap, waterRipples, timeProgress, weather, 0.0, 0.0, 0.0, null);
+    }
+
+    public void update(double deltaTime, Player player, List<FoodItem> foodList, List<MeatItem> meatList,
+                       List<PassiveAnimal> preyList, List<BearTrap> trapList,
+                       List<Footprint> scentTrail, List<Projectile> projectiles, List<Enemy> allEnemies,
+                       TileMap tileMap, List<WaterRipple> waterRipples, double timeProgress, WeatherType weather,
+                       double windVx, double windVy, double windIntensity, List<LightningStrike> lightningStrikes) {
         if (trapTimer > 0) {
             trapTimer -= deltaTime;
             state = AIState.TRAPPED;
             vx = 0;
             vy = 0;
             moving = false;
+            return;
+        }
+
+        // Fuga instintiva de telégrafo de queda de raio
+        if (checkLightningEvasion(lightningStrikes, tileMap)) {
             return;
         }
 
@@ -285,7 +299,7 @@ public class Enemy {
                 updateHunter(canSeePlayer, canHearPlayer, player, allEnemies, tileMap, projectiles, trapList, waterRipples, deltaTime, curCol, curRow, distToPlayer);
                 break;
             case HOUND:
-                updateHound(canSeePlayer, canHearPlayer, player, allEnemies, scentTrail, tileMap, waterRipples, deltaTime, curCol, curRow);
+                updateHound(canSeePlayer, canHearPlayer, player, allEnemies, scentTrail, tileMap, waterRipples, deltaTime, curCol, curRow, windVx, windVy);
                 break;
             case RIVAL:
                 updateRival(canSeePlayer, canHearPlayer, player, foodList, meatList, preyList, allEnemies, tileMap, waterRipples, deltaTime, curCol, curRow, distToPlayer);
@@ -455,7 +469,7 @@ public class Enemy {
 
     private void updateHound(boolean canSee, boolean canHear, Player player, List<Enemy> allEnemies,
                              List<Footprint> scentTrail, TileMap tileMap, List<WaterRipple> ripples,
-                             double dt, int curCol, int curRow) {
+                             double dt, int curCol, int curRow, double windVx, double windVy) {
         if (canHear || canSee) {
             state = AIState.CHASE;
             alertTimer = 4.5;
@@ -507,7 +521,7 @@ public class Enemy {
             return;
         }
 
-        Footprint nearestScent = findNearestScent(scentTrail, 260.0);
+        Footprint nearestScent = findNearestScent(scentTrail, 260.0, windVx, windVy);
         if (nearestScent != null) {
             state = AIState.SNIFFING_TRACK;
             patrolPauseTimer = 0;
@@ -535,6 +549,32 @@ public class Enemy {
         }
     }
 
+    private boolean checkLightningEvasion(List<LightningStrike> strikes, TileMap tileMap) {
+        if (strikes == null || strikes.isEmpty()) return false;
+        for (LightningStrike ls : strikes) {
+            if (ls.isWarning()) {
+                double d = Math.hypot(ls.getX() - x, ls.getY() - y);
+                if (d < 75.0) {
+                    double awayX = x - ls.getX();
+                    double awayY = y - ls.getY();
+                    double len = Math.hypot(awayX, awayY);
+                    if (len > 0.001) {
+                        awayX /= len;
+                        awayY /= len;
+                    } else {
+                        awayX = 1.0; awayY = 0.0;
+                    }
+                    vx = awayX * baseSpeed * 1.5;
+                    vy = awayY * baseSpeed * 1.5;
+                    moveWithCollisionSlide(vx * 0.016, vy * 0.016, tileMap);
+                    state = AIState.ALERT;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private void notifyHuntersInRadius(List<Enemy> allEnemies, double targetX, double targetY, double radius, TileMap tileMap) {
         for (Enemy other : allEnemies) {
             if (other == this || other.getHp() <= 0) continue;
@@ -547,14 +587,33 @@ public class Enemy {
         }
     }
 
-    private Footprint findNearestScent(List<Footprint> scentTrail, double maxDist) {
+    private Footprint findNearestScent(List<Footprint> scentTrail, double maxDist, double windVx, double windVy) {
         Footprint closest = null;
         double minDist = maxDist;
+        double windSpeed = Math.hypot(windVx, windVy);
+
         for (Footprint fp : scentTrail) {
             if (!fp.isExpired() && fp.isPlayerOrigin()) {
-                double d = Math.hypot(fp.getX() - x, fp.getY() - y);
-                if (d < minDist) {
-                    minDist = d;
+                double dx = fp.getX() - x;
+                double dy = fp.getY() - y;
+                double d = Math.hypot(dx, dy);
+
+                double effectiveDist = d;
+                if (windSpeed > 0.05 && d > 0.001) {
+                    double toHoundX = -dx / d;
+                    double toHoundY = -dy / d;
+                    double normWindX = windVx / windSpeed;
+                    double normWindY = windVy / windSpeed;
+                    double dot = toHoundX * normWindX + toHoundY * normWindY;
+
+                    // A favor do vento: alcance aumenta até 1.85x
+                    // Contra o vento: alcance reduz para até 0.20x
+                    double factor = Math.max(0.20, 1.0 + dot * 0.85 * Math.min(1.0, windSpeed));
+                    effectiveDist = d / factor;
+                }
+
+                if (effectiveDist < minDist) {
+                    minDist = effectiveDist;
                     closest = fp;
                 }
             }

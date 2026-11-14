@@ -38,10 +38,12 @@ public final class AmbienceController {
         double day = 1 - night;
         double rainIntensity = world.getRainIntensity();
         double fogIntensity = world.getFogIntensity();
+        double windIntensity = world.getWindIntensity();
+        double stormIntensity = world.getStormIntensity();
         boolean burrowed = world.getPlayer().isBurrowed();
         double muffle = burrowed ? 0.35 : 1.0;
 
-        applyLoopMix(day, night, rainIntensity, fogIntensity, muffle);
+        applyLoopMix(day, night, rainIntensity, fogIntensity, windIntensity, stormIntensity, muffle);
         scheduleEvents(world, spatial, dt, night, rainIntensity, muffle);
     }
 
@@ -56,22 +58,31 @@ public final class AmbienceController {
         double day = 1 - night;
         double rainIntensity = world.getRainIntensity();
         double fogIntensity = world.getFogIntensity();
+        double windIntensity = world.getWindIntensity();
+        double stormIntensity = world.getStormIntensity();
         double muffle = (world.getPlayer().isBurrowed() ? 0.35 : 1.0) * 0.25;
-        applyLoopMix(day, night, rainIntensity, fogIntensity, muffle);
+        applyLoopMix(day, night, rainIntensity, fogIntensity, windIntensity, stormIntensity, muffle);
     }
 
-    private void applyLoopMix(double day, double night, double rainIntensity, double fogIntensity, double muffle) {
+    private void applyLoopMix(double day, double night, double rainIntensity, double fogIntensity,
+                             double windIntensity, double stormIntensity, double muffle) {
         double windBias = (currentBiome == BiomeType.HIGHLAND) ? 0.14 : (currentBiome == BiomeType.SNOW ? 0.19 : 0.0);
         double forestBias = (currentBiome == BiomeType.DENSE_FOREST) ? 0.16 : 0.0;
         double swampWaterBias = (currentBiome == BiomeType.SWAMP) ? 0.12 : 0.0;
 
-        setGain(SoundId.LOOP_WIND, (0.18 + windBias + 0.10 * (1 - forestRatio)) * muffle);
+        // O som do vento nas árvores e folhagens escala dinamicamente com a intensidade do vento
+        double treeWindVolume = (0.14 + windIntensity * 0.46 + windBias + 0.10 * (1 - forestRatio)) * muffle;
+        setGain(SoundId.LOOP_WIND, Math.min(1.0, treeWindVolume));
+
         setGain(SoundId.LOOP_FOREST, Math.min(1.0, forestRatio + forestBias) * 0.38 * day * muffle * (1.0 - rainIntensity * 0.55));
         double nightSuppress = (currentBiome == BiomeType.SWAMP ? 0.25 : (currentBiome == BiomeType.SNOW ? 0.72 : 0.35));
         setGain(SoundId.LOOP_NIGHT, Math.max(0, night - nightSuppress) * 0.69 * muffle * (1.0 - rainIntensity * 0.5));
         setGain(SoundId.LOOP_RIVER, Math.min(1, waterRatio * 2.5 + swampWaterBias) * 0.45 * muffle);
         setGain(SoundId.LOOP_RAIN, (currentBiome != BiomeType.SNOW) ? 0.50 * rainIntensity * muffle : 0);
-        setGain(SoundId.LOOP_STORM_WIND, (rainIntensity * 0.22 + fogIntensity * 0.16) * muffle);
+
+        // Vento uivante e rajadas de tempestade
+        double stormWindGain = (stormIntensity * 0.65 + windIntensity * 0.25 + rainIntensity * 0.12) * muffle;
+        setGain(SoundId.LOOP_STORM_WIND, Math.min(1.0, stormWindGain));
     }
 
     private void scheduleEvents(World world, SpatialAudio sp, double dt, double night, double rainIntensity, double muffle) {

@@ -252,28 +252,33 @@ public class TerrainRenderer {
             double fx = sx + 7 + coordHash(col, row, 1400L) * (ts - 15);
             double fy = sy + 9 + coordHash(col, row, 1500L) * (ts - 15);
 
-            // Folhinhas verdes de suporte no solo
-            gc.setFill(Color.web("#2E7D32", 0.85));
-            gc.fillOval(fx - 3.2, fy + 0.6, 3.6, 1.8);
-            gc.fillOval(fx + 1.2, fy + 0.8, 3.6, 1.8);
+            if (biome == BiomeType.MEADOW) {
+                // Clareira / Prado: buquês botânicos ricos com múltiplas espécies e pétalas delicadas
+                renderMeadowWildflowers(fx, fy, col, row, ts);
+            } else {
+                // Folhinhas verdes de suporte no solo
+                gc.setFill(Color.web("#2E7D32", 0.85));
+                gc.fillOval(fx - 3.2, fy + 0.6, 3.6, 1.8);
+                gc.fillOval(fx + 1.2, fy + 0.8, 3.6, 1.8);
 
-            // Flor principal
-            Color petalColor = (coordHash(col, row, 1600L) > 0.5) ? pal.flowerPrimary : pal.flowerSecondary;
-            gc.setFill(FLOWER_SHADOW);
-            gc.fillOval(fx - 2.5, fy + 1.0, 5.5, 3.0);
-            gc.setFill(petalColor);
-            gc.fillOval(fx - 2.0, fy - 2.0, 4.2, 4.2);
-            gc.setFill(pal.flowerCenter);
-            gc.fillOval(fx - 0.7, fy - 0.7, 1.5, 1.5);
-
-            // Segunda florzinha complementar para formar tufo natural
-            if (coordHash(col, row, 1700L) > 0.38) {
-                double f2x = fx + (coordHash(col, row, 1711L) - 0.5) * 8.5;
-                double f2y = fy - 2.5 - coordHash(col, row, 1723L) * 3.5;
-                gc.setFill(pal.flowerSecondary);
-                gc.fillOval(f2x - 1.5, f2y - 1.5, 3.2, 3.2);
+                // Flor principal
+                Color petalColor = (coordHash(col, row, 1600L) > 0.5) ? pal.flowerPrimary : pal.flowerSecondary;
+                gc.setFill(FLOWER_SHADOW);
+                gc.fillOval(fx - 2.5, fy + 1.0, 5.5, 3.0);
+                gc.setFill(petalColor);
+                gc.fillOval(fx - 2.0, fy - 2.0, 4.2, 4.2);
                 gc.setFill(pal.flowerCenter);
-                gc.fillOval(f2x - 0.5, f2y - 0.5, 1.1, 1.1);
+                gc.fillOval(fx - 0.7, fy - 0.7, 1.5, 1.5);
+
+                // Segunda florzinha complementar para formar tufo natural
+                if (coordHash(col, row, 1700L) > 0.38) {
+                    double f2x = fx + (coordHash(col, row, 1711L) - 0.5) * 8.5;
+                    double f2y = fy - 2.5 - coordHash(col, row, 1723L) * 3.5;
+                    gc.setFill(pal.flowerSecondary);
+                    gc.fillOval(f2x - 1.5, f2y - 1.5, 3.2, 3.2);
+                    gc.setFill(pal.flowerCenter);
+                    gc.fillOval(f2x - 0.5, f2y - 0.5, 1.1, 1.1);
+                }
             }
         }
     }
@@ -490,58 +495,153 @@ public class TerrainRenderer {
         }
     }
 
+    private void renderMeadowWildflowers(double fx, double fy, int col, int row, int ts) {
+        // Seleção de espécie de flor silvestre da clareira
+        int flowerType = (int) (coordHash(col, row, 1600L) * 5) % 5;
+        Color petalColor;
+        Color centerColor;
+        int petalCount;
+        double petalRadius;
+
+        switch (flowerType) {
+            case 0:
+                // Botão-de-ouro (Buttercup)
+                petalColor = Color.web("#FFCA28");
+                centerColor = Color.web("#E65100");
+                petalCount = 5;
+                petalRadius = 2.4;
+                break;
+            case 1:
+                // Papoula silvestre (Scarlet Poppy)
+                petalColor = Color.web("#E53935");
+                centerColor = Color.web("#212121");
+                petalCount = 4;
+                petalRadius = 2.8;
+                break;
+            case 2:
+                // Miosótis / Não-me-esqueças (Forget-me-not)
+                petalColor = Color.web("#42A5F5");
+                centerColor = Color.web("#FFEE58");
+                petalCount = 5;
+                petalRadius = 2.0;
+                break;
+            case 3:
+                // Margarida campestre (Daisy)
+                petalColor = Color.web("#FFFFFF");
+                centerColor = Color.web("#FBC02D");
+                petalCount = 7;
+                petalRadius = 2.6;
+                break;
+            default:
+                // Trevo florido lilás
+                petalColor = Color.web("#BA68C8");
+                centerColor = Color.web("#6A1B9A");
+                petalCount = 5;
+                petalRadius = 2.2;
+                break;
+        }
+
+        // Folhinhas verdes de suporte e sépalas na base
+        gc.setFill(Color.web("#2E7D32", 0.90));
+        gc.fillOval(fx - 3.5, fy + 0.4, 3.8, 1.8);
+        gc.fillOval(fx + 1.0, fy + 0.6, 3.8, 1.8);
+
+        // Sombra suave sob a flor
+        gc.setFill(FLOWER_SHADOW);
+        gc.fillOval(fx - petalRadius - 0.5, fy - 0.5, petalRadius * 2.5, 2.8);
+
+        // Desenho das pétalas individuais radiais
+        gc.setFill(petalColor);
+        double angleStep = (2.0 * Math.PI) / petalCount;
+        double baseAngle = coordHash(col, row, 1650L) * Math.PI;
+        for (int p = 0; p < petalCount; p++) {
+            double angle = baseAngle + p * angleStep;
+            double px = fx + Math.cos(angle) * (petalRadius * 0.75);
+            double py = fy - 1.5 + Math.sin(angle) * (petalRadius * 0.75);
+            gc.fillOval(px - 1.2, py - 1.2, 2.4, 2.4);
+        }
+
+        // Miolo / pistilo central
+        gc.setFill(centerColor);
+        gc.fillOval(fx - 0.9, fy - 2.4, 1.8, 1.8);
+
+        // Segunda florzinha complementar em buquê natural
+        if (coordHash(col, row, 1700L) > 0.32) {
+            double f2x = fx + (coordHash(col, row, 1711L) - 0.5) * 8.5;
+            double f2y = fy - 2.0 - coordHash(col, row, 1723L) * 3.5;
+            gc.setFill(petalColor.deriveColor(0, 0.95, 1.05, 0.95));
+            for (int p = 0; p < petalCount; p++) {
+                double angle = baseAngle + p * angleStep + 0.3;
+                double px = f2x + Math.cos(angle) * (petalRadius * 0.55);
+                double py = f2y - 1.2 + Math.sin(angle) * (petalRadius * 0.55);
+                gc.fillOval(px - 0.9, py - 0.9, 1.8, 1.8);
+            }
+            gc.setFill(centerColor);
+            gc.fillOval(f2x - 0.6, f2y - 1.8, 1.2, 1.2);
+        }
+    }
+
     private void renderDetailedIceStatic(double sx, double sy, int ts, int col, int row,
                                          TileMap tileMap, BiomeType biome, BiomeTerrainPalette pal) {
-        // Base de gelo azul-turquesa cristalino e translúcido
-        double hue = 199.0 + (coordHash(col, row, 701L) - 0.5) * 8.0;
-        double sat = 0.38 + (coordHash(col, row, 709L) - 0.5) * 0.10;
-        double bri = 0.88 + (coordHash(col, row, 719L) - 0.5) * 0.08;
-        Color iceBase = Color.hsb(hue, clamp(sat, 0.25, 0.55), clamp(bri, 0.78, 0.96));
+        // Variação de matiz e brilho contínua macro (evita efeito xadrez/repetitivo)
+        double macro = coordHash(col / 3, row / 3, 701L);
+        double micro = coordHash(col, row, 709L);
+
+        double hue = 198.0 + (macro - 0.5) * 8.0;
+        double sat = 0.36 + (micro - 0.5) * 0.08;
+        double bri = 0.88 + (macro - 0.5) * 0.07;
+        Color iceBase = Color.hsb(hue, clamp(sat, 0.22, 0.48), clamp(bri, 0.78, 0.95));
 
         gc.setFill(iceBase);
         gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
 
-        // Núcleo reflexivo oval mais claro
-        gc.setFill(Color.web("#E0F7FA", 0.55));
-        gc.fillOval(sx + 2.5, sy + 2.5, ts - 5, ts - 5);
+        // Manchas orgânicas de profundidade e translucidez que fluem entre tiles
+        if (coordHash(col, row, 727L) > 0.40) {
+            double patchOffX = (coordHash(col, row, 731L) - 0.5) * 10.0;
+            double patchOffY = (coordHash(col, row, 733L) - 0.5) * 10.0;
+            gc.setFill(Color.web("#E0F7FA", 0.32));
+            gc.fillOval(sx + patchOffX, sy + patchOffY, ts + 8, ts + 6);
+        }
 
-        // Faixa de reflexo especular polido diagonal
-        double glossOffset = (coordHash(col, row, 733L) - 0.5) * 5.0;
-        gc.setFill(Color.web("#FFFFFF", 0.35));
-        gc.fillPolygon(
-                new double[]{sx + 4 + glossOffset, sx + 13 + glossOffset, sx + ts - 4, sx + ts - 13},
-                new double[]{sy + ts - 4, sy + ts - 4, sy + 4, sy + 4},
-                4
-        );
+        // Faixa de reflexo especular polido apenas ocasionalmente (não em cada quadrado!)
+        if (coordHash(col, row, 743L) > 0.68) {
+            double glossOffset = (coordHash(col, row, 751L) - 0.5) * 6.0;
+            gc.setFill(Color.web("#FFFFFF", 0.28));
+            gc.fillPolygon(
+                    new double[]{sx + 2 + glossOffset, sx + 9 + glossOffset, sx + ts - 2, sx + ts - 9},
+                    new double[]{sy + ts - 2, sy + ts - 2, sy + 2, sy + 2},
+                    4
+            );
+        }
 
-        // Fissuras e rachaduras internas cristalinas no gelo
-        if (coordHash(col, row, 751L) > 0.32) {
-            double startX = sx + 5 + coordHash(col, row, 757L) * (ts - 10);
-            double startY = sy + 5 + coordHash(col, row, 761L) * (ts - 10);
-            double midX = startX + (coordHash(col, row, 769L) - 0.5) * 13.0;
-            double midY = startY + (coordHash(col, row, 773L) - 0.5) * 13.0;
-            double endX = midX + (coordHash(col, row, 787L) - 0.5) * 10.0;
-            double endY = midY + (coordHash(col, row, 797L) - 0.5) * 10.0;
+        // Fissuras e rachaduras cristalinas no gelo com aspecto natural
+        if (coordHash(col, row, 769L) > 0.52) {
+            double startX = sx + 4 + coordHash(col, row, 773L) * (ts - 8);
+            double startY = sy + 4 + coordHash(col, row, 787L) * (ts - 8);
+            double midX = startX + (coordHash(col, row, 797L) - 0.5) * 14.0;
+            double midY = startY + (coordHash(col, row, 809L) - 0.5) * 14.0;
+            double endX = midX + (coordHash(col, row, 821L) - 0.5) * 12.0;
+            double endY = midY + (coordHash(col, row, 829L) - 0.5) * 12.0;
 
-            gc.setStroke(Color.web("#0284C7", 0.40));
-            gc.setLineWidth(1.6);
+            gc.setStroke(Color.web("#0284C7", 0.45));
+            gc.setLineWidth(1.4);
             gc.strokeLine(startX + 0.5, startY + 0.5, midX + 0.5, midY + 0.5);
             gc.strokeLine(midX + 0.5, midY + 0.5, endX + 0.5, endY + 0.5);
 
-            gc.setStroke(Color.web("#FFFFFF", 0.82));
-            gc.setLineWidth(0.9);
+            gc.setStroke(Color.web("#FFFFFF", 0.78));
+            gc.setLineWidth(0.8);
             gc.strokeLine(startX, startY, midX, midY);
             gc.strokeLine(midX, midY, endX, endY);
         }
 
-        // Borda de congelamento / geada periférica nas margens
+        // Borda de congelamento / geada periférica suave nas margens com chanfros
         boolean nIce = tileMap.getTileAt(col, row - 1) == TileType.ICE;
         boolean sIce = tileMap.getTileAt(col, row + 1) == TileType.ICE;
         boolean wIce = tileMap.getTileAt(col - 1, row) == TileType.ICE;
         boolean eIce = tileMap.getTileAt(col + 1, row) == TileType.ICE;
 
         if (!nIce || !sIce || !wIce || !eIce) {
-            gc.setFill(Color.web("#FFFFFF", 0.48));
+            gc.setFill(Color.web("#FFFFFF", 0.55));
             if (!nIce) gc.fillRect(sx, sy, ts + 0.6, 2.5);
             if (!sIce) gc.fillRect(sx, sy + ts - 2.5, ts + 0.6, 2.5);
             if (!wIce) gc.fillRect(sx, sy, 2.5, ts + 0.6);

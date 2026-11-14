@@ -268,7 +268,8 @@ public class Renderer {
                 if (tileMap.getTileAt(col, row) == TileType.TREE) {
                     double sx = col * ts - camX;
                     double sy = row * ts - camY;
-                    foliageAndCliffRenderer.renderTreeCanopy(sx, sy, ts, col, row, animTime, quality, tileMap.getBiomeAt(col, row));
+                    foliageAndCliffRenderer.renderTreeCanopy(sx, sy, ts, col, row, animTime, quality, tileMap.getBiomeAt(col, row),
+                            world.getWindVx(), world.getWindVy(), world.getWindIntensity());
                 }
             }
         }

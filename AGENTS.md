@@ -439,3 +439,33 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - **Câmera Panorâmica Cinematográfica:** Movimento suave e relaxante da câmera passeando pelo prado e pelo rio florido.
   - **Limpeza Total de HUD e Combate:** Ocultação rigorosa de nameplates de inimigos, barras de vida, cones de visão táticos e auras de combate na cena do menu, além de manter caçadores humanos armados fora da clareira do menu.
 
+## Feature: Sistema de Vento Dinâmico Diegético, Flores na Clareira e Tempestades Elétricas
+- **Sistema de Vento Dinâmico Diegético ([WindSystem.java](src/main/java/br/edu/unex/sentinela/world/WindSystem.java)):**
+  - Vento com intensidade contínua (`0.0` calmaria a `1.5` tempestade furiosa) e ângulo contínuo em radianos, interpolado suavemente por menor arco angular sem saltos bruscos.
+  - Rajadas periódicas orgânicas (`gusts`) que ampliam a força temporariamente antes de desvanecer.
+  - **100% Diegético (Sem biruta ou ícone artificial na HUD):** A percepção do vento é exclusivamente visual e auditiva:
+    - `WindStreak`: correntes de ar aerodinâmicas desenhadas com traço translúcido deslizante.
+    - `WindLeaf`: partículas e folhas voadoras específicas por bioma (pétalas multicoloridas na clareira, folhas de carvalho na floresta, agulhas de pinheiro douradas na serra, esporos no pântano e cristais de gelo na tundra) que rodopiam e realizam rotação tridimensional com `Math.cos(flutterPhase)`.
+- **Flores Silvestres Refinadas na Clareira ([TerrainRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/TerrainRenderer.java)):**
+  - Múltiplas espécies botânicas no bioma `MEADOW` (Botão-de-ouro amarelo, Papoula silvestre vermelha, Miosótis azul-celeste, Margarida campestre branca e Trevo lilás).
+  - Geometria multi-pétala com miolo/pistilo central, sépalas e buquês naturais de flores complementares.
+  - Correção na textura de Gelo: eliminação do círculo repetitivo em cada tile que causava o aspecto de bolhas, criando lençóis de gelo contínuos e translúcidos com fissuras cristalinas.
+- **Balanço das Copas das Árvores ([FoliageAndCliffRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/FoliageAndCliffRenderer.java)):**
+  - As copas das árvores 2.5D balançam dinamicamente inclinando na direção do vento (`windVx, windVy`) e oscilando mais rápido e forte durante ventanias.
+- **Chuva Inclinada pelo Vento ([LightingAndWeatherRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/LightingAndWeatherRenderer.java)):**
+  - Gotas de chuva agora acompanham a direção e velocidade do vento, inclinando organicamente para a esquerda ou direita com respingos no solo.
+- **Tempestade Elétrica e Queda de Raios ([LightningStrike.java](src/main/java/br/edu/unex/sentinela/world/LightningStrike.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - Novo clima `WeatherType.STORM`: chuva torrencial, ventania violenta e raios frequentes.
+  - **Telégrafo de Aviso Justo (1.35s):** Anel elétrico pulsante no solo com faíscas convergentes e arcos azuis/amarelos, dando tempo do jogador e animais saírem da área se quiserem.
+  - **Impacto Devastador (0.22s):** Relâmpago procedural zigue-zague descendo do céu com galhos bifurcados, flash na tela inteira, som estrondoso de trovão com estéreo posicional e dano massivo (2 vidas no jogador, 3 dano em monstros).
+  - **Fuga Instintiva da Fauna:** Inimigos e presas silvestres detectam o telégrafo eletrostático do raio e fogem em disparada na direção oposta antes do impacto cair.
+- **Vento no Odor e Faro dos Cães ([Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java)):**
+  - Projeção vetorial do rastro de cheiro com a direção do vento: quando a favor do vento (vento sopra da raposa para o cão), o alcance de detecção expande em até 1.85x; quando contra o vento, o alcance encolhe para até 0.20x.
+- **Camuflagem Acústica e Física de Movimentação ([Player.java](src/main/java/br/edu/unex/sentinela/entity/Player.java)):**
+  - O barulho do vento nas árvores abafa os passos da raposa (`noiseRadius` reduz até 45% com vento forte).
+  - Movimentação com física do vento: bônus de até +12% de velocidade ao correr a favor do vento e resistência de até -8% ao correr contra, com ligeiro consumo extra de sprint.
+- **Desvio Balístico em Flechas ([Projectile.java](src/main/java/br/edu/unex/sentinela/world/Projectile.java)):**
+  - Flechas do caçador sofrem desvio lateral suave empurradas pelo vento.
+- **Mixagem Sonora do Vento ([AmbienceController.java](src/main/java/br/edu/unex/sentinela/audio/AmbienceController.java)):**
+  - Loops `LOOP_WIND` e `LOOP_STORM_WIND` têm seus ganhos modulados dinamicamente pela intensidade do vento e tempestade.
+

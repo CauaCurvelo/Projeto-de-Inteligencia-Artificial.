@@ -4,6 +4,7 @@ import br.edu.unex.sentinela.ai.MobSteeringHelper;
 import br.edu.unex.sentinela.world.Burrow;
 import br.edu.unex.sentinela.world.Firefly;
 import br.edu.unex.sentinela.world.FoodItem;
+import br.edu.unex.sentinela.world.LightningStrike;
 import br.edu.unex.sentinela.world.MeatItem;
 import br.edu.unex.sentinela.world.MeatTier;
 import br.edu.unex.sentinela.world.Particle;
@@ -111,6 +112,13 @@ public class PassiveAnimal {
                        List<FoodItem> foodList, List<Burrow> burrows, List<Firefly> fireflies,
                        List<Particle> particles, TileMap tileMap, List<WaterRipple> ripples,
                        WeatherType weather, double timeProgress) {
+        update(dt, player, predators, allPassives, foodList, burrows, fireflies, particles, tileMap, ripples, weather, timeProgress, null);
+    }
+
+    public void update(double dt, Player player, List<Enemy> predators, List<PassiveAnimal> allPassives,
+                       List<FoodItem> foodList, List<Burrow> burrows, List<Firefly> fireflies,
+                       List<Particle> particles, TileMap tileMap, List<WaterRipple> ripples,
+                       WeatherType weather, double timeProgress, List<LightningStrike> lightningStrikes) {
         if (despawned) return;
 
         stateTimer -= dt;
@@ -120,7 +128,7 @@ public class PassiveAnimal {
         if (frogTongueTimer > 0) frogTongueTimer -= dt;
         burrowCooldown = Math.max(0.0, burrowCooldown - dt);
 
-        // 1. Identificar a ameaça mais próxima (Jogador ou Predador)
+        // 1. Identificar a ameaça mais próxima (Jogador, Predador ou Telégrafo de Raio)
         double nearestThreatDist = 99999.0;
         double threatX = 0;
         double threatY = 0;
@@ -142,6 +150,23 @@ public class PassiveAnimal {
                     nearestThreatDist = de;
                     threatX = enemy.getX();
                     threatY = enemy.getY();
+                }
+            }
+        }
+
+        if (lightningStrikes != null) {
+            for (LightningStrike ls : lightningStrikes) {
+                if (ls.isWarning()) {
+                    double dls = Math.hypot(ls.getX() - x, ls.getY() - y);
+                    if (dls < 90.0 && dls < nearestThreatDist) {
+                        nearestThreatDist = dls;
+                        threatX = ls.getX();
+                        threatY = ls.getY();
+                        if (state != State.FLEEING && state != State.BURROWED) {
+                            state = State.FLEEING;
+                            fleeDuration = 3.5;
+                        }
+                    }
                 }
             }
         }
@@ -1119,6 +1144,7 @@ public class PassiveAnimal {
     public double getFlightHeight() { return flightHeight; }
     public State getState() { return state; }
     public int getHp() { return hp; }
+    public boolean isDead() { return hp <= 0 || despawned; }
     public boolean isDespawned() { return despawned; }
     public double getFrogTongueTimer() { return frogTongueTimer; }
     public double getFrogTongueTargetX() { return frogTongueTargetX; }

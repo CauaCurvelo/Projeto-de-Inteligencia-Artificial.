@@ -46,15 +46,20 @@ public class World {
     private final HighScoreManager highScoreManager = new HighScoreManager();
     private final EcosystemSpawner ecosystemSpawner = new EcosystemSpawner();
 
-    // Dynamic Weather System
+    // Dynamic Weather & Wind System
     private WeatherType currentWeather = WeatherType.CLEAR;
     private double weatherTimer = 0.0;
     private final double weatherDuration = 45.0;
     private static final double WEATHER_TRANSITION_DURATION = 4.0;
     private double rainIntensity = 0.0;
     private double fogIntensity = 0.0;
+    private double stormIntensity = 0.0;
+    private double lightningCooldown = 5.0;
+    private double lightningFlash = 0.0;
     private double lastDeltaTime = 0.016;
     private final List<WeatherDrop> rainDrops = new ArrayList<>();
+    private final WindSystem windSystem = new WindSystem();
+    private final List<LightningStrike> activeLightningStrikes = new ArrayList<>();
 
     // Infinite Survival & Scoring Mechanics
     private double survivalTime = 0.0;
@@ -132,6 +137,10 @@ public class World {
         weatherTimer = 0.0;
         rainIntensity = 0.0;
         fogIntensity = 0.0;
+        stormIntensity = 0.0;
+        lightningCooldown = 5.0;
+        lightningFlash = 0.0;
+        activeLightningStrikes.clear();
         initRainDrops(130);
         currentWorldSeed = generateRandomSeed();
         gameOver = false;
@@ -188,6 +197,7 @@ public class World {
         }
 
         camera.updateMenuPan(survivalTime);
+        windSystem.update(deltaTime, camera.getX(), camera.getY(), camera.getViewportWidth(), camera.getViewportHeight(), currentWeather, BiomeType.MEADOW);
     }
 
     private void spawnFoodNearPlayer() {
@@ -236,14 +246,24 @@ public class World {
         if (weatherTimer >= weatherDuration) {
             weatherTimer = 0.0;
             switch (currentWeather) {
-                case CLEAR: currentWeather = rand.nextBoolean() ? WeatherType.RAIN : WeatherType.FOG; break;
-                case RAIN: currentWeather = rand.nextBoolean() ? WeatherType.CLEAR : WeatherType.FOG; break;
-                case FOG: currentWeather = rand.nextBoolean() ? WeatherType.CLEAR : WeatherType.RAIN; break;
+                case CLEAR:
+                    currentWeather = (rand.nextDouble() < 0.50) ? WeatherType.RAIN : WeatherType.FOG;
+                    break;
+                case RAIN:
+                    currentWeather = (rand.nextDouble() < 0.38) ? WeatherType.STORM : (rand.nextBoolean() ? WeatherType.CLEAR : WeatherType.FOG);
+                    break;
+                case FOG:
+                    currentWeather = rand.nextBoolean() ? WeatherType.CLEAR : WeatherType.RAIN;
+                    break;
+                case STORM:
+                    currentWeather = (rand.nextDouble() < 0.70) ? WeatherType.RAIN : WeatherType.CLEAR;
+                    break;
             }
         }
 
-        double targetRain = (currentWeather == WeatherType.RAIN) ? 1.0 : 0.0;
+        double targetRain = (currentWeather == WeatherType.RAIN || currentWeather == WeatherType.STORM) ? 1.0 : 0.0;
         double targetFog = (currentWeather == WeatherType.FOG) ? 1.0 : 0.0;
+        double targetStorm = (currentWeather == WeatherType.STORM) ? 1.0 : 0.0;
         double transStep = deltaTime / WEATHER_TRANSITION_DURATION;
 
         if (rainIntensity < targetRain) {
@@ -256,6 +276,45 @@ public class World {
             fogIntensity = Math.min(targetFog, fogIntensity + transStep);
         } else if (fogIntensity > targetFog) {
             fogIntensity = Math.max(targetFog, fogIntensity - transStep);
+        }
+
+        if (stormIntensity < targetStorm) {
+            stormIntensity = Math.min(targetStorm, stormIntensity + transStep);
+        } else if (stormIntensity > targetStorm) {
+            stormIntensity = Math.max(targetStorm, stormIntensity - transStep);
+        }
+
+        // Atualização dinâmica do Sistema de Vento (suave e diegético)
+        double camX = (camera != null) ? camera.getX() : 0.0;
+        double camY = (camera != null) ? camera.getY() : 0.0;
+        double vpW = (camera != null) ? camera.getViewportWidth() : 960.0;
+        double vpH = (camera != null) ? camera.getViewportHeight() : 640.0;
+        BiomeType currentBiome = BiomeType.MEADOW;
+        if (player != null && tileMap != null) {
+            currentBiome = tileMap.getBiomeAtWorld(player.getX(), player.getY());
+        }
+        windSystem.update(deltaTime, camX, camY, vpW, vpH, currentWeather, currentBiome);
+
+        // Atualização dos raios ativos e quedas de raios em tempestade
+        Iterator<LightningStrike> strikeIt = activeLightningStrikes.iterator();
+        while (strikeIt.hasNext()) {
+            LightningStrike strike = strikeIt.next();
+            strike.update(deltaTime, this);
+            if (strike.isDead()) {
+                strikeIt.remove();
+            }
+        }
+
+        if (stormIntensity > 0.25 || currentWeather == WeatherType.STORM) {
+            lightningCooldown -= deltaTime;
+            if (lightningCooldown <= 0) {
+                lightningCooldown = 3.6 + rand.nextDouble() * (5.5 - stormIntensity * 2.5);
+                spawnStormLightning(camX, camY, vpW, vpH);
+            }
+        }
+
+        if (lightningFlash > 0.0) {
+            lightningFlash = Math.max(0.0, lightningFlash - deltaTime * 4.5);
         }
 
         // Procedural entity & food streaming (limited density, only near trees or bushes)
@@ -286,7 +345,8 @@ public class World {
 
         // Update Player
         player.update(inputManager.getDx(), inputManager.getDy(), inputManager.isSprinting(), 
-                      inputManager.isAttackPressed(), deltaTime, tileMap, scentTrail, particles, burrows);
+                      inputManager.isAttackPressed(), deltaTime, tileMap, scentTrail, particles, burrows,
+                      windSystem.getWindVx(), windSystem.getWindVy(), windSystem.getIntensity());
 
         if (player.getHunger() <= 0) {
             triggerGameOver("Você sucumbiu à inanição (Fome esgotada)!");
@@ -346,7 +406,7 @@ public class World {
         if (player.isOnIce() && Math.hypot(player.getSlideVx(), player.getSlideVy()) > 130.0) {
             GameEventBus.get().post(new GameEvent(GameEvent.Type.ICE_DRIFT));
         }
-        BiomeType currentBiome = tileMap.getBiomeAtWorld(player.getX(), player.getY());
+        currentBiome = tileMap.getBiomeAtWorld(player.getX(), player.getY());
         GameEventBus.get().post(new GameEvent(GameEvent.Type.BIOME_VISITED, currentBiome));
 
         AchievementTracker.get().updateTick(survivalTime, score, player.getLives());
@@ -373,7 +433,7 @@ public class World {
         Iterator<Projectile> projIt = projectiles.iterator();
         while (projIt.hasNext()) {
             Projectile proj = projIt.next();
-            proj.update(deltaTime, tileMap);
+            proj.update(deltaTime, tileMap, windSystem.getWindVx(), windSystem.getWindVy());
 
             if (proj.isActive()) {
                 double dist = Math.hypot(proj.getX() - player.getX(), proj.getY() - player.getY());
@@ -510,7 +570,7 @@ public class World {
         Iterator<PassiveAnimal> passIt = passiveAnimals.iterator();
         while (passIt.hasNext()) {
             PassiveAnimal animal = passIt.next();
-            animal.update(deltaTime, player, enemies, passiveAnimals, foodItems, burrows, fireflies, particles, tileMap, waterRipples, currentWeather, timeProgress);
+            animal.update(deltaTime, player, enemies, passiveAnimals, foodItems, burrows, fireflies, particles, tileMap, waterRipples, currentWeather, timeProgress, activeLightningStrikes);
 
             // Ataque da Raposa contra a fauna passiva
             if (player.isAttacking() && !player.hasProcessedAttackHit()) {
@@ -583,7 +643,7 @@ public class World {
                 enemyIt.remove();
                 continue;
             }
-            enemy.update(deltaTime, player, foodItems, meatItems, passiveAnimals, bearTraps, scentTrail, projectiles, enemies, tileMap, waterRipples, timeProgress, currentWeather);
+            enemy.update(deltaTime, player, foodItems, meatItems, passiveAnimals, bearTraps, scentTrail, projectiles, enemies, tileMap, waterRipples, timeProgress, currentWeather, windSystem.getWindVx(), windSystem.getWindVy(), windSystem.getIntensity(), activeLightningStrikes);
 
             double distToPlayer = Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY());
             if (distToPlayer < 460.0) {
@@ -803,6 +863,54 @@ public class World {
     public List<PassiveAnimal> getPassiveAnimals() { return passiveAnimals; }
     public List<Firefly> getFireflies() { return fireflies; }
     public List<BearTrap> getBearTraps() { return bearTraps; }
+
+    public WindSystem getWindSystem() { return windSystem; }
+    public double getWindVx() { return windSystem.getWindVx(); }
+    public double getWindVy() { return windSystem.getWindVy(); }
+    public double getWindIntensity() { return windSystem.getIntensity(); }
+    public double getWindAngle() { return windSystem.getAngle(); }
+    public List<LightningStrike> getActiveLightningStrikes() { return activeLightningStrikes; }
+    public double getStormIntensity() { return stormIntensity; }
+    public double getLightningFlash() { return lightningFlash; }
+    public void triggerLightningFlash(double val) { this.lightningFlash = Math.max(this.lightningFlash, val); }
+
+    private void spawnStormLightning(double camX, double camY, double vpW, double vpH) {
+        double strikeX;
+        double strikeY;
+
+        if (rand.nextDouble() < 0.80) {
+            List<double[]> potentialTargets = new ArrayList<>();
+            if (player != null) {
+                potentialTargets.add(new double[]{player.getX(), player.getY()});
+            }
+            for (Enemy e : enemies) {
+                if (e.getHp() > 0 && camera != null && camera.isPointInView(e.getX(), e.getY(), 60.0)) {
+                    potentialTargets.add(new double[]{e.getX(), e.getY()});
+                }
+            }
+            for (PassiveAnimal a : passiveAnimals) {
+                if (!a.isDead() && camera != null && camera.isPointInView(a.getX(), a.getY(), 60.0)) {
+                    potentialTargets.add(new double[]{a.getX(), a.getY()});
+                }
+            }
+
+            if (!potentialTargets.isEmpty()) {
+                double[] target = potentialTargets.get(rand.nextInt(potentialTargets.size()));
+                double angle = rand.nextDouble() * 2.0 * Math.PI;
+                double offsetDist = 26.0 + rand.nextDouble() * 32.0;
+                strikeX = target[0] + Math.cos(angle) * offsetDist;
+                strikeY = target[1] + Math.sin(angle) * offsetDist;
+            } else {
+                strikeX = camX + 40.0 + rand.nextDouble() * (vpW - 80.0);
+                strikeY = camY + 40.0 + rand.nextDouble() * (vpH - 80.0);
+            }
+        } else {
+            strikeX = camX + 30.0 + rand.nextDouble() * (vpW - 60.0);
+            strikeY = camY + 30.0 + rand.nextDouble() * (vpH - 60.0);
+        }
+
+        activeLightningStrikes.add(new LightningStrike(strikeX, strikeY));
+    }
     public List<WaterRipple> getWaterRipples() { return waterRipples; }
 
     /**
