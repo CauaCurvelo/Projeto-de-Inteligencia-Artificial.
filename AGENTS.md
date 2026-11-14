@@ -274,3 +274,13 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
     - Perseguição direta via `Pathfinder.hasClearWorldCorridor` habilitada para caça de presas passivas e disputa territorial entre cães e lobos.
     - Supressão de repulsão (`computeSeparationForce`) entre rivais territoriais em combate direto para permitir que se aproximem e troquem golpes.
     - Caixa de acerto do ataque da Raposa sincronizada com seu ângulo de visão (`visualAngle`).
+- **Mecânica de Ascensão Aérea do Pássaro & Limite de Captura ([PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java), [PassiveAnimalRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/PassiveAnimalRenderer.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java), [Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java)):**
+  - Limite de altura de captura: `PassiveAnimal.BIRD_MAX_CATCHABLE_ALTITUDE = 24.0`.
+  - Enquanto o pássaro está no chão debicando sementes ou iniciando o voo de fuga (`flightHeight <= 24.0px`), ele mantém tamanho original (`scale = 1.0`) e 100% de opacidade (`alpha = 1.0`), sendo passível de captura (`isCatchable() == true`) pela raposa ou predadores.
+  - Ao subir acima do limiar (`flightHeight > 24.0px`), torna-se inalcançável (`isCatchable() == false`): a raposa e os predadores não conseguem atingi-lo e predadores interrompem a perseguição imediatamente.
+  - Efeito visual de perspectiva aérea: o pássaro cresce progressivamente na câmera superior até `1.70x` à medida que ganha altitude, esmaecendo suavemente sua opacidade (`alpha` de 1.0 a 0.0) até desaparecer no céu, acompanhado pelo esmaecimento gradual de sua sombra no solo.
+- **Remodelação Artística da Flecha 2.5D ([EntityRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/EntityRenderer.java)):**
+  - Ponta de ferro forjado cinza-aço em diamante alongado com farpas chanfradas e nervura central de brilho especular.
+  - Haste cilíndrica de madeira de freixo com faixas de amarração em linha encerada.
+  - Empenagem traseira com 3 rêmiges de penas aerodinâmicas chanfradas em vermelho carmesim e nock entalhado.
+  - Efeito balístico 2.5D: sombra projetada no solo deslocada dinamicamente conforme a parábola do tiro, acompanhada de micro-trilha de vento aerodinâmica.
