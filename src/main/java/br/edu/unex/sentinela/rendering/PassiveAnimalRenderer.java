@@ -33,6 +33,9 @@ public class PassiveAnimalRenderer {
         boolean moving = animal.isMoving();
         boolean fleeing = animal.getState() == PassiveAnimal.State.FLEEING;
         boolean alert = animal.getState() == PassiveAnimal.State.ALERT;
+        boolean drinking = animal.getState() == PassiveAnimal.State.DRINKING;
+        boolean foragingBush = animal.getState() == PassiveAnimal.State.FORAGING_BUSH;
+        boolean sheltering = animal.getState() == PassiveAnimal.State.SHELTERING;
         PassiveAnimalType type = animal.getType();
 
         // 1. Sombra Projetada no Solo (Permanece no chão em ax, ay)
@@ -61,6 +64,14 @@ public class PassiveAnimalRenderer {
         gc.translate(ax, ay - totalAltitude);
         gc.rotate(angleDeg);
 
+        if (sheltering) {
+            gc.scale(0.90, 0.90);
+        } else if (drinking) {
+            gc.scale(1.05, 0.94);
+        } else if (foragingBush) {
+            gc.translate(Math.sin(animal.getPeckTimer() * 2.5) * 1.2, 0.0);
+        }
+
         if (type == PassiveAnimalType.BIRD && animal.getState() == PassiveAnimal.State.FLYING_AWAY) {
             // Efeito visual de ascensão aérea em direção à câmera/céu:
             // Enquanto baixo (fly <= 24px): escala 1.0 (tamanho normal) e opacidade 1.0 (0% transparência).
@@ -86,6 +97,21 @@ public class PassiveAnimalRenderer {
             case BIRD:
                 drawBirdTopDown(walk, breath, fly, moving, animal.getState() == PassiveAnimal.State.FLYING_AWAY, animal.getPeckTimer());
                 break;
+        }
+
+        // Língua retrátil elástica do sapo capturando vaga-lumes
+        if (type == PassiveAnimalType.FROG && animal.getFrogTongueTimer() > 0) {
+            double tx = animal.getFrogTongueTargetX() - animal.getX();
+            double ty = animal.getFrogTongueTargetY() - animal.getY();
+            double vAngle = animal.getVisualAngle();
+            double localTx = tx * Math.cos(-vAngle) - ty * Math.sin(-vAngle);
+            double localTy = tx * Math.sin(-vAngle) + ty * Math.cos(-vAngle);
+
+            gc.setStroke(Color.web("#FF80AB", 0.92));
+            gc.setLineWidth(2.2);
+            gc.strokeLine(6.0, 0.0, localTx, localTy);
+            gc.setFill(Color.web("#FF4081"));
+            gc.fillOval(localTx - 2.5, localTy - 2.5, 5.0, 5.0);
         }
 
         gc.restore();

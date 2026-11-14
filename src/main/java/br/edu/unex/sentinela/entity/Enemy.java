@@ -235,6 +235,11 @@ public class Enemy {
         this.currentVisionRange = baseVisionRange * weather.getVisionMultiplier() * visionScale;
         this.currentHearingSensitivity = baseHearingSensitivity * weather.getSoundMultiplier();
 
+        if (state == AIState.RESTING) {
+            this.currentVisionRange = 0.0;
+            this.currentHearingSensitivity = baseHearingSensitivity * 0.35;
+        }
+
         double duskBoost = 1.0 + (timeProgress * 0.15);
         TileType currentTile = tileMap.getTileAt(curCol, curRow);
 
@@ -560,6 +565,35 @@ public class Enemy {
     private void updateRival(boolean canSee, boolean canHear, Player player, List<FoodItem> foodList, List<MeatItem> meatList,
                              List<PassiveAnimal> preyList, List<Enemy> allEnemies,
                              TileMap tileMap, List<WaterRipple> ripples, double dt, int curCol, int curRow, double distToPlayer) {
+        // Se estiver em repouso pós-refeição (dormindo no ninho/sombra)
+        if (state == AIState.RESTING) {
+            moving = false;
+            vx *= 0.3;
+            vy *= 0.3;
+            satiationTimer -= dt;
+
+            // Se a raposa se aproximar correndo (ruído alto) ou encostar muito perto (< 28px), o predador acorda em alerta!
+            if (distToPlayer < 28.0 || (distToPlayer < 65.0 && player.isSprinting() && !player.isBurrowed())) {
+                state = AIState.ALERT;
+                alertTimer = 4.0;
+                targetAimX = player.getX();
+                targetAimY = player.getY();
+                faceAngle = Math.atan2(player.getY() - y, player.getX() - x);
+                if (skin == EnemySkin.WOLF) {
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.WOLF_SNARL, 0.80, 0, 1.05);
+                } else if (skin == EnemySkin.BOAR) {
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BOAR_GRUNT, 0.80, 0, 1.0);
+                }
+                return;
+            }
+
+            if (satiationTimer <= 0) {
+                state = AIState.PATROL;
+                patrolPauseTimer = 1.6;
+            }
+            return;
+        }
+
         // Se estiver ativamente bebendo água na margem
         if (state == AIState.DRINKING) {
             drinkingTimer -= dt;
@@ -797,7 +831,19 @@ public class Enemy {
             }
         }
 
-        state = (satiationTimer > 0) ? AIState.SATIATED : AIState.PATROL;
+        if (satiationTimer > 0) {
+            // Predadores alimentados entram em repouso e dormem se o ambiente estiver calmo
+            if (isPredator && distToPlayer > 120.0 && state == AIState.SATIATED && patrolPauseTimer > 0.4) {
+                state = AIState.RESTING;
+                moving = false;
+                vx = 0;
+                vy = 0;
+                return;
+            }
+            state = AIState.SATIATED;
+        } else {
+            state = AIState.PATROL;
+        }
         if (isPathFinished()) {
             handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
         }
@@ -912,11 +958,11 @@ public class Enemy {
      */
     private void executeFluidMovement(double deltaTime, double maxSpeed, Player player, List<Enemy> allEnemies,
                                       TileMap tileMap, List<Footprint> scentTrail, TileType currentTile) {
-        if (state == AIState.AIMING || state == AIState.ROARING || state == AIState.DRINKING || patrolPauseTimer > 0) {
+        if (state == AIState.AIMING || state == AIState.ROARING || state == AIState.DRINKING || state == AIState.RESTING || patrolPauseTimer > 0) {
             this.moving = false;
             this.vx *= 0.5;
             this.vy *= 0.5;
-            if (state != AIState.ROARING && state != AIState.DRINKING) {
+            if (state != AIState.ROARING && state != AIState.DRINKING && state != AIState.RESTING) {
                 double[] drift = MobSteeringHelper.computePausedDispersionVelocity(this, allEnemies);
                 if (Math.hypot(drift[0], drift[1]) > 2.0) {
                     moveWithCollisionSlide(drift[0] * deltaTime, drift[1] * deltaTime, tileMap);
@@ -1004,8 +1050,14 @@ public class Enemy {
             double distT = Math.hypot(targetAimX - x, targetAimY - y);
             if (distT > 10.0 && distT < 280.0 &&
                 Pathfinder.hasClearWorldCorridor(tileMap, x, y, targetAimX, targetAimY, isCroc)) {
-                desiredDirX = (targetAimX - x) / distT;
-                desiredDirY = (targetAimY - y) / distT;
+                if (skin == EnemySkin.WOLF) {
+                    double[] flankDir = MobSteeringHelper.computePackFlankingDirection(this, allEnemies, targetAimX, targetAimY);
+                    desiredDirX = flankDir[0];
+                    desiredDirY = flankDir[1];
+                } else {
+                    desiredDirX = (targetAimX - x) / distT;
+                    desiredDirY = (targetAimY - y) / distT;
+                }
                 hasTarget = true;
             }
         }
@@ -1136,6 +1188,15 @@ public class Enemy {
     public boolean takeDamage(int amount, double fromX, double fromY) {
         this.hp -= amount;
         this.damageFlashTimer = 0.22;
+
+        if (state == AIState.RESTING || state == AIState.DRINKING) {
+            this.state = AIState.ALERT;
+            this.alertTimer = 4.5;
+            this.satiationTimer = 0.0;
+            this.targetAimX = fromX;
+            this.targetAimY = fromY;
+            this.faceAngle = Math.atan2(fromY - y, fromX - x);
+        }
 
         if (bossController != null) {
             bossController.onDamaged(hp, maxHp, fromX, fromY, x, y);

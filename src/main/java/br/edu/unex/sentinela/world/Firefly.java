@@ -14,6 +14,7 @@ public class Firefly {
     private final double pulseSpeed;
     private double lifeTime;
     private final BiomeType biome;
+    private boolean eaten = false;
 
     public Firefly(double x, double y, BiomeType biome) {
         this.x = x;
@@ -44,4 +45,6 @@ public class Firefly {
     public double getY() { return y; }
     public double getFloatZ() { return floatZ; }
     public BiomeType getBiome() { return biome; }
+    public boolean isEaten() { return eaten; }
+    public void setEaten(boolean eaten) { this.eaten = eaten; }
 }

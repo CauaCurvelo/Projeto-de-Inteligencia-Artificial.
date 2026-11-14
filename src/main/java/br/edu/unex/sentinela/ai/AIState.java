@@ -20,7 +20,8 @@ public enum AIState {
     CHARGING("Investida com Presas"),
     DRINKING("Bebendo Água"),
     KITING("Recuo Tático com Arco"),
-    SATIATED("Saciado e em Digestão");
+    SATIATED("Saciado e em Digestão"),
+    RESTING("Descansando e Dormindo");
 
     private final String description;
 

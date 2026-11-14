@@ -1,5 +1,6 @@
 package br.edu.unex.sentinela.rendering;
 
+import br.edu.unex.sentinela.ai.AIState;
 import br.edu.unex.sentinela.ai.AnimalVariant;
 import br.edu.unex.sentinela.ai.EnemySkin;
 import br.edu.unex.sentinela.ai.EnemyType;
@@ -138,10 +139,13 @@ public class CharacterSpriteRenderer {
             return;
         }
 
+        boolean resting = (enemy.getState() == AIState.RESTING);
         double angleDeg = Math.toDegrees(enemy.getFaceAngle());
-        double walk = enemy.getWalkPhase();
-        double breath = Math.sin(enemy.getBreathTimer() * 3.4) * 0.045;
-        boolean moving = enemy.isMoving();
+        double walk = resting ? 0.0 : enemy.getWalkPhase();
+        double breath = resting
+                ? Math.sin(enemy.getBreathTimer() * 1.8) * 0.030
+                : Math.sin(enemy.getBreathTimer() * 3.4) * 0.045;
+        boolean moving = !resting && enemy.isMoving();
 
         gc.save();
         gc.translate(ex, ey);
@@ -155,15 +159,26 @@ public class CharacterSpriteRenderer {
         if (type == EnemyType.HUNTER) {
             drawBipedHunter(walk, breath, moving, palette);
         } else if (type == EnemyType.HOUND) {
-            drawTrackerHound(walk, breath, moving, palette);
+            drawTrackerHound(walk, breath, moving, palette, resting);
         } else if (type == EnemyType.RIVAL) {
             if (skin == EnemySkin.WOLF) {
-                drawTimberWolf(walk, breath, moving, palette);
+                drawTimberWolf(walk, breath, moving, palette, resting);
             } else if (skin == EnemySkin.BADGER) {
-                drawFierceBadger(walk, breath, moving, palette);
+                drawFierceBadger(walk, breath, moving, palette, resting);
             } else {
-                drawWildBoar(walk, breath, moving, palette, variant == AnimalVariant.JUNGLE);
+                drawWildBoar(walk, breath, moving, palette, variant == AnimalVariant.JUNGLE, resting);
             }
+        }
+
+        if (resting) {
+            double zPhase = (enemy.getBreathTimer() * 0.65) % 1.0;
+            double zAlpha = Math.sin(zPhase * Math.PI) * 0.80;
+            gc.save();
+            gc.setGlobalAlpha(zAlpha);
+            gc.setFill(Color.web("#80CBC4"));
+            gc.setFont(javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 10.0));
+            gc.fillText("z", 10.0 + zPhase * 5.0, -12.0 - zPhase * 8.0);
+            gc.restore();
         }
 
         gc.restore();
@@ -229,7 +244,7 @@ public class CharacterSpriteRenderer {
         gc.restore();
     }
 
-    private void drawTrackerHound(double walk, double breath, boolean moving, EnemyPalette p) {
+    private void drawTrackerHound(double walk, double breath, boolean moving, EnemyPalette p, boolean resting) {
         double stride = moving ? Math.sin(walk) * 5.5 : 0.0;
         double wag = Math.sin(moving ? walk * 1.5 : breath * 10) * 3.5;
 
@@ -268,12 +283,19 @@ public class CharacterSpriteRenderer {
         gc.fillOval(5.5 + earSwing, -9.8, 7.5, 4.8);
         gc.fillOval(5.5 - earSwing, 5.0, 7.5, 4.8);
 
-        gc.setFill(p.eye);
-        gc.fillOval(11.0, -3.6, 2.2, 2.0);
-        gc.fillOval(11.0, 1.6, 2.2, 2.0);
+        if (resting) {
+            gc.setStroke(p.dark);
+            gc.setLineWidth(1.4);
+            gc.strokeLine(10.0, -2.6, 13.0, -2.6);
+            gc.strokeLine(10.0, 2.6, 13.0, 2.6);
+        } else {
+            gc.setFill(p.eye);
+            gc.fillOval(11.0, -3.6, 2.2, 2.0);
+            gc.fillOval(11.0, 1.6, 2.2, 2.0);
+        }
     }
 
-    private void drawTimberWolf(double walk, double breath, boolean moving, EnemyPalette p) {
+    private void drawTimberWolf(double walk, double breath, boolean moving, EnemyPalette p, boolean resting) {
         double stride = moving ? Math.sin(walk) * 5.6 : 0.0;
         double wag = Math.sin(moving ? walk : breath * 8) * 2.5;
 
@@ -306,12 +328,19 @@ public class CharacterSpriteRenderer {
         gc.fillPolygon(new double[]{6.5, 2.5, 9.5}, new double[]{-4.2, -9.5, -7.2}, 3);
         gc.fillPolygon(new double[]{6.5, 2.5, 9.5}, new double[]{4.2, 9.5, 7.2}, 3);
 
-        gc.setFill(p.eye);
-        gc.fillOval(11.0, -3.6, 2.4, 2.0);
-        gc.fillOval(11.0, 1.6, 2.4, 2.0);
+        if (resting) {
+            gc.setStroke(p.dark);
+            gc.setLineWidth(1.4);
+            gc.strokeLine(10.0, -2.6, 13.0, -2.6);
+            gc.strokeLine(10.0, 2.6, 13.0, 2.6);
+        } else {
+            gc.setFill(p.eye);
+            gc.fillOval(11.0, -3.6, 2.4, 2.0);
+            gc.fillOval(11.0, 1.6, 2.4, 2.0);
+        }
     }
 
-    private void drawWildBoar(double walk, double breath, boolean moving, EnemyPalette p, boolean spottedCoat) {
+    private void drawWildBoar(double walk, double breath, boolean moving, EnemyPalette p, boolean spottedCoat, boolean resting) {
         double stride = moving ? Math.sin(walk) * 4.5 : 0.0;
 
         gc.setFill(Color.color(0, 0, 0, 0.44));
@@ -345,18 +374,25 @@ public class CharacterSpriteRenderer {
         gc.fillPolygon(new double[]{12.0, 18.5, 14.0}, new double[]{-4.5, -8.5, -2.5}, 3);
         gc.fillPolygon(new double[]{12.0, 18.5, 14.0}, new double[]{4.5, 8.5, 2.5}, 3);
 
-        gc.setFill(p.eye);
-        gc.fillRoundRect(14.0, -3.8, 4.0, 7.6, 3, 3);
-        gc.setFill(p.dark);
-        gc.fillOval(16.0, -2.4, 1.5, 1.5);
-        gc.fillOval(16.0, 0.9, 1.5, 1.5);
+        if (resting) {
+            gc.setStroke(p.dark);
+            gc.setLineWidth(1.5);
+            gc.strokeLine(13.0, -1.8, 17.0, -1.8);
+            gc.strokeLine(13.0, 1.8, 17.0, 1.8);
+        } else {
+            gc.setFill(p.eye);
+            gc.fillRoundRect(14.0, -3.8, 4.0, 7.6, 3, 3);
+            gc.setFill(p.dark);
+            gc.fillOval(16.0, -2.4, 1.5, 1.5);
+            gc.fillOval(16.0, 0.9, 1.5, 1.5);
+        }
 
         gc.setFill(p.secondary.darker());
         gc.fillOval(5.5, -9.5, 5.5, 3.5);
         gc.fillOval(5.5, 6.0, 5.5, 3.5);
     }
 
-    private void drawFierceBadger(double walk, double breath, boolean moving, EnemyPalette p) {
+    private void drawFierceBadger(double walk, double breath, boolean moving, EnemyPalette p, boolean resting) {
         double stride = moving ? Math.sin(walk) * 4.2 : 0.0;
 
         gc.setFill(Color.color(0, 0, 0, 0.42));
@@ -384,6 +420,17 @@ public class CharacterSpriteRenderer {
 
         gc.setFill(Color.web("#000000"));
         gc.fillOval(15.2, -1.8, 3.2, 3.6);
+
+        if (resting) {
+            gc.setStroke(p.dark);
+            gc.setLineWidth(1.3);
+            gc.strokeLine(8.5, -2.5, 11.5, -2.5);
+            gc.strokeLine(8.5, 2.5, 11.5, 2.5);
+        } else {
+            gc.setFill(p.eye);
+            gc.fillOval(9.0, -3.2, 2.2, 1.8);
+            gc.fillOval(9.0, 1.4, 2.2, 1.8);
+        }
     }
 
     /**

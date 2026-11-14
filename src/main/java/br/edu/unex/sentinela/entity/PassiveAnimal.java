@@ -1,10 +1,16 @@
 package br.edu.unex.sentinela.entity;
 
+import br.edu.unex.sentinela.ai.MobSteeringHelper;
+import br.edu.unex.sentinela.world.Burrow;
+import br.edu.unex.sentinela.world.Firefly;
+import br.edu.unex.sentinela.world.FoodItem;
 import br.edu.unex.sentinela.world.MeatItem;
 import br.edu.unex.sentinela.world.MeatTier;
+import br.edu.unex.sentinela.world.Particle;
 import br.edu.unex.sentinela.world.TileMap;
 import br.edu.unex.sentinela.world.TileType;
 import br.edu.unex.sentinela.world.WaterRipple;
+import br.edu.unex.sentinela.world.WeatherType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,7 +28,10 @@ public class PassiveAnimal {
         FORAGING,
         ALERT,
         FLEEING,
-        FLYING_AWAY
+        FLYING_AWAY,
+        DRINKING,
+        FORAGING_BUSH,
+        SHELTERING
     }
 
     private final PassiveAnimalType type;
@@ -55,6 +64,21 @@ public class PassiveAnimal {
     private double rippleCooldown = 0.0;
     private boolean despawned = false;
 
+    // Dinâmica de ecossistema vivo (sede, pastoreio em arbustos, caça de vaga-lumes e abrigo)
+    private double thirstTimer = 22.0 + RAND.nextDouble() * 30.0;
+    private double drinkingTimer = 0.0;
+    private double drinkingWaterX = 0.0;
+    private double drinkingWaterY = 0.0;
+    private double drinkingRippleTimer = 0.0;
+
+    private double bushForageCooldown = 12.0 + RAND.nextDouble() * 20.0;
+    private double bushForageTimer = 0.0;
+
+    private double frogFireflyHuntCooldown = 1.0;
+    private double frogTongueTimer = 0.0;
+    private double frogTongueTargetX = 0.0;
+    private double frogTongueTargetY = 0.0;
+
     public PassiveAnimal(PassiveAnimalType type, double x, double y) {
         this.type = type != null ? type : PassiveAnimalType.RABBIT;
         this.x = x;
@@ -69,16 +93,24 @@ public class PassiveAnimal {
     }
 
     public void update(double dt, Player player, List<Enemy> predators, TileMap tileMap, List<WaterRipple> ripples) {
-        update(dt, player, predators, null, tileMap, ripples);
+        update(dt, player, predators, null, null, null, null, null, tileMap, ripples, WeatherType.CLEAR, 0.0);
     }
 
     public void update(double dt, Player player, List<Enemy> predators, List<PassiveAnimal> allPassives, TileMap tileMap, List<WaterRipple> ripples) {
+        update(dt, player, predators, allPassives, null, null, null, null, tileMap, ripples, WeatherType.CLEAR, 0.0);
+    }
+
+    public void update(double dt, Player player, List<Enemy> predators, List<PassiveAnimal> allPassives,
+                       List<FoodItem> foodList, List<Burrow> burrows, List<Firefly> fireflies,
+                       List<Particle> particles, TileMap tileMap, List<WaterRipple> ripples,
+                       WeatherType weather, double timeProgress) {
         if (despawned) return;
 
         stateTimer -= dt;
         animPhase += dt * 6.0;
         breathTimer += dt;
         rippleCooldown -= dt;
+        if (frogTongueTimer > 0) frogTongueTimer -= dt;
 
         // 1. Identificar a ameaça mais próxima (Jogador ou Predador)
         double nearestThreatDist = 99999.0;
@@ -107,7 +139,15 @@ public class PassiveAnimal {
         }
 
         // 2. Máquina de Estados da Presa
-        boolean sensedThreat = nearestThreatDist <= type.getPerceptionRadius();
+        double effectivePerception = type.getPerceptionRadius();
+        if (state == State.DRINKING) {
+            // Bebendo com cabeça baixa: percepção reduzida em 25% (foco de emboscadas naturais)
+            effectivePerception *= 0.75;
+        } else if (state == State.SHELTERING) {
+            effectivePerception *= 0.85;
+        }
+
+        boolean sensedThreat = nearestThreatDist <= effectivePerception;
 
         if (state == State.FLYING_AWAY) {
             flightHeight += dt * 45.0;
@@ -140,12 +180,12 @@ public class PassiveAnimal {
                 } else {
                     fleeDuration = Math.max(fleeDuration, 2.0);
                 }
-                // Cervo emite sinal de alerta e assusta outros animais passivos no raio de 160px
+                // Cervo emite sinal de alerta e assusta outros animais passivos no raio de 200px
                 if (type == PassiveAnimalType.DEER && allPassives != null) {
                     for (PassiveAnimal other : allPassives) {
                         if (other == this || other.isDespawned()) continue;
                         double dOther = Math.hypot(other.getX() - x, other.getY() - y);
-                        if (dOther < 160.0 && other.getState() != State.FLEEING) {
+                        if (dOther < 200.0 && other.getState() != State.FLEEING) {
                             other.triggerAlertFlee(threatX, threatY);
                         }
                     }
@@ -166,8 +206,17 @@ public class PassiveAnimal {
 
         // 3. Comportamento Específico por Estado
         switch (state) {
+            case DRINKING:
+                updateDrinking(dt, ripples);
+                break;
+            case FORAGING_BUSH:
+                updateForagingBush(dt, particles);
+                break;
+            case SHELTERING:
+                updateSheltering(dt, weather);
+                break;
             case FORAGING:
-                updateForaging(dt, tileMap);
+                updateForaging(dt, allPassives, foodList, burrows, fireflies, particles, tileMap, ripples, weather, timeProgress);
                 break;
             case ALERT:
                 vx *= 0.82;
@@ -180,7 +229,7 @@ public class PassiveAnimal {
                 }
                 break;
             case FLEEING:
-                updateFleeing(dt, threatX, threatY, tileMap);
+                updateFleeing(dt, threatX, threatY, allPassives, tileMap);
                 break;
             default:
                 break;
@@ -246,6 +295,250 @@ public class PassiveAnimal {
         }
     }
 
+    private void updateDrinking(double dt, List<WaterRipple> ripples) {
+        drinkingTimer -= dt;
+        drinkingRippleTimer -= dt;
+        vx = 0;
+        vy = 0;
+        moving = false;
+
+        if (drinkingRippleTimer <= 0 && ripples != null) {
+            drinkingRippleTimer = 0.55;
+            ripples.add(new WaterRipple(drinkingWaterX, drinkingWaterY, type == PassiveAnimalType.DEER ? 15.0 : 10.0, 0.70));
+        }
+
+        if (drinkingTimer <= 0) {
+            thirstTimer = 38.0 + RAND.nextDouble() * 32.0;
+            state = State.FORAGING;
+            stateTimer = 1.6;
+        }
+    }
+
+    private void updateForagingBush(double dt, List<Particle> particles) {
+        bushForageTimer -= dt;
+        vx = 0;
+        vy = 0;
+        moving = false;
+        peckTimer += dt * 3.5;
+
+        if (particles != null && RAND.nextDouble() < 0.10) {
+            particles.add(new Particle(x + faceDx * 6.0, y + faceDy * 6.0,
+                (RAND.nextDouble() - 0.5) * 12.0, -6.0 - RAND.nextDouble() * 8.0,
+                0.35, "#81C784", 2.0));
+        }
+
+        if (bushForageTimer <= 0) {
+            if (hp < type.getMaxHp()) hp++;
+            bushForageCooldown = 26.0 + RAND.nextDouble() * 24.0;
+            state = State.FORAGING;
+            stateTimer = 1.6;
+        }
+    }
+
+    private void updateSheltering(double dt, WeatherType weather) {
+        vx = 0;
+        vy = 0;
+        moving = false;
+        if (weather != WeatherType.RAIN) {
+            state = State.FORAGING;
+            stateTimer = 1.4;
+        }
+    }
+
+    private void updateForaging(double dt, List<PassiveAnimal> allPassives, List<FoodItem> foodList,
+                                List<Burrow> burrows, List<Firefly> fireflies, List<Particle> particles,
+                                TileMap tileMap, List<WaterRipple> ripples, WeatherType weather, double timeProgress) {
+        // 1. Abrigo em tempestades/chuvas fortes para pequenas criaturas
+        if (weather == WeatherType.RAIN && type == PassiveAnimalType.RABBIT && burrows != null) {
+            Burrow nearestBurrow = null;
+            double minBurrowDist = 180.0;
+            for (Burrow b : burrows) {
+                double db = Math.hypot(b.getX() - x, b.getY() - y);
+                if (db < minBurrowDist) {
+                    minBurrowDist = db;
+                    nearestBurrow = b;
+                }
+            }
+            if (nearestBurrow != null) {
+                double db = Math.hypot(nearestBurrow.getX() - x, nearestBurrow.getY() - y);
+                if (db <= 22.0) {
+                    state = State.SHELTERING;
+                    vx = 0;
+                    vy = 0;
+                    moving = false;
+                    return;
+                } else {
+                    double ang = Math.atan2(nearestBurrow.getY() - y, nearestBurrow.getX() - x);
+                    vx = Math.cos(ang) * type.getBaseSpeed() * 0.85;
+                    vy = Math.sin(ang) * type.getBaseSpeed() * 0.85;
+                    visualAngle = ang;
+                    faceDx = Math.cos(ang);
+                    faceDy = Math.sin(ang);
+                    return;
+                }
+            }
+        }
+
+        // 2. Caça de vaga-lumes bioluminescentes por sapos anfíbios
+        if (type == PassiveAnimalType.FROG && fireflies != null) {
+            frogFireflyHuntCooldown -= dt;
+            if (frogFireflyHuntCooldown <= 0) {
+                Firefly nearestF = null;
+                double minFDist = 95.0;
+                for (Firefly ff : fireflies) {
+                    if (ff.isEaten()) continue;
+                    double df = Math.hypot(ff.getX() - x, ff.getY() - y);
+                    if (df < minFDist) {
+                        minFDist = df;
+                        nearestF = ff;
+                    }
+                }
+                if (nearestF != null) {
+                    if (minFDist <= 28.0) {
+                        frogTongueTimer = 0.22;
+                        frogTongueTargetX = nearestF.getX();
+                        frogTongueTargetY = nearestF.getY();
+                        nearestF.setEaten(true);
+                        frogFireflyHuntCooldown = 4.0 + RAND.nextDouble() * 3.0;
+                        visualAngle = Math.atan2(nearestF.getY() - y, nearestF.getX() - x);
+                        faceDx = Math.cos(visualAngle);
+                        faceDy = Math.sin(visualAngle);
+                        if (particles != null) {
+                            for (int p = 0; p < 4; p++) {
+                                particles.add(new Particle(nearestF.getX(), nearestF.getY(),
+                                    (RAND.nextDouble() - 0.5) * 25.0, -10.0 - RAND.nextDouble() * 15.0,
+                                    0.45, "#E0F7FA", 2.2));
+                            }
+                        }
+                        vx = 0;
+                        vy = 0;
+                        return;
+                    } else {
+                        double ang = Math.atan2(nearestF.getY() - y, nearestF.getX() - x);
+                        visualAngle = ang;
+                        faceDx = Math.cos(ang);
+                        faceDy = Math.sin(ang);
+                        vx = Math.cos(ang) * type.getBaseSpeed() * 0.65;
+                        vy = Math.sin(ang) * type.getBaseSpeed() * 0.65;
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 3. Forrageamento em arbustos de frutas naturais (Coelhos e Cervos)
+        if ((type == PassiveAnimalType.RABBIT || type == PassiveAnimalType.DEER) && foodList != null) {
+            bushForageCooldown -= dt;
+            if (bushForageCooldown <= 0) {
+                FoodItem nearestBush = null;
+                double minBushDist = 140.0;
+                for (FoodItem fi : foodList) {
+                    if (fi.isEaten()) continue;
+                    double df = Math.hypot(fi.getX() - x, fi.getY() - y);
+                    if (df < minBushDist) {
+                        minBushDist = df;
+                        nearestBush = fi;
+                    }
+                }
+                if (nearestBush != null) {
+                    if (minBushDist <= 18.0) {
+                        state = State.FORAGING_BUSH;
+                        bushForageTimer = 2.8 + RAND.nextDouble() * 1.4;
+                        vx = 0;
+                        vy = 0;
+                        moving = false;
+                        visualAngle = Math.atan2(nearestBush.getY() - y, nearestBush.getX() - x);
+                        faceDx = Math.cos(visualAngle);
+                        faceDy = Math.sin(visualAngle);
+                        return;
+                    } else {
+                        double ang = Math.atan2(nearestBush.getY() - y, nearestBush.getX() - x);
+                        vx = Math.cos(ang) * type.getBaseSpeed() * 0.40;
+                        vy = Math.sin(ang) * type.getBaseSpeed() * 0.40;
+                        visualAngle = ang;
+                        faceDx = Math.cos(ang);
+                        faceDy = Math.sin(ang);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 4. Ciclo de sede e busca de água na margem de rios e lagos
+        thirstTimer -= dt;
+        if (thirstTimer <= 0) {
+            int curCol = (int) Math.floor(x / TileMap.TILE_SIZE);
+            int curRow = (int) Math.floor(y / TileMap.TILE_SIZE);
+            int[] shore = MobSteeringHelper.findNearestWaterShoreTile(tileMap, curCol, curRow, 9);
+            if (shore != null) {
+                double shoreX = shore[0] * TileMap.TILE_SIZE + 16.0;
+                double shoreY = shore[1] * TileMap.TILE_SIZE + 16.0;
+                double dShore = Math.hypot(shoreX - x, shoreY - y);
+                if (dShore <= 18.0) {
+                    state = State.DRINKING;
+                    drinkingTimer = 3.2 + RAND.nextDouble() * 1.8;
+                    drinkingWaterX = shore[2] * TileMap.TILE_SIZE + 16.0;
+                    drinkingWaterY = shore[3] * TileMap.TILE_SIZE + 16.0;
+                    vx = 0;
+                    vy = 0;
+                    moving = false;
+                    visualAngle = Math.atan2(drinkingWaterY - y, drinkingWaterX - x);
+                    faceDx = Math.cos(visualAngle);
+                    faceDy = Math.sin(visualAngle);
+                    return;
+                } else {
+                    double ang = Math.atan2(shoreY - y, shoreX - x);
+                    vx = Math.cos(ang) * type.getBaseSpeed() * 0.45;
+                    vy = Math.sin(ang) * type.getBaseSpeed() * 0.45;
+                    visualAngle = ang;
+                    faceDx = Math.cos(ang);
+                    faceDy = Math.sin(ang);
+                    return;
+                }
+            }
+        }
+
+        // 5. Coesão de bando / rebanho de cervos
+        if (type == PassiveAnimalType.DEER && allPassives != null) {
+            double herdCenterX = 0;
+            double herdCenterY = 0;
+            int deerCount = 0;
+            double pushX = 0;
+            double pushY = 0;
+
+            for (PassiveAnimal other : allPassives) {
+                if (other == this || other.isDespawned() || other.getType() != PassiveAnimalType.DEER) continue;
+                double dd = Math.hypot(other.x - x, other.y - y);
+                if (dd < 180.0) {
+                    herdCenterX += other.x;
+                    herdCenterY += other.y;
+                    deerCount++;
+                    if (dd < 42.0 && dd > 0.001) {
+                        pushX += (x - other.x) / dd;
+                        pushY += (y - other.y) / dd;
+                    }
+                }
+            }
+
+            if (deerCount > 0) {
+                herdCenterX /= deerCount;
+                herdCenterY /= deerCount;
+                double distCentroid = Math.hypot(herdCenterX - x, herdCenterY - y);
+                if (distCentroid > 70.0) {
+                    vx += ((herdCenterX - x) / distCentroid) * type.getBaseSpeed() * 0.18;
+                    vy += ((herdCenterY - y) / distCentroid) * type.getBaseSpeed() * 0.18;
+                }
+                if (Math.hypot(pushX, pushY) > 0.01) {
+                    vx += pushX * 14.0;
+                    vy += pushY * 14.0;
+                }
+            }
+        }
+
+        // Pastoreio padrão
+        updateForaging(dt, tileMap);
+    }
+
     private void updateForaging(double dt, TileMap tileMap) {
         if (stateTimer <= 0) {
             stateTimer = 1.6 + RAND.nextDouble() * 2.4;
@@ -283,6 +576,21 @@ public class PassiveAnimal {
         }
     }
 
+    public void triggerFlightBurst(double originX, double originY) {
+        if (despawned) return;
+        if (type == PassiveAnimalType.BIRD) {
+            if (state != State.FLYING_AWAY) {
+                state = State.FLYING_AWAY;
+                double away = Math.atan2(y - originY, x - originX);
+                faceDx = Math.cos(away);
+                faceDy = Math.sin(away);
+                visualAngle = away;
+            }
+        } else if (state != State.FLEEING) {
+            triggerAlertFlee(originX, originY);
+        }
+    }
+
     public void triggerAlertFlee(double threatX, double threatY) {
         if (state != State.FLEEING && state != State.FLYING_AWAY) {
             if (type == PassiveAnimalType.BIRD) {
@@ -297,6 +605,10 @@ public class PassiveAnimal {
                 stateTimer = fleeDuration;
             }
         }
+    }
+
+    private void updateFleeing(double dt, double threatX, double threatY, List<PassiveAnimal> allPassives, TileMap tileMap) {
+        updateFleeing(dt, threatX, threatY, tileMap);
     }
 
     private void updateFleeing(double dt, double threatX, double threatY, TileMap tileMap) {
@@ -636,4 +948,9 @@ public class PassiveAnimal {
     public State getState() { return state; }
     public int getHp() { return hp; }
     public boolean isDespawned() { return despawned; }
+    public double getFrogTongueTimer() { return frogTongueTimer; }
+    public double getFrogTongueTargetX() { return frogTongueTargetX; }
+    public double getFrogTongueTargetY() { return frogTongueTargetY; }
+    public double getDrinkingWaterX() { return drinkingWaterX; }
+    public double getDrinkingWaterY() { return drinkingWaterY; }
 }

@@ -156,6 +156,11 @@ public class TacticalAuraRenderer {
         double faceAngle = enemy.getFaceAngle();
         double startAngleDeg = -Math.toDegrees(faceAngle) - (fovDeg / 2.0);
 
+        if (enemy.getState() == AIState.RESTING) {
+            // Dormindo em repouso pós-refeição: olhos fechados, cone de visão desligado
+            return;
+        }
+
         boolean isAlert = enemy.getState() == AIState.CHASE ||
                           enemy.getState() == AIState.AIMING ||
                           enemy.getState() == AIState.ROARING ||
@@ -263,7 +268,9 @@ public class TacticalAuraRenderer {
             case DRINKING:
                 return Color.web("#29B6F6"); // Azul Celeste (Bebendo Água na Margem)
             case SATIATED:
-                return Color.web("#81C784"); // Verde Suave (Saciado / Descanso Pós-Refeição)
+                return Color.web("#81C784"); // Verde Suave (Saciado / Digestão)
+            case RESTING:
+                return Color.web("#80CBC4"); // Verde-Água Suave (Adormecido / Repouso)
             case TRAPPED:
                 return Color.web("#90A4AE"); // Aço Acinzentado (Preso)
             case RETREATING:

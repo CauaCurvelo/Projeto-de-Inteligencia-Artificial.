@@ -471,10 +471,11 @@ public class World {
             }
         }
 
+        double timeProgress = (survivalTime / 240.0);
         Iterator<PassiveAnimal> passIt = passiveAnimals.iterator();
         while (passIt.hasNext()) {
             PassiveAnimal animal = passIt.next();
-            animal.update(deltaTime, player, enemies, passiveAnimals, tileMap, waterRipples);
+            animal.update(deltaTime, player, enemies, passiveAnimals, foodItems, burrows, fireflies, particles, tileMap, waterRipples, currentWeather, timeProgress);
 
             // Ataque da Raposa contra a fauna passiva
             if (player.isAttacking() && !player.hasProcessedAttackHit()) {
@@ -486,6 +487,7 @@ public class World {
                 if (distToAnimal <= attackRange && animal.isCatchable()) {
                     player.markAttackHitProcessed();
                     boolean dead = animal.takeDamage(1);
+                    triggerForestDisturbance(animal.getX(), animal.getY(), 190.0);
                     br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.8, 0, 1.15);
                     for (int k = 0; k < 5; k++) {
                         particles.add(new Particle(animal.getX(), animal.getY(),
@@ -523,12 +525,12 @@ public class World {
 
         // 4. Streaming e atualização de vagalumes noturnos
         streamFireflies(deltaTime);
+        fireflies.removeIf(Firefly::isEaten);
         for (Firefly f : fireflies) {
             f.update(deltaTime);
         }
 
         // Update Enemies & Combat
-        double timeProgress = (survivalTime / 240.0);
         Iterator<Enemy> enemyIt = enemies.iterator();
         while (enemyIt.hasNext()) {
             Enemy enemy = enemyIt.next();
@@ -553,6 +555,7 @@ public class World {
                 if (distToAttack <= attackRange) {
                     player.markAttackHitProcessed();
                     boolean defeated = enemy.takeDamage(1, player.getX(), player.getY());
+                    triggerForestDisturbance(enemy.getX(), enemy.getY(), 190.0);
 
                     for (int k = 0; k < 6; k++) {
                         particles.add(new Particle(
@@ -757,6 +760,20 @@ public class World {
     public List<Firefly> getFireflies() { return fireflies; }
     public List<BearTrap> getBearTraps() { return bearTraps; }
     public List<WaterRipple> getWaterRipples() { return waterRipples; }
+
+    /**
+     * Efeito em cadeia de perturbação na floresta:
+     * Quando ocorre combate estrondoso, pássaros voam espantados e presas entram em alerta.
+     */
+    public void triggerForestDisturbance(double x, double y, double radius) {
+        for (PassiveAnimal animal : passiveAnimals) {
+            if (animal.isDespawned()) continue;
+            double dist = Math.hypot(animal.getX() - x, animal.getY() - y);
+            if (dist <= radius) {
+                animal.triggerFlightBurst(x, y);
+            }
+        }
+    }
 
     private void spawnPassiveAnimalNearPlayer() {
         int playerCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
