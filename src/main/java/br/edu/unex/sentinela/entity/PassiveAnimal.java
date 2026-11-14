@@ -16,6 +16,7 @@ import java.util.Random;
  */
 public class PassiveAnimal {
     private static final Random RAND = new Random();
+    public static final double BIRD_MAX_CATCHABLE_ALTITUDE = 24.0;
 
     public enum State {
         FORAGING,
@@ -359,7 +360,18 @@ public class PassiveAnimal {
         return t.isWalkable();
     }
 
+    public boolean isCatchable() {
+        if (despawned) return false;
+        if (type == PassiveAnimalType.BIRD && state == State.FLYING_AWAY) {
+            return flightHeight <= BIRD_MAX_CATCHABLE_ALTITUDE;
+        }
+        return true;
+    }
+
     public boolean takeDamage(int amount) {
+        if (!isCatchable()) {
+            return false;
+        }
         hp -= amount;
         if (hp <= 0) {
             despawned = true;

@@ -454,7 +454,7 @@ public class World {
                 double attackY = player.getY() + Math.sin(player.getVisualAngle()) * 18.0;
                 double distToAnimal = Math.hypot(animal.getX() - attackX, animal.getY() - attackY);
 
-                if (distToAnimal <= attackRange) {
+                if (distToAnimal <= attackRange && animal.isCatchable()) {
                     player.markAttackHitProcessed();
                     boolean dead = animal.takeDamage(1);
                     br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.8, 0, 1.15);

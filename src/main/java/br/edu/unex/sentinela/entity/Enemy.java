@@ -684,7 +684,7 @@ public class Enemy {
             PassiveAnimal nearestPrey = null;
             double minPreyDist = 220.0;
             for (PassiveAnimal prey : preyList) {
-                if (prey.isDespawned()) continue;
+                if (prey.isDespawned() || !prey.isCatchable()) continue;
                 double dp = Math.hypot(prey.getX() - x, prey.getY() - y);
                 if (dp < minPreyDist) {
                     minPreyDist = dp;
@@ -701,7 +701,7 @@ public class Enemy {
                 int preyRow = (int) Math.floor(nearestPrey.getY() / TileMap.TILE_SIZE);
                 requestPath(tileMap, curCol, curRow, preyCol, preyRow, false);
 
-                if (minPreyDist <= 38.0) {
+                if (minPreyDist <= 38.0 && nearestPrey.isCatchable()) {
                     boolean dead = nearestPrey.takeDamage(1);
                     br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.75, 0, 1.1);
                     if (dead) {

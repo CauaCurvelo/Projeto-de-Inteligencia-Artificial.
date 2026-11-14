@@ -36,27 +36,42 @@ public class PassiveAnimalRenderer {
         PassiveAnimalType type = animal.getType();
 
         // 1. Sombra Projetada no Solo (Permanece no chão em ax, ay)
-        double shadowFactor = Math.max(0.18, 1.0 - totalAltitude / 80.0);
-        double shadowAlpha = Math.max(0.08, 0.38 * shadowFactor);
+        double shadowMaxAlt = (type == PassiveAnimalType.BIRD) ? 75.0 : 80.0;
+        double shadowFactor = Math.max(0.0, 1.0 - totalAltitude / shadowMaxAlt);
+        double shadowAlpha = Math.max(0.0, 0.38 * shadowFactor);
 
-        gc.save();
-        gc.translate(ax, ay);
-        gc.rotate(angleDeg);
+        if (shadowAlpha > 0.01) {
+            gc.save();
+            gc.translate(ax, ay);
+            gc.rotate(angleDeg);
 
-        gc.setFill(Color.color(0.02, 0.04, 0.02, shadowAlpha));
-        double sw = (type == PassiveAnimalType.DEER ? 32.0 :
-                    (type == PassiveAnimalType.RABBIT ? 19.0 :
-                    (type == PassiveAnimalType.FROG ? 14.0 : 12.0))) * shadowFactor;
-        double sh = (type == PassiveAnimalType.DEER ? 15.0 :
-                    (type == PassiveAnimalType.RABBIT ? 10.5 :
-                    (type == PassiveAnimalType.FROG ? 11.0 : 7.5))) * shadowFactor;
-        gc.fillOval(-sw * 0.5, -sh * 0.5, sw, sh);
-        gc.restore();
+            gc.setFill(Color.color(0.02, 0.04, 0.02, shadowAlpha));
+            double sw = (type == PassiveAnimalType.DEER ? 32.0 :
+                        (type == PassiveAnimalType.RABBIT ? 19.0 :
+                        (type == PassiveAnimalType.FROG ? 14.0 : 12.0))) * Math.max(0.2, shadowFactor);
+            double sh = (type == PassiveAnimalType.DEER ? 15.0 :
+                        (type == PassiveAnimalType.RABBIT ? 10.5 :
+                        (type == PassiveAnimalType.FROG ? 11.0 : 7.5))) * Math.max(0.2, shadowFactor);
+            gc.fillOval(-sw * 0.5, -sh * 0.5, sw, sh);
+            gc.restore();
+        }
 
         // 2. Corpo do Animal Elevado no Espaço 2.5D (ax, ay - totalAltitude)
         gc.save();
         gc.translate(ax, ay - totalAltitude);
         gc.rotate(angleDeg);
+
+        if (type == PassiveAnimalType.BIRD && animal.getState() == PassiveAnimal.State.FLYING_AWAY) {
+            // Efeito visual de ascensão aérea em direção à câmera/céu:
+            // Enquanto baixo (fly <= 24px): escala 1.0 (tamanho normal) e opacidade 1.0 (0% transparência).
+            // Conforme sobe acima de 24px: cresce progressivamente na perspectiva aérea e ganha transparência gradual até sumir.
+            double ascendProgress = Math.max(0.0, Math.min(1.0, (fly - PassiveAnimal.BIRD_MAX_CATCHABLE_ALTITUDE) / 65.0));
+            double scale = 1.0 + ascendProgress * 0.70; // Cresce suavemente até 1.70x
+            double alpha = Math.max(0.0, 1.0 - Math.pow(ascendProgress, 1.25)); // Fade out suave até 0.0
+
+            gc.scale(scale, scale);
+            gc.setGlobalAlpha(alpha);
+        }
 
         switch (type) {
             case RABBIT:
