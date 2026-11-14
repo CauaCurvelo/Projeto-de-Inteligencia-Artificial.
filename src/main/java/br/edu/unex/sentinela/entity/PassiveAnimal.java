@@ -81,7 +81,6 @@ public class PassiveAnimal {
     private double frogTongueTargetY = 0.0;
 
     // Dinâmica de tocas de coelho (Burrows)
-    private boolean burrowed = false;
     private double burrowTimer = 0.0;
     private double burrowCooldown = 0.0;
     private double peekTimer = 0.0;
@@ -426,7 +425,6 @@ public class PassiveAnimal {
 
     public void enterBurrow(Burrow b, List<Particle> particles, double duration) {
         state = State.BURROWED;
-        burrowed = true;
         burrowTimer = duration;
         peekTimer = 0.0;
         currentBurrow = b;
@@ -449,7 +447,6 @@ public class PassiveAnimal {
 
     public void flushOutFromBurrow(double threatX, double threatY, List<Particle> particles) {
         state = State.FLEEING;
-        burrowed = false;
         burrowCooldown = 12.0;
         fleeDuration = 4.0;
         stateTimer = fleeDuration;
@@ -479,7 +476,6 @@ public class PassiveAnimal {
 
     public void emergeFromBurrow(List<Particle> particles) {
         state = State.ALERT;
-        burrowed = false;
         burrowCooldown = 14.0 + RAND.nextDouble() * 10.0;
         stateTimer = 1.8;
         currentBurrow = null;
@@ -757,10 +753,6 @@ public class PassiveAnimal {
         }
     }
 
-    private void updateFleeing(double dt, double threatX, double threatY, List<PassiveAnimal> allPassives, TileMap tileMap) {
-        updateFleeing(dt, threatX, threatY, allPassives, null, null, null, tileMap);
-    }
-
     private void updateFleeing(double dt, double threatX, double threatY, List<PassiveAnimal> allPassives,
                               List<Burrow> burrows, List<Particle> particles, Player player, TileMap tileMap) {
         // Se estiver em arrancada de desvio evasivo de quina, segue o vetor de juke
@@ -846,10 +838,6 @@ public class PassiveAnimal {
 
         faceDx = Math.cos(visualAngle);
         faceDy = Math.sin(visualAngle);
-    }
-
-    private double computeBestFleeAngle(double threatX, double threatY, TileMap tileMap) {
-        return computeBestFleeAngle(threatX, threatY, null, tileMap);
     }
 
     private double computeBestFleeAngle(double threatX, double threatY, Burrow targetBurrow, TileMap tileMap) {
