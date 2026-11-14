@@ -153,6 +153,41 @@ public class World {
         for (int i = 0; i < 14; i++) {
             spawnPassiveAnimalNearPlayer();
         }
+        // Popula a clareira cênica central com fauna pacífica e graciosa (coelhos, cervos, pássaros, sapos)
+        passiveAnimals.add(new PassiveAnimal(PassiveAnimalType.RABBIT, 70.0, 45.0));
+        passiveAnimals.add(new PassiveAnimal(PassiveAnimalType.RABBIT, 160.0, 110.0));
+        passiveAnimals.add(new PassiveAnimal(PassiveAnimalType.DEER, 210.0, 75.0));
+        passiveAnimals.add(new PassiveAnimal(PassiveAnimalType.BIRD, 95.0, 140.0));
+        passiveAnimals.add(new PassiveAnimal(PassiveAnimalType.BIRD, 140.0, 30.0));
+        passiveAnimals.add(new PassiveAnimal(PassiveAnimalType.FROG, 240.0, 160.0));
+    }
+
+    /** Atualiza o ecossistema vivo e a atmosfera ambiente em tempo real para a vitrine do Menu Principal. */
+    public void updateMenuAmbient(double deltaTime) {
+        survivalTime += deltaTime;
+        cycleProgressTimer = (cycleProgressTimer + deltaTime) % cycleDuration;
+
+        for (PassiveAnimal animal : passiveAnimals) {
+            animal.update(deltaTime, null, null, passiveAnimals, foodItems, burrows, fireflies, particles, tileMap, waterRipples, currentWeather, 0.0);
+        }
+
+        Iterator<WaterRipple> ripIt = waterRipples.iterator();
+        while (ripIt.hasNext()) {
+            WaterRipple wr = ripIt.next();
+            wr.update(deltaTime);
+            if (wr.isExpired()) ripIt.remove();
+        }
+
+        streamFireflies(deltaTime);
+
+        Iterator<Particle> pIt = particles.iterator();
+        while (pIt.hasNext()) {
+            Particle p = pIt.next();
+            p.update(deltaTime);
+            if (p.isExpired()) pIt.remove();
+        }
+
+        camera.updateMenuPan(survivalTime);
     }
 
     private void spawnFoodNearPlayer() {

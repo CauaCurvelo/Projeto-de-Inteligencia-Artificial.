@@ -333,6 +333,10 @@ public class EntityRenderer {
     }
 
     public void renderEnemy(Enemy enemy, double ex, double ey) {
+        renderEnemy(enemy, ex, ey, true);
+    }
+
+    public void renderEnemy(Enemy enemy, double ex, double ey, boolean showNameplate) {
         double angle = enemy.getFaceAngle();
 
         if (enemy.isFlashing()) {
@@ -348,7 +352,7 @@ public class EntityRenderer {
 
         spriteRenderer.renderEnemySprite(enemy, ex, ey);
 
-        if (br.edu.unex.sentinela.settings.GameSettings.get().isShowNameplates()) {
+        if (showNameplate && br.edu.unex.sentinela.settings.GameSettings.get().isShowNameplates()) {
             renderRpgEnemyNameplate(enemy, ex, ey);
         }
     }

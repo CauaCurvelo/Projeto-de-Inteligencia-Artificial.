@@ -89,6 +89,17 @@ public class Camera {
         }
     }
 
+    /** Movimento panorâmico lento e relaxante para a vitrine de natureza do Menu Principal. */
+    public void updateMenuPan(double animTime) {
+        double visibleWidth = viewportWidth / zoom;
+        double visibleHeight = viewportHeight / zoom;
+        double targetX = 140.0 + Math.sin(animTime * 0.045) * 55.0;
+        double targetY = 85.0 + Math.cos(animTime * 0.035) * 40.0;
+        this.x = targetX - (visibleWidth / 2.0);
+        this.y = targetY - (visibleHeight / 2.0);
+        this.initialized = true;
+    }
+
     public double getX() { return x; }
     public double getY() { return y; }
     public double getCenterX() { return x + (getVisibleWidth() / 2.0); }

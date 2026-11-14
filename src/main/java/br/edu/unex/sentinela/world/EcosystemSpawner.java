@@ -41,19 +41,19 @@ public class EcosystemSpawner {
             spawnFoodNearPlayer(tileMap, foodItems, 0, 0, 8.0, 56.0, 145.0);
         }
 
-        // 3. Patrulhas iniciais com rotação 360° aleatória e ampla dispersão radial
+        // 3. Patrulhas iniciais com rotação 360° aleatória e ampla dispersão radial (reserva a clareira central)
         double[] patrolAngles = EcosystemPlacementHelper.generateShuffledAngles(4, rand);
-        spawnHunterAndHoundPair(tileMap, enemies, 0, 0, patrolAngles[0], 17, 36, 1.0);
-        spawnHunterAndHoundPair(tileMap, enemies, 0, 0, patrolAngles[1], 22, 46, 1.0);
-        spawnByHabitat(tileMap, enemies, EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, 0, 0, patrolAngles[2], 20, 48, 1.0);
-        spawnByHabitat(tileMap, enemies, EnemyType.HOUND, EnemySkin.HOUND_TRACKER, 0, 0, patrolAngles[3], 18, 42, 1.0);
+        spawnHunterAndHoundPair(tileMap, enemies, 0, 0, patrolAngles[0], 28, 48, 1.0);
+        spawnHunterAndHoundPair(tileMap, enemies, 0, 0, patrolAngles[1], 32, 54, 1.0);
+        spawnByHabitat(tileMap, enemies, EnemyType.HUNTER, EnemySkin.HUNTER_SNIPER, 0, 0, patrolAngles[2], 30, 52, 1.0);
+        spawnByHabitat(tileMap, enemies, EnemyType.HOUND, EnemySkin.HOUND_TRACKER, 0, 0, patrolAngles[3], 26, 46, 1.0);
 
         // 4. Fauna silvestre variada conforme o bioma de cada setor sorteado
         double[] wildAngles = EcosystemPlacementHelper.generateShuffledAngles(7, rand);
         for (int i = 0; i < wildAngles.length; i++) {
             double ang = wildAngles[i];
-            int minR = 16 + (i % 3) * 8;
-            int maxR = 36 + (i % 3) * 14;
+            int minR = 25 + (i % 3) * 8;
+            int maxR = 45 + (i % 3) * 14;
             double sampleDist = (minR + maxR) * 0.5;
             int sampleCol = (int) Math.round(Math.cos(ang) * sampleDist);
             int sampleRow = (int) Math.round(Math.sin(ang) * sampleDist);

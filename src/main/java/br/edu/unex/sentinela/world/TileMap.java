@@ -123,9 +123,9 @@ public class TileMap {
                 int worldCol = chunkX * CHUNK_SIZE + c;
                 int worldRow = chunkY * CHUNK_SIZE + r;
 
-                // 1. Clareira inicial do jogador (ao redor de 0,0) - Prado limpo circular sem quinas artificiais
+                // 1. Clareira inicial do jogador (ao redor de 0,0) - Prado limpo com transição orgânica
                 double spawnDist = Math.hypot(worldCol, worldRow);
-                if (spawnDist <= 11.5) {
+                if (spawnDist < 4.5) {
                     chunk[r][c] = TileType.GRASS;
                     continue;
                 }
@@ -335,8 +335,8 @@ public class TileMap {
                     continue;
                 }
 
-                // 4. Trilhas naturais orgânicas conectando os biomas sem repetir sempre o mesmo caminho
-                if (radialDist > 15.0 && (trail1 < 0.72 || trail2 < 0.72)) {
+                // 4. Trilhas naturais orgânicas conectando os biomas sem corte abrupto no meio da tela
+                if (radialDist > 5.5 && (trail1 < 1.15 || trail2 < 1.15)) {
                     chunk[r][c] = TileType.DIRT_PATH;
                     continue;
                 }
@@ -390,6 +390,9 @@ public class TileMap {
 
                 // 6. Mountain Cliffs / Granite Formations (dense in Serra Granítica, with passes)
                 double rockThreshold = 0.89 - biome.getRockBias();
+                if (spawnDist < 13.5) {
+                    elevation = Math.min(elevation, rockThreshold - 0.15); // Sem paredões bloqueando a clareira central
+                }
                 if (elevation > rockThreshold && forestClumping > (biome == BiomeType.HIGHLAND ? 0.50 : 0.53)) {
                     if (rawHash(worldCol, worldRow, 619L) > 0.16) {
                         chunk[r][c] = TileType.WALL;
@@ -398,7 +401,8 @@ public class TileMap {
                 }
 
                 // 7. Forests & Woods scaled by biome canopy density (preserving walkable glades)
-                if (forestClumping > biome.getTreeThreshold()) {
+                double treeClump = (spawnDist < 12.0) ? (forestClumping * (spawnDist / 12.0)) : forestClumping;
+                if (treeClump > biome.getTreeThreshold()) {
                     if (biome == BiomeType.DENSE_FOREST) {
                         boolean keepGlade = rawHash(worldCol, worldRow, 887L) < 0.46;
                         chunk[r][c] = keepGlade ? TileType.TALL_GRASS : TileType.TREE;

@@ -425,3 +425,17 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
 - **Ecologia e Spawn Natural ([World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
   - Coelhos gerados pelo ecossistema têm 40% de chance de nascer já abrigados dentro de tocas naturais próximas, tornando o mundo vivo e repleto de tocas habitadas para exploração.
 
+## Overhaul Visual e de Geração: Paisagem Natural do Menu Principal e Autotiling de Margens
+- **Autotiling Orgânico de Margens e Eliminação de Degraus 90° ([TerrainRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/TerrainRenderer.java)):**
+  - Substituição das antigas bordas retangulares rígidas (`fillRect`) de água por **Autotiling com chanfros de curvatura natural (fillets côncavos e convexos)** em 8 direções (N, S, E, W, NW, NE, SW, SE).
+  - Praias arenosas suaves, espumas translúcidas onduladas e beiradas de terra/seixos projetando-se organicamente para dentro da água, transformando rios e lagoas em corpos d'água contínuos e pintados, sem quinas em escada.
+- **Trilhas Meandrosas Conectadas e Flores Silvestres ([TerrainRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/TerrainRenderer.java), [BiomeTerrainPalette.java](src/main/java/br/edu/unex/sentinela/rendering/BiomeTerrainPalette.java)):**
+  - `renderDetailedDirtPath`: trilhas agora conectam suavemente seus vizinhos com leito central de terra batida pisoteada, grama encroaching nas laterais e pedrinhas polidas, eliminando linhas quebradas pixeladas.
+  - Campos de flores silvestres em buquês vivos de botões-de-ouro amarelos, papoulas vermelhas e miosótis azuis espalhados pela grama.
+- **Transição Suave da Clareira Inicial ([TileMap.java](src/main/java/br/edu/unex/sentinela/world/TileMap.java)):**
+  - Substituído o antigo corte abrupto circular de `spawnDist <= 11.5` por uma clareira orgânica sem anéis artificiais de árvores e rochas, e trilhas contínuas que se estendem sem cortes no meio do campo de visão.
+- **Vitrine Viva e Animada no Menu Principal ([GameEngine.java](src/main/java/br/edu/unex/sentinela/core/GameEngine.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java), [Camera.java](src/main/java/br/edu/unex/sentinela/world/Camera.java), [Renderer.java](src/main/java/br/edu/unex/sentinela/rendering/Renderer.java)):**
+  - **Diorama Vivo a 60 FPS:** O fundo do menu não fica mais congelado estaticamente; agora atualiza em tempo real com vento balançando as copas das árvores, ondulações na água, vaga-lumes e fauna passiva (coelhos, cervos, pássaros e sapos) pastando e espreitando pacificamente.
+  - **Câmera Panorâmica Cinematográfica:** Movimento suave e relaxante da câmera passeando pelo prado e pelo rio florido.
+  - **Limpeza Total de HUD e Combate:** Ocultação rigorosa de nameplates de inimigos, barras de vida, cones de visão táticos e auras de combate na cena do menu, além de manter caçadores humanos armados fora da clareira do menu.
+

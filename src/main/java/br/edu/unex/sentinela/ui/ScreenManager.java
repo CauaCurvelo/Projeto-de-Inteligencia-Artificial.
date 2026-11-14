@@ -73,6 +73,10 @@ public class ScreenManager extends StackPane {
         return currentState == ScreenState.PLAYING;
     }
 
+    public boolean isMainMenu() {
+        return currentState == ScreenState.MAIN_MENU;
+    }
+
     /** Verdadeiro quando em pausa ou configurações abertas a partir de uma partida ativa. */
     public boolean isInMatchMenu() {
         return currentState != ScreenState.MAIN_MENU

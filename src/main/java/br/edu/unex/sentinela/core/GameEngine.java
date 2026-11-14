@@ -76,7 +76,10 @@ public class GameEngine {
                     render();
                     backdropDirty = false;
                 } else {
-                    if (wasGameRunning || backdropDirty) {
+                    if (screenManager != null && screenManager.isMainMenu()) {
+                        world.updateMenuAmbient(deltaTime);
+                        render();
+                    } else if (wasGameRunning || backdropDirty) {
                         render();
                         backdropDirty = false;
                     }

@@ -1,5 +1,6 @@
 package br.edu.unex.sentinela.rendering;
 
+import br.edu.unex.sentinela.ai.EnemyType;
 import br.edu.unex.sentinela.entity.Enemy;
 import br.edu.unex.sentinela.entity.PassiveAnimal;
 import br.edu.unex.sentinela.entity.Player;
@@ -141,9 +142,11 @@ public class Renderer {
             }
         }
 
-        // PASSO 3: Áreas dos Bosses (sempre visíveis), Cones de Visão Táticos, Rotas e Sonar
-        bossAuraRenderer.renderBossTerritories(world, camX, camY, visibleW, visibleH, animTime);
-        tacticalAuraRenderer.renderTacticalAuras(world, camX, camY, visibleW, visibleH, animTime, inputManager.isDebugOverlay());
+        // PASSO 3: Áreas dos Bosses, Cones de Visão Táticos, Rotas e Sonar (somente com HUD ativo em jogo)
+        if (renderHud) {
+            bossAuraRenderer.renderBossTerritories(world, camX, camY, visibleW, visibleH, animTime);
+            tacticalAuraRenderer.renderTacticalAuras(world, camX, camY, visibleW, visibleH, animTime, inputManager.isDebugOverlay());
+        }
 
         // PASSO 4: Tocas, Pegadas/Rastro de Cheiro, Partículas, Arbustos de Frutas e Carne
         for (Burrow b : world.getBurrows()) {
@@ -231,7 +234,9 @@ public class Renderer {
             double ex = enemy.getX() - camX;
             double ey = enemy.getY() - camY;
             if (ex < -60 || ex > visibleW + 60 || ey < -60 || ey > visibleH + 60) continue;
-            entityRenderer.renderEnemy(enemy, ex, ey);
+            // No Menu Principal, omite caçadores armados para manter a atmosfera de natureza pura
+            if (!renderHud && (enemy.getType() == EnemyType.HUNTER || enemy.getType() == EnemyType.HOUND)) continue;
+            entityRenderer.renderEnemy(enemy, ex, ey, renderHud);
         }
 
         // Fauna Passiva Silvestre (Coelho, Cervo, Sapo e Pássaro)
@@ -249,10 +254,12 @@ public class Renderer {
         double px = player.getX() - camX;
         double py = player.getY() - camY;
 
-        entityRenderer.drawPlayerFox(player, px, py);
+        if (renderHud) {
+            entityRenderer.drawPlayerFox(player, px, py);
 
-        if (player.isAttacking()) {
-            entityRenderer.drawClawSlash(player, px, py);
+            if (player.isAttacking()) {
+                entityRenderer.drawClawSlash(player, px, py);
+            }
         }
 
         // PASSO 7: Copas de Árvores Volumétricas 2.5D (Sobrepondo troncos e bordas de auras no solo)

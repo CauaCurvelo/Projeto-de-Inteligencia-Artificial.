@@ -63,7 +63,7 @@ public class TerrainRenderer {
                 break;
 
             case DIRT_PATH:
-                renderDetailedDirtPath(sx, sy, ts, col, row, macroNoise, microNoise, pal);
+                renderDetailedDirtPath(sx, sy, ts, col, row, macroNoise, microNoise, tileMap, pal);
                 break;
 
             case MUD:
@@ -247,16 +247,34 @@ public class TerrainRenderer {
             gc.strokeLine(cx, cy, cx + 4.5, cy - 3.0);
         }
 
-        // Flores silvestres / orquídeas / lírios regionais
+        // Flores silvestres / orquídeas / lírios regionais em tufos graciosos
         if (!underTree && coordHash(col, row, 1237L) > pal.flowerDensityThreshold) {
-            double fx = sx + 8 + coordHash(col, row, 1400L) * (ts - 16);
-            double fy = sy + 8 + coordHash(col, row, 1500L) * (ts - 16);
+            double fx = sx + 7 + coordHash(col, row, 1400L) * (ts - 15);
+            double fy = sy + 9 + coordHash(col, row, 1500L) * (ts - 15);
+
+            // Folhinhas verdes de suporte no solo
+            gc.setFill(Color.web("#2E7D32", 0.85));
+            gc.fillOval(fx - 3.2, fy + 0.6, 3.6, 1.8);
+            gc.fillOval(fx + 1.2, fy + 0.8, 3.6, 1.8);
+
+            // Flor principal
+            Color petalColor = (coordHash(col, row, 1600L) > 0.5) ? pal.flowerPrimary : pal.flowerSecondary;
             gc.setFill(FLOWER_SHADOW);
-            gc.fillOval(fx - 2, fy, 5, 3);
-            gc.setFill(coordHash(col, row, 1600L) > 0.5 ? pal.flowerPrimary : pal.flowerSecondary);
-            gc.fillOval(fx - 1.8, fy - 1.8, 3.8, 3.8);
+            gc.fillOval(fx - 2.5, fy + 1.0, 5.5, 3.0);
+            gc.setFill(petalColor);
+            gc.fillOval(fx - 2.0, fy - 2.0, 4.2, 4.2);
             gc.setFill(pal.flowerCenter);
-            gc.fillOval(fx - 0.6, fy - 0.6, 1.4, 1.4);
+            gc.fillOval(fx - 0.7, fy - 0.7, 1.5, 1.5);
+
+            // Segunda florzinha complementar para formar tufo natural
+            if (coordHash(col, row, 1700L) > 0.38) {
+                double f2x = fx + (coordHash(col, row, 1711L) - 0.5) * 8.5;
+                double f2y = fy - 2.5 - coordHash(col, row, 1723L) * 3.5;
+                gc.setFill(pal.flowerSecondary);
+                gc.fillOval(f2x - 1.5, f2y - 1.5, 3.2, 3.2);
+                gc.setFill(pal.flowerCenter);
+                gc.fillOval(f2x - 0.5, f2y - 0.5, 1.1, 1.1);
+            }
         }
     }
 
@@ -322,27 +340,77 @@ public class TerrainRenderer {
     }
 
     private void renderDetailedDirtPath(double sx, double sy, int ts, int col, int row,
-                                        double macro, double micro, BiomeTerrainPalette pal) {
+                                        double macro, double micro, TileMap tileMap, BiomeTerrainPalette pal) {
+        // Base de grama do bioma para que as bordas da trilha se mesclem perfeitamente
+        double gHue = pal.grassHueBase + (macro - 0.5) * 8.0;
+        double gSat = clamp(pal.grassSatBase + (micro - 0.5) * 0.08, 0.22, 0.68);
+        double gBri = clamp(pal.grassBriOpen + (macro - 0.5) * 0.06, 0.22, 0.56);
+        gc.setFill(Color.hsb(gHue, gSat, gBri));
+        gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+
+        // Cor de terra batida
         double hue = pal.dirtHue + (macro - 0.5) * 6.0;
         double sat = pal.dirtSat + (micro - 0.5) * 0.08;
         double bri = pal.dirtBri + (macro - 0.5) * 0.07;
         Color dirtBase = Color.hsb(hue, clamp(sat, 0.20, 0.60), clamp(bri, 0.28, 0.58));
 
+        boolean pathN = tileMap != null && tileMap.getTileAt(col, row - 1) == TileType.DIRT_PATH;
+        boolean pathS = tileMap != null && tileMap.getTileAt(col, row + 1) == TileType.DIRT_PATH;
+        boolean pathW = tileMap != null && tileMap.getTileAt(col - 1, row) == TileType.DIRT_PATH;
+        boolean pathE = tileMap != null && tileMap.getTileAt(col + 1, row) == TileType.DIRT_PATH;
+
         gc.setFill(dirtBase);
-        gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+        // Centro da trilha
+        gc.fillOval(sx + 3.0, sy + 3.0, ts - 6.0, ts - 6.0);
 
-        gc.setFill(dirtBase.deriveColor(-2, 1.08, 0.84, 0.65));
-        gc.fillOval(sx + 2, sy + 2, ts - 4, ts - 4);
+        // Extensões contínuas conectando tiles vizinhos
+        if (pathN) {
+            gc.fillRect(sx + 4.5, sy - 0.5, ts - 9.0, ts * 0.55 + 0.5);
+        }
+        if (pathS) {
+            gc.fillRect(sx + 4.5, sy + ts * 0.45, ts - 9.0, ts * 0.55 + 0.5);
+        }
+        if (pathW) {
+            gc.fillRect(sx - 0.5, sy + 4.5, ts * 0.55 + 0.5, ts - 9.0);
+        }
+        if (pathE) {
+            gc.fillRect(sx + ts * 0.45, sy + 4.5, ts * 0.55 + 0.5, ts - 9.0);
+        }
 
-        gc.setFill(dirtBase.deriveColor(2, 0.90, 1.16, 0.35));
-        gc.fillOval(sx + 4, sy + 3, ts - 10, ts - 12);
+        // Se for um trecho diagonal ou curva suave
+        if (!pathN && !pathS && !pathW && !pathE) {
+            gc.fillRect(sx + 3.0, sy + 3.0, ts - 6.0, ts - 6.0);
+        }
 
-        int pebbleCount = 2 + (int) (coordHash(col, row, 3001L) * 4);
+        // Camada interna de desgaste de pisadas / sulco central
+        gc.setFill(dirtBase.deriveColor(1, 0.92, 1.14, 0.45));
+        gc.fillOval(sx + 5.5, sy + 5.5, ts - 11.0, ts - 11.0);
+
+        // Tufinhos de grama encroaching nas margens onde não há conexão
+        gc.setFill(pal.grassEdge);
+        if (!pathN) {
+            gc.fillOval(sx + 2, sy - 3, 13, 6);
+            gc.fillOval(sx + 16, sy - 2.5, 14, 5.5);
+        }
+        if (!pathS) {
+            gc.fillOval(sx + 3, sy + ts - 3, 13, 6);
+            gc.fillOval(sx + 17, sy + ts - 3, 13, 5.5);
+        }
+        if (!pathW) {
+            gc.fillOval(sx - 3, sy + 2, 6, 13);
+            gc.fillOval(sx - 2.5, sy + 16, 5.5, 14);
+        }
+        if (!pathE) {
+            gc.fillOval(sx + ts - 3, sy + 3, 6, 13);
+            gc.fillOval(sx + ts - 3, sy + 17, 5.5, 13);
+        }
+
+        int pebbleCount = 1 + (int) (coordHash(col, row, 3001L) * 3);
         for (int i = 0; i < pebbleCount; i++) {
-            double px = sx + 4 + coordHash(col + i * 13, row - i * 7, 3100L) * (ts - 8);
-            double py = sy + 4 + coordHash(col - i * 9, row + i * 17, 3200L) * (ts - 8);
-            double pw = 2.5 + coordHash(col * i, row + i, 3300L) * 3.5;
-            double ph = pw * 0.75;
+            double px = sx + 5 + coordHash(col + i * 13, row - i * 7, 3100L) * (ts - 10);
+            double py = sy + 5 + coordHash(col - i * 9, row + i * 17, 3200L) * (ts - 10);
+            double pw = 2.2 + coordHash(col * i, row + i, 3300L) * 3.0;
+            double ph = pw * 0.72;
 
             gc.setFill(PEBBLE_SHADOW);
             gc.fillOval(px + 0.8, py + 1.0, pw, ph);
@@ -492,29 +560,46 @@ public class TerrainRenderer {
         TileType west = tileMap.getTileAt(col - 1, row);
         TileType east = tileMap.getTileAt(col + 1, row);
 
-        // 1. Margem de Rio com barranco 3D (Terra faz sombra dentro da água ao Norte/Oeste)
+        // 1. Margem de Rio com barranco 3D, leito arenoso e chanfros orgânicos arredondados
         if (type == TileType.WATER) {
-            if (north != TileType.WATER) {
-                gc.setFill(Color.web("#3E2723", 0.75));
-                gc.fillRect(sx, sy, ts + 0.6, 3.5);
-                gc.setFill(Color.color(0.02, 0.08, 0.14, 0.48));
-                gc.fillRect(sx, sy + 3.5, ts + 0.6, 5.5);
-                gc.setFill(pal.waterFoam);
-                gc.fillRoundRect(sx + 2, sy + 3.5, ts - 4, 2.0, 2, 2);
-            }
-            if (south != TileType.WATER) {
-                gc.setFill(pal.waterRimLight);
-                gc.fillRect(sx, sy + ts - 3, ts + 0.6, 3);
-            }
-            if (west != TileType.WATER) {
-                gc.setFill(Color.color(0.02, 0.08, 0.14, 0.40));
-                gc.fillRect(sx, sy, 5.0, ts + 0.6);
-            }
-            if (east != TileType.WATER) {
-                gc.setFill(pal.waterRimLight.deriveColor(0, 1.0, 1.0, 0.78));
-                gc.fillRect(sx + ts - 3, sy, 3.0, ts + 0.6);
-            }
+            renderWaterShorelineAndCornerFillets(sx, sy, ts, col, row, tileMap, pal);
             return;
+        }
+
+        // Transição da terra avançando suavemente com seixos e areia sobre o rio vizinho
+        if (type != TileType.WALL && type != TileType.ICE) {
+            if (north == TileType.WATER) {
+                gc.setFill(Color.web("#8D6E63", 0.65));
+                gc.fillOval(sx + 2, sy - 3, ts * 0.55, 6);
+                gc.fillOval(sx + ts * 0.42, sy - 3, ts * 0.55, 6);
+                gc.setFill(pal.grassEdge);
+                gc.fillOval(sx + 3, sy - 2, 12, 5);
+                gc.fillOval(sx + 17, sy - 2, 13, 5);
+            }
+            if (south == TileType.WATER) {
+                gc.setFill(Color.web("#8D6E63", 0.65));
+                gc.fillOval(sx + 2, sy + ts - 3, ts * 0.55, 6);
+                gc.fillOval(sx + ts * 0.42, sy + ts - 3, ts * 0.55, 6);
+                gc.setFill(pal.grassEdge);
+                gc.fillOval(sx + 3, sy + ts - 3, 12, 5);
+                gc.fillOval(sx + 17, sy + ts - 3, 13, 5);
+            }
+            if (west == TileType.WATER) {
+                gc.setFill(Color.web("#8D6E63", 0.65));
+                gc.fillOval(sx - 3, sy + 2, 6, ts * 0.55);
+                gc.fillOval(sx - 3, sy + ts * 0.42, 6, ts * 0.55);
+                gc.setFill(pal.grassEdge);
+                gc.fillOval(sx - 2, sy + 3, 5, 12);
+                gc.fillOval(sx - 2, sy + 17, 5, 13);
+            }
+            if (east == TileType.WATER) {
+                gc.setFill(Color.web("#8D6E63", 0.65));
+                gc.fillOval(sx + ts - 3, sy + 2, 6, ts * 0.55);
+                gc.fillOval(sx + ts - 3, sy + ts * 0.42, 6, ts * 0.55);
+                gc.setFill(pal.grassEdge);
+                gc.fillOval(sx + ts - 3, sy + 3, 5, 12);
+                gc.fillOval(sx + ts - 3, sy + 17, 5, 13);
+            }
         }
 
         // 2. Transição orgânica de Grama invadindo Trilha de Terra ou Lama
@@ -596,6 +681,156 @@ public class TerrainRenderer {
                 gc.setFill(Color.color(0.0, 0.0, 0.0, 0.22));
                 gc.fillRect(sx + ts - 4, sy, 4, ts + 0.6);
             }
+        }
+    }
+
+    /**
+     * Autotiling orgânico para margens d'água: chanfros côncavos e convexos em curvas naturais
+     * que eliminam 100% dos degraus artificiais de 90° em escada.
+     */
+    private void renderWaterShorelineAndCornerFillets(double sx, double sy, int ts, int col, int row,
+                                                     TileMap tileMap, BiomeTerrainPalette pal) {
+        TileType north = tileMap.getTileAt(col, row - 1);
+        TileType south = tileMap.getTileAt(col, row + 1);
+        TileType west = tileMap.getTileAt(col - 1, row);
+        TileType east = tileMap.getTileAt(col + 1, row);
+
+        TileType nw = tileMap.getTileAt(col - 1, row - 1);
+        TileType ne = tileMap.getTileAt(col + 1, row - 1);
+        TileType sw = tileMap.getTileAt(col - 1, row + 1);
+        TileType se = tileMap.getTileAt(col + 1, row + 1);
+
+        boolean nLand = north != TileType.WATER;
+        boolean sLand = south != TileType.WATER;
+        boolean wLand = west != TileType.WATER;
+        boolean eLand = east != TileType.WATER;
+
+        boolean nwLand = nw != TileType.WATER;
+        boolean neLand = ne != TileType.WATER;
+        boolean swLand = sw != TileType.WATER;
+        boolean seLand = se != TileType.WATER;
+
+        // 1. Margem Norte (sombra e barranco de terra)
+        if (nLand) {
+            gc.setFill(Color.web("#3E2723", 0.78));
+            gc.fillOval(sx - 2, sy - 5, ts * 0.65, 10);
+            gc.fillOval(sx + ts * 0.42, sy - 5, ts * 0.65, 10);
+            gc.setFill(Color.web("#8D6E63", 0.55));
+            gc.fillOval(sx + 2, sy - 3, ts * 0.55, 6);
+            gc.fillOval(sx + ts * 0.40, sy - 3, ts * 0.55, 6);
+            gc.setStroke(pal.waterFoam);
+            gc.setLineWidth(1.3);
+            gc.strokeArc(sx + 1, sy + 1.2, ts * 0.55, 4.5, 15, 150, ArcType.OPEN);
+            gc.strokeArc(sx + ts * 0.44, sy + 0.8, ts * 0.55, 4.5, 15, 150, ArcType.OPEN);
+        }
+
+        // 2. Margem Sul (luz refletida e praia suave)
+        if (sLand) {
+            gc.setFill(Color.web("#5D4037", 0.55));
+            gc.fillOval(sx - 2, sy + ts - 5, ts * 0.65, 9);
+            gc.fillOval(sx + ts * 0.42, sy + ts - 5, ts * 0.65, 9);
+            gc.setStroke(pal.waterRimLight);
+            gc.setLineWidth(1.3);
+            gc.strokeArc(sx + 1, sy + ts - 4.5, ts * 0.55, 4.0, 195, 150, ArcType.OPEN);
+            gc.strokeArc(sx + ts * 0.44, sy + ts - 4.0, ts * 0.55, 4.0, 195, 150, ArcType.OPEN);
+        }
+
+        // 3. Margem Oeste
+        if (wLand) {
+            gc.setFill(Color.web("#3E2723", 0.65));
+            gc.fillOval(sx - 5, sy - 2, 10, ts * 0.65);
+            gc.fillOval(sx - 5, sy + ts * 0.42, 10, ts * 0.65);
+            gc.setStroke(pal.waterFoam);
+            gc.setLineWidth(1.2);
+            gc.strokeArc(sx + 1.2, sy + 1, 4.0, ts * 0.55, 105, 150, ArcType.OPEN);
+            gc.strokeArc(sx + 0.8, sy + ts * 0.44, 4.0, ts * 0.55, 105, 150, ArcType.OPEN);
+        }
+
+        // 4. Margem Leste
+        if (eLand) {
+            gc.setFill(Color.web("#5D4037", 0.50));
+            gc.fillOval(sx + ts - 5, sy - 2, 10, ts * 0.65);
+            gc.fillOval(sx + ts - 5, sy + ts * 0.42, 10, ts * 0.65);
+            gc.setStroke(pal.waterRimLight);
+            gc.setLineWidth(1.2);
+            gc.strokeArc(sx + ts - 5.5, sy + 1, 4.0, ts * 0.55, 285, 150, ArcType.OPEN);
+            gc.strokeArc(sx + ts - 5.0, sy + ts * 0.44, 4.0, ts * 0.55, 285, 150, ArcType.OPEN);
+        }
+
+        // 5. Cantos Côncavos (quando 2 lados ortogonais são terra -> arredonda o ângulo interno para eliminar degrau)
+        if (nLand && wLand) {
+            gc.setFill(Color.web("#3E2723", 0.88));
+            gc.fillOval(sx - 7, sy - 7, 22, 22);
+            gc.setFill(Color.web("#8D6E63", 0.65));
+            gc.fillOval(sx - 3, sy - 3, 14, 14);
+            gc.setStroke(pal.waterFoam);
+            gc.setLineWidth(1.5);
+            gc.strokeArc(sx - 3, sy - 3, 18, 18, 270, 90, ArcType.OPEN);
+        }
+        if (nLand && eLand) {
+            gc.setFill(Color.web("#3E2723", 0.88));
+            gc.fillOval(sx + ts - 15, sy - 7, 22, 22);
+            gc.setFill(Color.web("#8D6E63", 0.65));
+            gc.fillOval(sx + ts - 11, sy - 3, 14, 14);
+            gc.setStroke(pal.waterFoam);
+            gc.setLineWidth(1.5);
+            gc.strokeArc(sx + ts - 15, sy - 3, 18, 18, 180, 90, ArcType.OPEN);
+        }
+        if (sLand && wLand) {
+            gc.setFill(Color.web("#3E2723", 0.88));
+            gc.fillOval(sx - 7, sy + ts - 15, 22, 22);
+            gc.setFill(Color.web("#8D6E63", 0.65));
+            gc.fillOval(sx - 3, sy + ts - 11, 14, 14);
+            gc.setStroke(pal.waterRimLight);
+            gc.setLineWidth(1.5);
+            gc.strokeArc(sx - 3, sy + ts - 15, 18, 18, 0, 90, ArcType.OPEN);
+        }
+        if (sLand && eLand) {
+            gc.setFill(Color.web("#3E2723", 0.88));
+            gc.fillOval(sx + ts - 15, sy + ts - 15, 22, 22);
+            gc.setFill(Color.web("#8D6E63", 0.65));
+            gc.fillOval(sx + ts - 11, sy + ts - 11, 14, 14);
+            gc.setStroke(pal.waterRimLight);
+            gc.setLineWidth(1.5);
+            gc.strokeArc(sx + ts - 15, sy + ts - 15, 18, 18, 90, 90, ArcType.OPEN);
+        }
+
+        // 6. Cantos Convexos (quando os 2 lados são água, mas o canto diagonal é terra -> suaviza a ponta)
+        if (!nLand && !wLand && nwLand) {
+            gc.setFill(Color.web("#3E2723", 0.75));
+            gc.fillOval(sx - 8, sy - 8, 16, 16);
+            gc.setFill(Color.web("#8D6E63", 0.55));
+            gc.fillOval(sx - 5, sy - 5, 11, 11);
+            gc.setStroke(pal.waterFoam);
+            gc.setLineWidth(1.3);
+            gc.strokeArc(sx - 2, sy - 2, 13, 13, 270, 90, ArcType.OPEN);
+        }
+        if (!nLand && !eLand && neLand) {
+            gc.setFill(Color.web("#3E2723", 0.75));
+            gc.fillOval(sx + ts - 8, sy - 8, 16, 16);
+            gc.setFill(Color.web("#8D6E63", 0.55));
+            gc.fillOval(sx + ts - 6, sy - 5, 11, 11);
+            gc.setStroke(pal.waterFoam);
+            gc.setLineWidth(1.3);
+            gc.strokeArc(sx + ts - 11, sy - 2, 13, 13, 180, 90, ArcType.OPEN);
+        }
+        if (!sLand && !wLand && swLand) {
+            gc.setFill(Color.web("#3E2723", 0.75));
+            gc.fillOval(sx - 8, sy + ts - 8, 16, 16);
+            gc.setFill(Color.web("#8D6E63", 0.55));
+            gc.fillOval(sx - 5, sy + ts - 6, 11, 11);
+            gc.setStroke(pal.waterRimLight);
+            gc.setLineWidth(1.3);
+            gc.strokeArc(sx - 2, sy + ts - 11, 13, 13, 0, 90, ArcType.OPEN);
+        }
+        if (!sLand && !eLand && seLand) {
+            gc.setFill(Color.web("#3E2723", 0.75));
+            gc.fillOval(sx + ts - 8, sy + ts - 8, 16, 16);
+            gc.setFill(Color.web("#8D6E63", 0.55));
+            gc.fillOval(sx + ts - 6, sy + ts - 6, 11, 11);
+            gc.setStroke(pal.waterRimLight);
+            gc.setLineWidth(1.3);
+            gc.strokeArc(sx + ts - 11, sy + ts - 11, 13, 13, 90, 90, ArcType.OPEN);
         }
     }
 

@@ -83,7 +83,7 @@ public final class BiomeTerrainPalette {
         Color.web("#124675"), Color.web("#1B639E"), Color.web("#0D3357", 0.38), Color.web("#2980B9", 0.24),
         Color.web("#E1F5FE", 0.42), Color.web("#81D4FA", 0.35),
         Color.web("#FFF59D"), Color.web("#E1BEE7"), Color.web("#FF8F00"),
-        Color.web("#2E5A27", 0.85), Color.web("#689F38", 0.85), 0.86
+        Color.web("#2E5A27", 0.85), Color.web("#689F38", 0.85), 0.58
     );
 
     private static final BiomeTerrainPalette SWAMP = new BiomeTerrainPalette(
