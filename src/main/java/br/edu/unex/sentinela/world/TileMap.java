@@ -137,31 +137,12 @@ public class TileMap {
                 double moisture = fbm(worldCol * 0.030, worldRow * 0.030, 303);
                 double forestClumping = fbm(worldCol * 0.055, worldRow * 0.055, 707);
 
-                // 3. Sistema Hidrográfico Orgânico: Rio Principal com Meandros Multi-Escala
+                // 3. Sistema Hidrográfico Orgânico: Rio Principal, Bacias Lacustres e Riachos
                 double ru = worldCol * riverCos + worldRow * riverSin;
                 double rv = -worldCol * riverSin + worldRow * riverCos;
 
-                // Meandros fluviais compostos (Macro-curvatura, ondas intermediárias e perturbação de margem)
-                double meanderMacro = Math.sin(ru * 0.012 + riverPhaseA) * 20.0;
-                double meanderMed = Math.cos(ru * 0.026 + riverPhaseB) * 11.0;
-                double meanderDetail = (fbm(ru * 0.065, 3.8, 821L) - 0.5) * 7.5;
-                double riverCenterV = riverOffset + meanderMacro + meanderMed + meanderDetail;
+                double riverCenterV = computeRiverCenterV(ru);
                 double riverDist = Math.abs(rv - riverCenterV);
-
-                // Largura orgânica dinâmica: remansos largos, enseadas e trechos de garganta
-                double widthNoise = fbm(ru * 0.032, 7.2, 853L); // 0.0 .. 1.0
-                double baseRiverWidth = (biome == BiomeType.SWAMP) ? 3.5 : (biome == BiomeType.SNOW ? 2.1 : 2.6);
-                double riverHalfWidth = baseRiverWidth + (widthNoise - 0.45) * 1.8; // Varia entre 1.7 e 4.4 tiles
-
-                // Margens e várzeas estratificadas
-                double bankNoise = (fbm(worldCol * 0.08, worldRow * 0.08, 941L) - 0.5) * 0.8;
-                double mudHalfWidth = riverHalfWidth + (biome == BiomeType.SWAMP ? 1.9 : 1.1) + bankNoise;
-                double marshHalfWidth = mudHalfWidth + (biome == BiomeType.SWAMP ? 2.2 : 1.4);
-
-                // Pontes rústicas e travessias de trilhas sobre o rio
-                int bridgeCell = (int) Math.floor(ru / 50.0);
-                double bridgePos = (bridgeCell + 0.25 + rawHash(bridgeCell, 7, 1777L) * 0.5) * 50.0;
-                boolean isRusticBridge = Math.abs(ru - bridgePos) <= 1.3 && riverDist <= (riverHalfWidth + 2.2);
 
                 double radialDist = Math.hypot(worldCol, worldRow);
                 double tu1 = worldCol * Math.cos(trailAngleA) + worldRow * Math.sin(trailAngleA);
@@ -172,12 +153,94 @@ public class TileMap {
                 double tv2 = -worldCol * Math.sin(trailAngleB) + worldRow * Math.cos(trailAngleB);
                 double trail2 = Math.abs(tv2 - (trailOffsetB + Math.sin(tu2 * 0.024 + riverPhaseB) * 13.0));
 
-                boolean isTrailCrossing = (radialDist > 14.0 && (trail1 < 0.95 || trail2 < 0.95) && riverDist <= riverHalfWidth + 2.0);
+                double baseRiverWidth = (biome == BiomeType.SWAMP) ? 3.5 : (biome == BiomeType.SNOW ? 2.1 : 2.6);
+
+                // 3a. Grandes Lagos Fluviais e Bacias de Expansão Fluvial
+                // A cada ~84 tiles de curso do rio, o rio deságua e expande-se em um grande lago navegável
+                int lakeCell = (int) Math.floor(ru / 84.0);
+                double lakeCellSeed = rawHash(lakeCell, 19, 2027L);
+                double lakeU = (lakeCell + 0.35 + lakeCellSeed * 0.30) * 84.0;
+                double lakeV = computeRiverCenterV(lakeU) + (rawHash(lakeCell, 23, 2039L) - 0.5) * 3.5;
+
+                double dLu = ru - lakeU;
+                double dLv = rv - lakeV;
+                double distToLake = Math.hypot(dLu, dLv);
+
+                double baseLakeRadius = (biome == BiomeType.SWAMP ? 11.5 : (biome == BiomeType.SNOW ? 8.5 : 9.8))
+                                        + rawHash(lakeCell, 31, 2053L) * 5.2; // Raio de 8.5 a 16.7 tiles
+                double lakeAngle = Math.atan2(dLv, dLu);
+                double lakeWarp = (fbm(worldCol * 0.07, worldRow * 0.07, 2069L) - 0.5) * 4.4
+                                  + Math.sin(lakeAngle * 3.0 + lakeCellSeed * 6.28) * 2.2;
+                double effectiveLakeRadius = baseLakeRadius + lakeWarp;
+
+                // Verificação de travessia de trilha / pontes sobre o lago ou rio
+                int bridgeCell = (int) Math.floor(ru / 50.0);
+                double bridgePos = (bridgeCell + 0.25 + rawHash(bridgeCell, 7, 1777L) * 0.5) * 50.0;
+                boolean isRusticBridge = Math.abs(ru - bridgePos) <= 1.3 && riverDist <= (baseRiverWidth + 3.0);
+                boolean isTrailCrossing = (radialDist > 14.0 && (trail1 < 0.95 || trail2 < 0.95)
+                        && (riverDist <= baseRiverWidth + 2.5 || (distToLake <= effectiveLakeRadius + 1.5 && distToLake >= effectiveLakeRadius * 0.45)));
 
                 if (isRusticBridge || isTrailCrossing) {
                     chunk[r][c] = TileType.DIRT_PATH;
                     continue;
                 }
+
+                // Processa o Grande Lago Fluvial se o ponto estiver dentro do raio da bacia lacustre
+                if (distToLake < effectiveLakeRadius) {
+                    // Ilhota lacustre arborizada no centro de grandes lagos
+                    if (baseLakeRadius >= 10.5 && distToLake < effectiveLakeRadius * 0.35) {
+                        double islandNoise = fbm(worldCol * 0.14, worldRow * 0.14, 2081L);
+                        if (islandNoise > 0.60) {
+                            chunk[r][c] = (biome == BiomeType.SWAMP || rawHash(worldCol, worldRow, 2087L) > 0.40)
+                                    ? TileType.TALL_GRASS : TileType.GRASS;
+                            continue;
+                        }
+                    }
+                    chunk[r][c] = TileType.WATER;
+                    continue;
+                } else if (distToLake < effectiveLakeRadius + 1.8) {
+                    // Praia / orla de lama e seixos ao redor do lago
+                    chunk[r][c] = (biome == BiomeType.SNOW || biome == BiomeType.SWAMP || moisture > 0.38)
+                            ? TileType.MUD : TileType.TALL_GRASS;
+                    continue;
+                } else if (distToLake < effectiveLakeRadius + 3.4) {
+                    // Várzea e juncos ao redor do lago
+                    chunk[r][c] = (biome == BiomeType.SWAMP || moisture > 0.40) ? TileType.TALL_GRASS : TileType.GRASS;
+                    continue;
+                }
+
+                // 3b. Lagos de Meandro em Ferradura (Oxbow Lakes)
+                int oxbowCell = (int) Math.floor((ru + 42.0) / 84.0);
+                double oxbowSeed = rawHash(oxbowCell, 37, 2099L);
+                if (oxbowSeed > 0.35) { // 65% das bacias possuem lago de ferradura anexo
+                    double oxbowU = (oxbowCell + 0.5) * 84.0;
+                    double oxbowSide = (rawHash(oxbowCell, 39, 2101L) >= 0.5 ? 1.0 : -1.0);
+                    double oxbowV = computeRiverCenterV(oxbowU) + oxbowSide * (11.0 + rawHash(oxbowCell, 41, 2111L) * 6.0);
+                    double dOxU = ru - oxbowU;
+                    double dOxV = (rv - oxbowV) * 1.45;
+                    double distOxbow = Math.hypot(dOxU, dOxV);
+                    double oxbowRadius = 4.2 + rawHash(oxbowCell, 43, 2129L) * 2.6;
+
+                    if (distOxbow < oxbowRadius) {
+                        chunk[r][c] = TileType.WATER;
+                        continue;
+                    } else if (distOxbow < oxbowRadius + 1.5) {
+                        chunk[r][c] = TileType.MUD;
+                        continue;
+                    } else if (distOxbow < oxbowRadius + 2.8) {
+                        chunk[r][c] = TileType.TALL_GRASS;
+                        continue;
+                    }
+                }
+
+                // 3c. Curso Normal do Rio (fora das bacias lacustres)
+                double widthNoise = fbm(ru * 0.032, 7.2, 853L); // 0.0 .. 1.0
+                double riverHalfWidth = baseRiverWidth + (widthNoise - 0.45) * 1.8; // Varia entre 1.7 e 4.4 tiles
+
+                // Margens e várzeas estratificadas
+                double bankNoise = (fbm(worldCol * 0.08, worldRow * 0.08, 941L) - 0.5) * 0.8;
+                double mudHalfWidth = riverHalfWidth + (biome == BiomeType.SWAMP ? 1.9 : 1.1) + bankNoise;
+                double marshHalfWidth = mudHalfWidth + (biome == BiomeType.SWAMP ? 2.2 : 1.4);
 
                 // Ilhotas fluviais e bancos de areia/vegetação em trechos largos
                 if (riverHalfWidth > 3.0 && riverDist < riverHalfWidth * 0.40) {
@@ -201,7 +264,7 @@ public class TileMap {
                     continue;
                 }
 
-                // 3b. Riacho Afluente Secundário (Tributary Stream)
+                // 3d. Riacho Afluente Secundário (Tributary Stream)
                 double tru = worldCol * tribCos + worldRow * tribSin;
                 double trv = -worldCol * tribSin + worldRow * tribCos;
                 double tribCenterV = tribOffset + Math.sin(tru * 0.021 + tribPhaseA) * 14.0
@@ -234,21 +297,37 @@ public class TileMap {
                     continue;
                 }
 
-                // 5. Lagos / brejos / lagoas glaciais de acordo com o bioma
+                // 5. Lagos Regionais Autônomos, Lagoas Glaciais e Brejos Profundos
                 double adjElevation = elevation - biome.getWaterBias();
                 double adjMoisture = moisture + biome.getMudBias();
-                if (adjElevation < 0.23 && adjMoisture > 0.56) {
+                if (adjElevation < 0.24 && adjMoisture > 0.52) {
                     if (biome == BiomeType.SWAMP) {
-                        double bogIsland = fbm(worldCol * 0.14, worldRow * 0.14, 521L);
-                        if (bogIsland > 0.57) {
-                            chunk[r][c] = rawHash(worldCol, worldRow, 523L) > 0.55 ? TileType.TALL_GRASS : TileType.MUD;
-                        } else if (adjElevation < 0.15) {
+                        double bogIsland = fbm(worldCol * 0.12, worldRow * 0.12, 521L);
+                        if (bogIsland > 0.58) {
+                            chunk[r][c] = rawHash(worldCol, worldRow, 523L) > 0.50 ? TileType.TALL_GRASS : TileType.MUD;
+                        } else if (adjElevation < 0.18) {
+                            chunk[r][c] = TileType.WATER;
+                        } else {
+                            chunk[r][c] = TileType.MUD;
+                        }
+                    } else if (biome == BiomeType.SNOW) {
+                        if (adjElevation < 0.17) {
+                            chunk[r][c] = TileType.WATER;
+                        } else {
+                            chunk[r][c] = (rawHash(worldCol, worldRow, 529L) > 0.40) ? TileType.MUD : TileType.TALL_GRASS;
+                        }
+                    } else if (biome == BiomeType.HIGHLAND) {
+                        if (adjElevation < 0.16) {
                             chunk[r][c] = TileType.WATER;
                         } else {
                             chunk[r][c] = TileType.MUD;
                         }
                     } else {
-                        chunk[r][c] = (adjElevation < 0.16) ? TileType.WATER : TileType.MUD;
+                        if (adjElevation < 0.17) {
+                            chunk[r][c] = TileType.WATER;
+                        } else {
+                            chunk[r][c] = (moisture > 0.56) ? TileType.MUD : TileType.TALL_GRASS;
+                        }
                     }
                     continue;
                 }
@@ -300,6 +379,13 @@ public class TileMap {
         }
 
         return chunk;
+    }
+
+    private double computeRiverCenterV(double u) {
+        double meanderMacro = Math.sin(u * 0.012 + riverPhaseA) * 20.0;
+        double meanderMed = Math.cos(u * 0.026 + riverPhaseB) * 11.0;
+        double meanderDetail = (fbm(u * 0.065, 3.8, 821L) - 0.5) * 7.5;
+        return riverOffset + meanderMacro + meanderMed + meanderDetail;
     }
 
     // Fractal Brownian Motion (fBm): 2 octaves of smooth noise for organic landmasses

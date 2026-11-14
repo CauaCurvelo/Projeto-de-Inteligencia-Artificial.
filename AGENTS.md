@@ -299,3 +299,8 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - **Várzea e Margens Estratificadas:** transição natural entre água profunda, barrancos de lama úmida (`TileType.MUD`) e vegetação densa de várzea.
   - **Riacho Afluente Secundário (Tributary):** afluente menor serpenteando pelo relevo e confluindo na bacia principal.
   - **Pontes e Cruzamentos Integrados:** conexões perfeitas de trilhas de terra batida (`DIRT_PATH`) sobre a água como pontes e vaus rústicos contínuos a cada ~50 tiles, e clareira inicial circular sem cortes em caixa quadrada.
+- **Integração de Bacias Lacustres Fluviais, Lagos de Ferradura e Lagos Regionais ([TileMap.java](src/main/java/br/edu/unex/sentinela/world/TileMap.java)):**
+  - **Grandes Lagos Fluviais Conectados:** A cada ~84 tiles ao longo do curso do rio, o leito se expande organicamente formando vastas bacias lacustres navegáveis (raio de 8.5 a 16.7 tiles = até 530px de largura), onde o rio deságua em uma extremidade e segue seu fluxo na outra.
+  - **Ilhotas Lacustres Centrais:** Lagos de grande porte geram ilhas centrais arborizadas e com juncos ribeirinhos (`TileType.TALL_GRASS`), criando pontos estratégicos de travessia e refúgio para a raposa contra ameaças terrestres.
+  - **Lagos de Meandro em Ferradura (Oxbow Lakes):** Lagoas crescentes em formato de ferradura surgem nas planícies de inundação ao lado do rio, emolduradas por praias de lama e vegetação de várzea.
+  - **Lagos Regionais Autônomos Aprimorados:** Depressões topográficas geram lagos límpidos na montanha/tundra e lagoas bucólicas na floresta/pradaria com praias e orlas estratificadas de água rasa, lama e juncos.
