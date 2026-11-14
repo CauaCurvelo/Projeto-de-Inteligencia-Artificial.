@@ -41,6 +41,8 @@ public class Main extends Application {
         World world = new World();
         Renderer renderer = new Renderer(gc, INITIAL_WIDTH, INITIAL_HEIGHT);
         ScreenManager screenManager = new ScreenManager(world);
+        screenManager.prefWidthProperty().bind(scene.widthProperty());
+        screenManager.prefHeightProperty().bind(scene.heightProperty());
         inputManager.setGameplayInputEnabled(screenManager::isGameRunning);
 
         root.getChildren().addAll(canvas, screenManager);

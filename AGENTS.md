@@ -378,3 +378,11 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
 - **Segurança de Spawn no Mundo ([World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
   - Validação rigorosa em `spawnPassiveAnimalNearPlayer`: verificação de quadrante livre de obstáculos ao redor do ponto de criação, impedindo que qualquer animal passivo ou ave nasça preso em granito, árvores ou água profunda.
 
+## Bugfix: Correção do Toast de Conquistas e Estabilidade do Layout do Menu Principal
+- **Eliminação de Loop de Layout e Esticamento da Barra ([AchievementToast.java](src/main/java/br/edu/unex/sentinela/ui/AchievementToast.java)):**
+  - Corrigido o `bind` circular em `timerTrack.widthProperty().bind(cardShell.widthProperty())`, que forçava a caixa da notificação a se expandir descontroladamente até a largura total da janela como uma barra preta contínua.
+  - Fixadas dimensões estritas de card RPG compacto (`348x74 px`) com barra de progresso fixa (`324 px`) e tipografia contida, exibindo medalhão vetorial brilhante, acento de cor e textos perfeitamente alinhados à direita.
+- **Isolamento de Layout como Camada Não-Gerenciada ([AchievementToast.java](src/main/java/br/edu/unex/sentinela/ui/AchievementToast.java), [ScreenManager.java](src/main/java/br/edu/unex/sentinela/ui/ScreenManager.java), [Main.java](src/main/java/br/edu/unex/sentinela/app/Main.java)):**
+  - Configurado `toast.setManaged(false)` em `ScreenManager` com posicionamento absoluto via `resizeRelocate` em `layoutChildren()`. Dessa forma, o deslocamento animado (`SLIDE_OFFSET_X = 390.0`) não vaza para os `bounds` da cena e nunca mais empurra o `ScreenManager` ou o Menu Principal para fora da tela à esquerda.
+  - `ScreenManager` vinculado estritamente às dimensões do `Scene` em `Main.java` (`prefWidthProperty().bind(scene.widthProperty())`), garantindo centralização perfeita e estabilidade em resoluções com e sem tela cheia.
+

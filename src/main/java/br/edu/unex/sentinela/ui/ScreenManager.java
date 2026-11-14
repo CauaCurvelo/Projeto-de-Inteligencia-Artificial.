@@ -46,6 +46,7 @@ public class ScreenManager extends StackPane {
             }
         };
 
+        toast.setManaged(false);
         getChildren().addAll(contentLayer, toast);
 
         sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -206,7 +207,8 @@ public class ScreenManager extends StackPane {
                 break;
         }
 
-        toast.setVisible(currentState == ScreenState.PLAYING || currentState == ScreenState.PAUSED);
+        boolean inGame = (currentState == ScreenState.PLAYING || currentState == ScreenState.PAUSED);
+        toast.setVisible(inGame && toast.isDisplayingToast());
 
         if (screenNode != null) {
             contentLayer.getChildren().add(screenNode);
@@ -218,6 +220,18 @@ public class ScreenManager extends StackPane {
 
         if (onViewChanged != null) {
             onViewChanged.run();
+        }
+    }
+
+    @Override
+    protected void layoutChildren() {
+        super.layoutChildren();
+        if (toast != null) {
+            double tw = toast.getPrefWidth();
+            double th = toast.getPrefHeight();
+            double tx = Math.max(0, getWidth() - tw - 24);
+            double ty = Math.max(0, getHeight() - th - 24);
+            toast.resizeRelocate(tx, ty, tw, th);
         }
     }
 }
