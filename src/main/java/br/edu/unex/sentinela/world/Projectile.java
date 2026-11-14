@@ -52,5 +52,10 @@ public class Projectile {
     public void deactivate() { this.active = false; }
     public double getX() { return x; }
     public double getY() { return y; }
+    public double getVx() { return vx; }
+    public double getVy() { return vy; }
+    public double getAngle() { return Math.atan2(vy, vx); }
+    public double getDistanceTraveled() { return distanceTraveled; }
+    public double getMaxDistance() { return maxDistance; }
 }
 

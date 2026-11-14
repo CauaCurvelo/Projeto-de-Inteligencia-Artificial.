@@ -12,6 +12,7 @@ import br.edu.unex.sentinela.world.Burrow;
 import br.edu.unex.sentinela.world.FoodItem;
 import br.edu.unex.sentinela.world.Footprint;
 import br.edu.unex.sentinela.world.MeatItem;
+import br.edu.unex.sentinela.world.Projectile;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
@@ -125,6 +126,124 @@ public class EntityRenderer {
 
     public void drawBearTrap(br.edu.unex.sentinela.world.BearTrap trap, double tx, double ty) {
         groundItemRenderer.drawBearTrap(trap, tx, ty);
+    }
+
+    /**
+     * Renderiza a flecha de caça disparada com alta fidelidade visual (Top-Down 2.5D):
+     * - Rotação fluida 360° no vetor balístico de voo (vx, vy)
+     * - Parábola de elevação 2.5D suave e sombra de contato projetada no solo
+     * - Rastro de vento aerodinâmico (speed streaks)
+     * - Haste em madeira torneada com chanfros de amarração em linho escuro
+     * - Ponta Broadhead afiada de aço forjado com farpas e gume reluzente
+     * - Penas de estabilização clássicas de caça em carmesim e marfim com entalhe nock
+     */
+    public void renderProjectile(Projectile proj, double px, double py) {
+        if (proj == null || !proj.isActive()) return;
+
+        double angle = proj.getAngle();
+        double angleDeg = Math.toDegrees(angle);
+        double distProgress = Math.min(1.0, proj.getDistanceTraveled() / proj.getMaxDistance());
+
+        // Parábola de altitude 2.5D no ar (sobe até ~12px no meio do voo e desce)
+        double flightAlt = Math.sin(distProgress * Math.PI) * 11.0 + 5.0;
+
+        gc.save();
+
+        // 1. Sombra Projetada no Solo (Permanece no chão em px, py com atenuação de altura)
+        double shadowAlpha = Math.max(0.10, 0.35 - (flightAlt / 35.0));
+        gc.save();
+        gc.translate(px, py);
+        gc.rotate(angleDeg);
+
+        gc.setFill(Color.color(0.02, 0.04, 0.02, shadowAlpha));
+        // Sombra da haste
+        gc.fillRoundRect(-11.0, -1.0, 22.0, 2.0, 1.0, 1.0);
+        // Sombra da ponta triangular
+        gc.fillPolygon(new double[]{10.0, 16.5, 10.0}, new double[]{-2.5, 0.0, 2.5}, 3);
+        // Sombra das penas
+        gc.fillPolygon(new double[]{-11.5, -5.5, -9.0}, new double[]{-3.2, 0.0, 3.2}, 3);
+        gc.restore();
+
+        // 2. Flecha Elevada no Ar (px, py - flightAlt)
+        gc.save();
+        gc.translate(px, py - flightAlt);
+        gc.rotate(angleDeg);
+
+        // Trilha aerodinâmica de ar rasgado esvanecendo para trás
+        gc.setLineWidth(1.1);
+        gc.setStroke(Color.color(0.92, 0.96, 1.0, 0.28));
+        gc.strokeLine(-14.0, -1.8, -32.0, -2.4);
+        gc.strokeLine(-13.0, 1.8, -32.0, 2.4);
+        gc.setStroke(Color.color(1.0, 1.0, 1.0, 0.45));
+        gc.strokeLine(-12.0, 0.0, -28.0, 0.0);
+
+        // 3. Haste da Flecha (Madeira nobre torneada)
+        // Linha de contorno/sombra inferior da madeira
+        gc.setFill(Color.web("#3E2723"));
+        gc.fillRoundRect(-12.0, -1.3, 23.0, 2.6, 1.2, 1.2);
+        // Madeira de freixo iluminada
+        gc.setFill(Color.web("#8D6E63"));
+        gc.fillRoundRect(-11.5, -1.0, 22.0, 2.0, 1.0, 1.0);
+        // Brilho especular longitudinal no cume superior
+        gc.setFill(Color.web("#D7CCC8", 0.75));
+        gc.fillRect(-10.5, -1.0, 19.5, 0.7);
+
+        // Amarração de linho encerado perto da ponta e das penas
+        gc.setFill(Color.web("#2E1C14"));
+        gc.fillRect(8.0, -1.4, 2.0, 2.8);
+        gc.fillRect(-6.0, -1.4, 1.8, 2.8);
+
+        // 4. Penas de Estabilização (Fletching carmesim e marfim)
+        // Penas superiores
+        gc.setFill(Color.web("#B71C1C"));
+        gc.fillPolygon(new double[]{-12.0, -5.5, -8.0, -12.0},
+                       new double[]{-1.0, -1.0, -4.8, -3.2}, 4);
+        // Penas inferiores
+        gc.fillPolygon(new double[]{-12.0, -5.5, -8.0, -12.0},
+                       new double[]{1.0, 1.0, 4.8, 3.2}, 4);
+
+        // Detalhe de friso branco nas aletas
+        gc.setFill(Color.web("#ECEFF1", 0.90));
+        gc.fillPolygon(new double[]{-11.5, -7.0, -9.0, -11.5},
+                       new double[]{-1.0, -1.0, -3.2, -2.2}, 4);
+        gc.fillPolygon(new double[]{-11.5, -7.0, -9.0, -11.5},
+                       new double[]{1.0, 1.0, 3.2, 2.2}, 4);
+
+        // Entalhe traseiro (Nock)
+        gc.setFill(Color.web("#212121"));
+        gc.fillRoundRect(-13.5, -1.2, 2.2, 2.4, 1, 1);
+
+        // 5. Ponta Broadhead de Aço Forjado (Arrowhead afiada com farpas)
+        // Base de encaixe do ferro na madeira
+        gc.setFill(Color.web("#455A64"));
+        gc.fillRect(9.0, -1.5, 2.5, 3.0);
+
+        // Lâmina de aço triangular com farpas laterais
+        gc.setFill(Color.web("#78909C"));
+        gc.fillPolygon(new double[]{10.5, 17.5, 10.5, 12.0},
+                       new double[]{-3.6, 0.0, 3.6, 0.0}, 4);
+
+        // Lâmina superior iluminada em prata metálica
+        gc.setFill(Color.web("#CFD8DC"));
+        gc.fillPolygon(new double[]{11.0, 17.0, 11.8},
+                       new double[]{-3.0, 0.0, 0.0}, 3);
+
+        // Lâmina inferior em aço escovado
+        gc.setFill(Color.web("#90A4AE"));
+        gc.fillPolygon(new double[]{11.0, 17.0, 11.8},
+                       new double[]{3.0, 0.0, 0.0}, 3);
+
+        // Fio da lâmina cortante (gume alvo reluzente)
+        gc.setStroke(Color.web("#FFFFFF", 0.95));
+        gc.setLineWidth(0.8);
+        gc.strokeLine(11.0, -2.8, 17.2, 0.0);
+        gc.strokeLine(11.0, 2.8, 17.2, 0.0);
+        // Cume central de reforço
+        gc.setStroke(Color.web("#ECEFF1", 0.90));
+        gc.strokeLine(10.5, 0.0, 17.5, 0.0);
+
+        gc.restore();
+        gc.restore();
     }
 
     public void drawPlayerFox(Player player, double px, double py) {

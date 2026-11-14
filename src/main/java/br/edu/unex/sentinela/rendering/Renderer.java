@@ -216,17 +216,14 @@ public class Renderer {
             }
         }
 
-        // PASSO 6: Projéteis, Inimigos (com Nameplates Modernos) e Jogador
+        // PASSO 6: Projéteis (Flechas Balísticas 2.5D), Inimigos (com Nameplates Modernos) e Jogador
         for (Projectile proj : world.getProjectiles()) {
             if (proj.isActive()) {
                 double prx = proj.getX() - camX;
                 double pry = proj.getY() - camY;
-                gc.setFill(Color.color(0, 0, 0, 0.35));
-                gc.fillOval(prx - 3, pry + 4, 6, 4);
-                gc.setFill(Color.web("#FFD700"));
-                gc.fillOval(prx - 4, pry - 4, 8, 8);
-                gc.setFill(Color.web("#FF4444"));
-                gc.fillOval(prx - 2, pry - 2, 4, 4);
+                if (prx >= -50 && prx <= visibleW + 50 && pry >= -50 && pry <= visibleH + 50) {
+                    entityRenderer.renderProjectile(proj, prx, pry);
+                }
             }
         }
 
