@@ -19,36 +19,38 @@ import javafx.scene.paint.Stop;
  * Responsável pelo pós-processamento atmosférico:
  * - Iluminação direcional solar (Luz quente dourada no canto superior esquerdo)
  * - Iluminação noturna com Halo Radial suave focado na raposa (Visão Noturna)
- * - Vinheta de borda de lente (Ambient Vignette) para profundidade cinematográfica
- * - Efeitos climáticos volumétricos (Chuva com ripples de impacto e Neblina densa em camadas)
+ * - Vinheta de borda de lente (Ambient Vignette) para profundidade
+ * cinematográfica
+ * - Efeitos climáticos volumétricos (Chuva com ripples de impacto e Neblina
+ * densa em camadas)
  */
 public class LightingAndWeatherRenderer {
     private static final Color FOG_LOW_COLOR = Color.color(0.82, 0.88, 0.92, 0.34);
 
     private static final RadialGradient FOG_GRAD = new RadialGradient(
-        0, 0, 0.5, 0.5, 0.72,
-        true, CycleMethod.NO_CYCLE,
-        new Stop(0.0, Color.color(0.88, 0.92, 0.95, 0.16)),
-        new Stop(0.6, Color.color(0.82, 0.88, 0.92, 0.36)),
-        new Stop(1.0, Color.color(0.75, 0.82, 0.88, 0.52))
-    );
+            0, 0, 0.5, 0.5, 0.72,
+            true, CycleMethod.NO_CYCLE,
+            new Stop(0.0, Color.color(0.88, 0.92, 0.95, 0.16)),
+            new Stop(0.6, Color.color(0.82, 0.88, 0.92, 0.36)),
+            new Stop(1.0, Color.color(0.75, 0.82, 0.88, 0.52)));
 
     private static final LinearGradient SUN_BEAM_GRAD = new LinearGradient(
-        0, 0, 1, 1, true, CycleMethod.NO_CYCLE,
-        new Stop(0.0, Color.color(1.0, 0.95, 0.72, 0.14)),
-        new Stop(0.45, Color.color(1.0, 0.90, 0.60, 0.04)),
-        new Stop(1.0, Color.color(0.02, 0.08, 0.04, 0.12))
-    );
+            0, 0, 1, 1, true, CycleMethod.NO_CYCLE,
+            new Stop(0.0, Color.color(1.0, 0.95, 0.72, 0.14)),
+            new Stop(0.45, Color.color(1.0, 0.90, 0.60, 0.04)),
+            new Stop(1.0, Color.color(0.02, 0.08, 0.04, 0.12)));
 
     private static final RadialGradient VIGNETTE_GRAD = new RadialGradient(
-        0, 0, 0.5, 0.5, 0.78,
-        true, CycleMethod.NO_CYCLE,
-        new Stop(0.0, Color.TRANSPARENT),
-        new Stop(0.68, Color.color(0.0, 0.0, 0.0, 0.05)),
-        new Stop(1.0, Color.color(0.0, 0.02, 0.0, 0.38))
-    );
+            0, 0, 0.5, 0.5, 0.78,
+            true, CycleMethod.NO_CYCLE,
+            new Stop(0.0, Color.TRANSPARENT),
+            new Stop(0.68, Color.color(0.0, 0.0, 0.0, 0.05)),
+            new Stop(1.0, Color.color(0.0, 0.02, 0.0, 0.38)));
 
-    /** Raio físico fixo da visão noturna da raposa no espaço do mundo (~8.3 tiles, imune a zoom). */
+    /**
+     * Raio físico fixo da visão noturna da raposa no espaço do mundo (~8.3 tiles,
+     * imune a zoom).
+     */
     public static final double FOX_NIGHT_VISION_RADIUS_WORLD = 265.0;
 
     private final GraphicsContext gc;
@@ -72,7 +74,7 @@ public class LightingAndWeatherRenderer {
         }
 
         renderFireflies(world, world.getCamera() != null ? world.getCamera().getX() : 0,
-                        world.getCamera() != null ? world.getCamera().getY() : 0, visibleW, visibleH);
+                world.getCamera() != null ? world.getCamera().getY() : 0, visibleW, visibleH);
 
         if (rainIntensity > 0.01 && !inSnow) {
             var drops = world.getRainDrops();
@@ -85,7 +87,8 @@ public class LightingAndWeatherRenderer {
             Color currentRainColor = Color.web("#B3E5FC", dropAlpha);
             Color currentRippleColor = Color.web("#E1F5FE", 0.35 * Math.min(1.0, rainIntensity * 1.25));
 
-            // Inclinação e alongamento da gota diretamente proporcionais ao vetor físico de vento
+            // Inclinação e alongamento da gota diretamente proporcionais ao vetor físico de
+            // vento
             double windVx = world.getWindVx();
             double windVy = world.getWindVy();
             double physicalVx = -35.0 + (windVx * 340.0);
@@ -103,7 +106,8 @@ public class LightingAndWeatherRenderer {
                 double dy = drop.getY();
                 gc.strokeLine(dx, dy, dx + streakDx, dy + streakDy);
 
-                // Pequenos anéis de respingo (water splash ripples) no chão quando a gota está no fim do curso
+                // Pequenos anéis de respingo (water splash ripples) no chão quando a gota está
+                // no fim do curso
                 if (quality != GraphicsQuality.LOW && rainIntensity > 0.25 && ((int) (dy + dx) % 15) == 0) {
                     gc.setStroke(currentRippleColor);
                     gc.strokeOval(dx + streakDx - 2.5, dy + streakDy - 1.2, 5, 2.5);
@@ -146,7 +150,8 @@ public class LightingAndWeatherRenderer {
 
     private void renderWindVisuals(World world, double camX, double camY, double visibleW, double visibleH) {
         WindSystem wind = world.getWindSystem();
-        if (wind == null) return;
+        if (wind == null)
+            return;
 
         // 1. Linhas aerodinâmicas de corrente de ar (WindStreaks)
         var streaks = wind.getStreaks();
@@ -155,9 +160,11 @@ public class LightingAndWeatherRenderer {
             for (WindSystem.WindStreak s : streaks) {
                 double sx = s.x - camX;
                 double sy = s.y - camY;
-                if (sx < -80 || sx > visibleW + 80 || sy < -80 || sy > visibleH + 80) continue;
+                if (sx < -80 || sx > visibleW + 80 || sy < -80 || sy > visibleH + 80)
+                    continue;
                 double a = s.getAlpha();
-                if (a <= 0.01) continue;
+                if (a <= 0.01)
+                    continue;
 
                 gc.setStroke(Color.color(0.92, 0.96, 1.0, a));
                 double endX = sx + Math.cos(s.angle) * s.length;
@@ -172,9 +179,11 @@ public class LightingAndWeatherRenderer {
             for (WindSystem.WindLeaf l : leaves) {
                 double sx = l.x - camX;
                 double sy = l.y - camY - l.z;
-                if (sx < -40 || sx > visibleW + 40 || sy < -40 || sy > visibleH + 40) continue;
+                if (sx < -40 || sx > visibleW + 40 || sy < -40 || sy > visibleH + 40)
+                    continue;
                 double a = l.getAlpha();
-                if (a <= 0.01) continue;
+                if (a <= 0.01)
+                    continue;
 
                 gc.save();
                 gc.translate(sx, sy);
@@ -189,14 +198,16 @@ public class LightingAndWeatherRenderer {
 
     private void renderLightningStrikes(World world, double camX, double camY, double visibleW, double visibleH) {
         var strikes = world.getActiveLightningStrikes();
-        if (strikes == null || strikes.isEmpty()) return;
+        if (strikes == null || strikes.isEmpty())
+            return;
 
         for (LightningStrike strike : strikes) {
             double sx = strike.getX() - camX;
             double sy = strike.getY() - camY;
 
             if (sx < -100 || sx > visibleW + 100 || sy < -100 || sy > visibleH + 100) {
-                if (!strike.isStriking()) continue;
+                if (!strike.isStriking())
+                    continue;
             }
 
             if (strike.isWarning()) {
@@ -222,7 +233,8 @@ public class LightingAndWeatherRenderer {
                     double spX = sx + Math.cos(angle + p * speed) * curDist;
                     double spY = sy + Math.sin(angle + p * speed) * (curDist * 0.55);
 
-                    Color spColor = (p > 0.65 && ((int) (p * 24) % 2 == 0)) ? Color.web("#FFF59D", 0.95) : Color.web("#80D8FF", 0.85);
+                    Color spColor = (p > 0.65 && ((int) (p * 24) % 2 == 0)) ? Color.web("#FFF59D", 0.95)
+                            : Color.web("#80D8FF", 0.85);
                     gc.setFill(spColor);
                     gc.fillOval(spX - 1.5, spY - 1.5, 3.0, 3.0);
                 }
@@ -282,7 +294,7 @@ public class LightingAndWeatherRenderer {
     }
 
     private void renderSnowfall(double visibleW, double visibleH, double animTime,
-                                GraphicsQuality quality, boolean blizzard) {
+            GraphicsQuality quality, boolean blizzard) {
         int count = quality == GraphicsQuality.LOW ? 28 : (blizzard ? 95 : 54);
         double speedY = blizzard ? 92.0 : 46.0;
         double windX = blizzard ? -34.0 : -14.0;
@@ -293,7 +305,8 @@ public class LightingAndWeatherRenderer {
         for (int i = 0; i < count; i++) {
             double h1 = TerrainRenderer.coordHash(i * 17, 3, 9101L);
             double h2 = TerrainRenderer.coordHash(i * 31, 7, 9203L);
-            double fx = ((h1 * visibleW + animTime * (windX + (i % 5) * 4.0) + Math.sin(animTime * 1.4 + i) * 14.0) % visibleW + visibleW) % visibleW;
+            double fx = ((h1 * visibleW + animTime * (windX + (i % 5) * 4.0) + Math.sin(animTime * 1.4 + i) * 14.0)
+                    % visibleW + visibleW) % visibleW;
             double fy = ((h2 * visibleH + animTime * (speedY + (i % 7) * 6.0)) % visibleH + visibleH) % visibleH;
             double size = 2.0 + (i % 3) * 1.1;
             gc.setFill(i % 4 == 0 ? Color.web("#BAE6FD", 0.72) : Color.web("#FFFFFF", 0.78));
@@ -302,13 +315,16 @@ public class LightingAndWeatherRenderer {
     }
 
     public void renderFireflies(World world, double camX, double camY, double visibleW, double visibleH) {
-        if (world == null || world.getFireflies() == null) return;
+        if (world == null || world.getFireflies() == null)
+            return;
         var fireflies = world.getFireflies();
-        if (fireflies.isEmpty()) return;
+        if (fireflies.isEmpty())
+            return;
 
         double nightFactor = world.getNightFactor();
         // Os vagalumes só começam a brilhar estritamente de noite
-        if (nightFactor <= 0.45) return;
+        if (nightFactor <= 0.45)
+            return;
         double nightGlowScale = Math.min(1.0, (nightFactor - 0.45) / 0.15);
 
         GraphicsQuality quality = GameSettings.get().getGraphicsQuality();
@@ -317,18 +333,19 @@ public class LightingAndWeatherRenderer {
             double fx = f.getX() - camX;
             double fy = f.getY() - camY - f.getFloatZ();
 
-            if (fx < -25 || fx > visibleW + 25 || fy < -25 || fy > visibleH + 25) continue;
+            if (fx < -25 || fx > visibleW + 25 || fy < -25 || fy > visibleH + 25)
+                continue;
 
             double glow = f.getGlowAlpha() * nightGlowScale;
-            if (glow <= 0.02) continue;
+            if (glow <= 0.02)
+                continue;
 
             if (quality != GraphicsQuality.LOW) {
                 RadialGradient halo = new RadialGradient(
-                    0, 0, fx, fy, 18.0, false, CycleMethod.NO_CYCLE,
-                    new Stop(0.0, Color.color(0.85, 0.98, 0.35, glow * 0.45)),
-                    new Stop(0.5, Color.color(0.55, 0.90, 0.25, glow * 0.20)),
-                    new Stop(1.0, Color.color(0.20, 0.70, 0.15, 0.0))
-                );
+                        0, 0, fx, fy, 18.0, false, CycleMethod.NO_CYCLE,
+                        new Stop(0.0, Color.color(0.85, 0.98, 0.35, glow * 0.45)),
+                        new Stop(0.5, Color.color(0.55, 0.90, 0.25, glow * 0.20)),
+                        new Stop(1.0, Color.color(0.20, 0.70, 0.15, 0.0)));
                 gc.setFill(halo);
                 gc.fillOval(fx - 18, fy - 18, 36, 36);
             }
@@ -340,11 +357,13 @@ public class LightingAndWeatherRenderer {
         }
     }
 
-    public void renderDynamicLightingAndVignette(World world, double playerScreenX, double playerScreenY, double visibleW, double visibleH) {
+    public void renderDynamicLightingAndVignette(World world, double playerScreenX, double playerScreenY,
+            double visibleW, double visibleH) {
         double nightFactor = world.getNightFactor(); // 0 = Meio-dia, 1 = Meia-noite
         GraphicsQuality quality = GameSettings.get().getGraphicsQuality();
 
-        // 1. Luz Solar Direcional (Diurna) vinda de Noroeste - transição suave sem corte abrupto
+        // 1. Luz Solar Direcional (Diurna) vinda de Noroeste - transição suave sem
+        // corte abrupto
         if (nightFactor < 0.48 && quality != GraphicsQuality.LOW) {
             double sunT = nightFactor / 0.48; // 0.0 no meio-dia, 1.0 no crepúsculo
             double sunStrength = 1.0 - (sunT * sunT); // Decaimento quadrático contínuo
@@ -355,25 +374,30 @@ public class LightingAndWeatherRenderer {
             gc.restore();
         }
 
-        // 2. Transição Crepúsculo (Golden Hour / Pôr do Sol alaranjado quente em sino senoidal contínuo)
+        // 2. Transição Crepúsculo (Golden Hour / Pôr do Sol alaranjado quente em sino
+        // senoidal contínuo)
         if (nightFactor >= 0.20 && nightFactor <= 0.62) {
             double duskDist = Math.abs(nightFactor - 0.41) / 0.21;
             if (duskDist < 1.0) {
-                // Curva de cosseno elevada: derivada zero no início, no pico e no final (sem corte brusco)
+                // Curva de cosseno elevada: derivada zero no início, no pico e no final (sem
+                // corte brusco)
                 double duskSmooth = 0.5 + 0.5 * Math.cos(duskDist * Math.PI);
                 gc.setFill(Color.color(0.88, 0.40, 0.12, 0.18 * duskSmooth));
                 gc.fillRect(0, 0, visibleW, visibleH);
             }
         }
 
-        // 3. Iluminação Noturna Densa com Transição Perfeitamente Gradual (Smoothstep sem degrau)
+        // 3. Iluminação Noturna Densa com Transição Perfeitamente Gradual (Smoothstep
+        // sem degrau)
         if (nightFactor > 0.35) {
             double t = (nightFactor - 0.35) / (1.0 - 0.35); // 0.0 a 1.0
-            // Hermite Smoothstep cúbico: derivada zero em t=0 e t=1. maxDarkness parte exatamente de 0.0
+            // Hermite Smoothstep cúbico: derivada zero em t=0 e t=1. maxDarkness parte
+            // exatamente de 0.0
             double smoothT = t * t * (3.0 - 2.0 * t);
             double maxDarkness = 0.94 * smoothT; // Escala suave de 0.0 até 0.94 no ápice da meia-noite
 
-            // Clivagem de relâmpago: dissipa momentaneamente a escuridão durante flashes de tempestade
+            // Clivagem de relâmpago: dissipa momentaneamente a escuridão durante flashes de
+            // tempestade
             double flash = world.getLightningFlash();
             if (flash > 0.01) {
                 maxDarkness *= Math.max(0.0, 1.0 - flash * 1.35);
@@ -386,7 +410,7 @@ public class LightingAndWeatherRenderer {
                 } else {
                     // Determina o centro focal e o raio físico no espaço do mundo
                     boolean isMenuMode = (playerScreenX < -80 || playerScreenX > visibleW + 80 ||
-                                          playerScreenY < -80 || playerScreenY > visibleH + 80);
+                            playerScreenY < -80 || playerScreenY > visibleH + 80);
                     double focalX;
                     double focalY;
                     double lightRadius;
@@ -403,14 +427,13 @@ public class LightingAndWeatherRenderer {
                     }
 
                     RadialGradient nightLight = new RadialGradient(
-                        0, 0, focalX, focalY, lightRadius,
-                        false, CycleMethod.NO_CYCLE,
-                        new Stop(0.0,  Color.color(0.025, 0.045, 0.12, maxDarkness * 0.05)),
-                        new Stop(0.28, Color.color(0.020, 0.038, 0.10, maxDarkness * 0.20)),
-                        new Stop(0.54, Color.color(0.014, 0.028, 0.08, maxDarkness * 0.52)),
-                        new Stop(0.78, Color.color(0.008, 0.018, 0.05, maxDarkness * 0.82)),
-                        new Stop(1.0,  Color.color(0.003, 0.006, 0.022, maxDarkness))
-                    );
+                            0, 0, focalX, focalY, lightRadius,
+                            false, CycleMethod.NO_CYCLE,
+                            new Stop(0.0, Color.color(0.025, 0.045, 0.12, maxDarkness * 0.05)),
+                            new Stop(0.28, Color.color(0.020, 0.038, 0.10, maxDarkness * 0.20)),
+                            new Stop(0.54, Color.color(0.014, 0.028, 0.08, maxDarkness * 0.52)),
+                            new Stop(0.78, Color.color(0.008, 0.018, 0.05, maxDarkness * 0.82)),
+                            new Stop(1.0, Color.color(0.003, 0.006, 0.022, maxDarkness)));
                     gc.setFill(nightLight);
                     gc.fillRect(0, 0, visibleW, visibleH);
                 }

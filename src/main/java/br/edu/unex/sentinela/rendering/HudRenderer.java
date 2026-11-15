@@ -161,10 +161,10 @@ public class HudRenderer {
         iconDrawer.drawStyledText("NUTRIÇÃO " + hungerInt + "%", barX + barW * 0.5, barY + barH * 0.5,
                 HUNGER_BAR_FONT, Color.WHITE, Color.BLACK, 2.4, TextAlignment.CENTER);
 
-        // Linha 3: Barra de Sprint / Stamina com Ícone de Raio
+        // Linha 3: Barra de Stamina com Ícone de Raio
         double sprintY = panelY + 60;
         double sprintH = 14;
-        iconDrawer.drawPlayerSprintBar(player, contentStartX, barX, sprintY, barW, sprintH, animTime);
+        iconDrawer.drawPlayerStaminaBar(player, contentStartX, barX, sprintY, barW, sprintH, animTime);
 
         // Linha 4: Badges de Status Furtivo & Clima Ilustrado
         double statusY = panelY + 93;

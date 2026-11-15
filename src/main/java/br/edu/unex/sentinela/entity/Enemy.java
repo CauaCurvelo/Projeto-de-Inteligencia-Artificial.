@@ -48,6 +48,7 @@ public class Enemy {
     private double knockbackVy = 0.0;
 
     private AIState state = AIState.PATROL;
+    private TileType currentTile = TileType.GRASS;
     private List<Node> currentPath;
     private int currentPathIndex = 0;
     private int targetCol = -1;
@@ -256,10 +257,11 @@ public class Enemy {
 
         double duskBoost = 1.0 + (timeProgress * 0.15);
         TileType currentTile = tileMap.getTileAt(curCol, curRow);
+        this.currentTile = currentTile;
 
         // Apex predator behavior (velocidade, território e leash delegados ao BossBehaviorController)
         if (type == EnemyType.BEAR_BOSS && bossController != null) {
-            updateApexBoss(player, allEnemies, tileMap, curCol, curRow, deltaTime, duskBoost, scentTrail, currentTile);
+            updateApexBoss(player, allEnemies, tileMap, curCol, curRow, deltaTime, duskBoost, scentTrail, currentTile, waterRipples);
             return;
         }
 
@@ -273,9 +275,13 @@ public class Enemy {
                 currentActualSpeed = baseSpeed * 0.65;
             }
         } else if (currentTile == TileType.MUD) {
-            currentActualSpeed *= variant.isMudAdapted() ? 0.92 : 0.55;
+            if (type == EnemyType.HUNTER) {
+                currentActualSpeed *= 0.35; // Caçador com botas pesadas atola muito na lama
+            } else {
+                currentActualSpeed *= variant.isMudAdapted() ? 0.60 : 0.38; // Animais terrestres desaceleram fortemente
+            }
         } else if (currentTile == TileType.WATER) {
-            currentActualSpeed *= 0.45;
+            currentActualSpeed *= 0.40;
         } else if (currentTile == TileType.DIRT_PATH) {
             currentActualSpeed *= 1.12;
         }
@@ -309,11 +315,12 @@ public class Enemy {
         }
 
         // Executa o movimento fluido: Perseguição Direta se corredor livre ou Seguimento de Rota Suavizada
-        executeFluidMovement(deltaTime, currentActualSpeed, player, allEnemies, tileMap, scentTrail, currentTile);
+        executeFluidMovement(deltaTime, currentActualSpeed, player, allEnemies, tileMap, scentTrail, currentTile, waterRipples);
     }
 
     private void updateApexBoss(Player player, List<Enemy> allEnemies, TileMap tileMap, int curCol, int curRow,
-                                double deltaTime, double duskBoost, List<Footprint> scentTrail, TileType currentTile) {
+                                double deltaTime, double duskBoost, List<Footprint> scentTrail, TileType currentTile,
+                                List<WaterRipple> waterRipples) {
         BossBehaviorController.BossTickDecision decision = bossController.evaluateBehavior(
             this, player, allEnemies, tileMap, curCol, curRow, deltaTime
         );
@@ -348,7 +355,7 @@ public class Enemy {
         }
 
         double currentActualSpeed = bossController.computeCurrentSpeed(state, currentTile, duskBoost);
-        executeFluidMovement(deltaTime, currentActualSpeed, player, allEnemies, tileMap, scentTrail, currentTile);
+        executeFluidMovement(deltaTime, currentActualSpeed, player, allEnemies, tileMap, scentTrail, currentTile, waterRipples);
     }
 
     public void receiveHoundAlert(double targetX, double targetY, TileMap tileMap) {
@@ -1032,7 +1039,8 @@ public class Enemy {
      * - Aplica força suave de separação entre inimigos próximos para evitar sobreposição.
      */
     private void executeFluidMovement(double deltaTime, double maxSpeed, Player player, List<Enemy> allEnemies,
-                                      TileMap tileMap, List<Footprint> scentTrail, TileType currentTile) {
+                                      TileMap tileMap, List<Footprint> scentTrail, TileType currentTile,
+                                      List<WaterRipple> waterRipples) {
         if (state == AIState.AIMING || state == AIState.ROARING || state == AIState.DRINKING || state == AIState.RESTING || patrolPauseTimer > 0) {
             this.moving = false;
             this.vx *= 0.5;
@@ -1046,10 +1054,11 @@ public class Enemy {
             return;
         }
 
-        // Investida retilínea do javali (Charging)
+        // Investida retilínea do javali (Charging) - na lama, perde quase todo o ímpeto e velocidade
         if (state == AIState.CHARGING) {
             this.moving = true;
-            double chargeSpeed = maxSpeed * 1.55;
+            double chargeMult = (currentTile == TileType.MUD) ? 0.45 : 1.55;
+            double chargeSpeed = maxSpeed * chargeMult;
             this.vx = chargeDirX * chargeSpeed;
             this.vy = chargeDirY * chargeSpeed;
             this.walkPhase += chargeSpeed * deltaTime * 0.12;
@@ -1058,10 +1067,11 @@ public class Enemy {
             return;
         }
 
-        // Recuo tático do caçador com arco (Kiting)
+        // Recuo tático do caçador com arco (Kiting) - atola botas na lama
         if (state == AIState.KITING) {
             this.moving = true;
-            double kiteSpeed = maxSpeed * 0.95;
+            double kiteMult = (currentTile == TileType.MUD) ? 0.40 : 0.95;
+            double kiteSpeed = maxSpeed * kiteMult;
             double awayX = x - targetAimX;
             double awayY = y - targetAimY;
             double awayLen = Math.hypot(awayX, awayY);
@@ -1186,6 +1196,9 @@ public class Enemy {
         if (currentTile == TileType.ICE) {
             boolean hasFrostGrip = (skin == EnemySkin.POLAR_BEAR || variant == AnimalVariant.ARCTIC);
             steerRate = hasFrostGrip ? 9.5 : 2.6;
+        } else if (currentTile == TileType.MUD) {
+            boolean mudAdapted = (skin == EnemySkin.CROCODILE || variant.isMudAdapted());
+            steerRate = mudAdapted ? 10.0 : 4.5;
         }
         double steerFactor = Math.min(1.0, deltaTime * steerRate);
         double targetVx = combinedX * maxSpeed;
@@ -1201,6 +1214,15 @@ public class Enemy {
             this.faceAngle = lerpAngle(this.faceAngle, moveAngle, Math.min(1.0, deltaTime * 11.0));
 
             moveWithCollisionSlide(vx * deltaTime, vy * deltaTime, tileMap);
+
+            if (currentTile == TileType.WATER && actualSpeed > 8.0 && waterRipples != null) {
+                waterRippleTimer += deltaTime;
+                if (waterRippleTimer >= 0.28) {
+                    waterRippleTimer = 0.0;
+                    double rippleRadius = (type == EnemyType.BEAR_BOSS || skin == EnemySkin.BOAR) ? 20.0 : 13.0;
+                    waterRipples.add(new WaterRipple(x, y, rippleRadius, 0.65));
+                }
+            }
 
             // Detector Anti-Stuck: Se tentou andar por 0.6s mas não saiu do lugar, recalcula nova rota
             stuckTimer += deltaTime;
@@ -1519,4 +1541,5 @@ public class Enemy {
     public boolean isStalking() { return state == AIState.STALKING; }
     public boolean isDrinking() { return state == AIState.DRINKING; }
     public boolean isKiting() { return state == AIState.KITING; }
+    public TileType getCurrentTile() { return currentTile; }
 }

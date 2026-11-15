@@ -13,6 +13,7 @@ import br.edu.unex.sentinela.world.FoodItem;
 import br.edu.unex.sentinela.world.Footprint;
 import br.edu.unex.sentinela.world.MeatItem;
 import br.edu.unex.sentinela.world.Projectile;
+import br.edu.unex.sentinela.world.TileType;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
@@ -350,7 +351,22 @@ public class EntityRenderer {
             renderUniqueAttackTelegraph(enemy, ex, ey, angle);
         }
 
-        spriteRenderer.renderEnemySprite(enemy, ex, ey);
+        TileType enemyTile = enemy.getCurrentTile();
+        double renderEy = ey;
+        if (enemyTile == TileType.MUD && enemy.getSkin() != EnemySkin.CROCODILE) {
+            renderEy += 3.2; // Afunda visualmente na lama
+            gc.setFill(Color.web("#2B170B", 0.40));
+            gc.fillOval(ex - 12, ey + 6, 24, 8);
+        }
+
+        spriteRenderer.renderEnemySprite(enemy, ex, renderEy);
+
+        if (enemyTile == TileType.WATER && enemy.getSkin() != EnemySkin.CROCODILE) {
+            // Efeito visual de água rasa ondulando ao redor das patas
+            gc.setStroke(Color.web("#B2EBF2", 0.45));
+            gc.setLineWidth(1.6);
+            gc.strokeOval(ex - 14, ey + 4, 28, 10);
+        }
 
         if (showNameplate && br.edu.unex.sentinela.settings.GameSettings.get().isShowNameplates()) {
             renderRpgEnemyNameplate(enemy, ex, ey);

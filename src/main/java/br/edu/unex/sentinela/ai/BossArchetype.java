@@ -109,11 +109,11 @@ public enum BossArchetype {
             case SHADOW_PANTHER:
                 if (tile == TileType.TALL_GRASS) return 1.12;
                 if (tile == TileType.DIRT_PATH) return 1.08;
-                if (tile == TileType.MUD) return 0.72;
-                if (tile == TileType.WATER) return 0.52;
+                if (tile == TileType.MUD) return 0.40;
+                if (tile == TileType.WATER) return 0.45;
                 return 1.0;
             case POLAR_BEAR:
-                if (tile == TileType.MUD) return 0.98; // adaptado à neve fofa e gelo fino
+                if (tile == TileType.MUD) return 0.45; // Urso polar pesado atola na lama
                 if (tile == TileType.WATER) return 0.92; // excelente nadador glacial
                 if (tile == TileType.ICE) return 1.25; // garras adaptadas a tracionar no gelo
                 if (tile == TileType.DIRT_PATH) return 1.08;
@@ -122,8 +122,8 @@ public enum BossArchetype {
             default:
                 if (tile == TileType.ICE) return 0.88;
                 if (tile == TileType.DIRT_PATH) return 1.08;
-                if (tile == TileType.MUD) return 0.80;
-                if (tile == TileType.WATER) return 0.78;
+                if (tile == TileType.MUD) return 0.42; // Urso pardo maciço sofre penalidade severa de atolamento
+                if (tile == TileType.WATER) return 0.50; // Vadeia com dificuldade na água
                 if (tile == TileType.TALL_GRASS) return 0.96;
                 return 1.0;
         }

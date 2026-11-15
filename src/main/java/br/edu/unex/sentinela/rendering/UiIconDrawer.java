@@ -615,9 +615,9 @@ public class UiIconDrawer {
     private static final Font METER_BAR_FONT = Font.font("Segoe UI", FontWeight.BOLD, 9.5);
 
     /**
-     * Desenha a barra completa de Sprint/Stamina no HUD, refletindo corrida, exaustão e bloqueio por fome.
+     * Desenha a barra completa de Stamina no HUD, refletindo corrida, exaustão, custo de ataque e bloqueio por fome.
      */
-    public void drawPlayerSprintBar(Player player, double contentStartX, double barX, double y, double w, double h, double animTime) {
+    public void drawPlayerStaminaBar(Player player, double contentStartX, double barX, double y, double w, double h, double animTime) {
         double maxStam = Math.max(1.0, player.getMaxStamina());
         double pct = Math.max(0.0, Math.min(1.0, player.getStamina() / maxStam));
         boolean sprinting = player.isSprinting();
@@ -651,7 +651,7 @@ public class UiIconDrawer {
             gradBottom = Color.web("#5D1B09");
             borderColor = Color.web("#FF7043", 0.9);
             textColor = Color.web("#FFCCBC");
-            label = "FOME • SPRINT BLOQ.";
+            label = "FOME • STAMINA BLOQ.";
         } else if (exhausted) {
             double warnPulse = 0.5 + 0.5 * Math.sin(animTime * 10.0);
             gradTop = Color.web("#EF5350");
@@ -671,10 +671,17 @@ public class UiIconDrawer {
             gradBottom = Color.web("#0277BD");
             borderColor = Color.web("#4FC3F7", 0.7);
             textColor = Color.web("#E1F5FE");
-            label = "SPRINT " + pctInt + "%";
+            label = "STAMINA " + pctInt + "%";
         }
 
         drawHudStatBar(barX, y, w, h, pct, gradTop, gradBottom, borderColor,
                 thresholdMarker, label, METER_BAR_FONT, textColor);
+    }
+
+    /**
+     * Alias de compatibilidade retroativa para drawPlayerStaminaBar.
+     */
+    public void drawPlayerSprintBar(Player player, double contentStartX, double barX, double y, double w, double h, double animTime) {
+        drawPlayerStaminaBar(player, contentStartX, barX, y, w, h, animTime);
     }
 }

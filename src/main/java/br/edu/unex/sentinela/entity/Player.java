@@ -31,12 +31,12 @@ public class Player {
     private double maxHunger = 100.0;
 
     // Sprint / Stamina mechanics
-    public static final double STAMINA_DRAIN_PER_SEC = 32.0;
-    public static final double STAMINA_REGEN_IDLE_PER_SEC = 24.0;
-    public static final double STAMINA_REGEN_WALK_PER_SEC = 15.0;
-    public static final double STAMINA_EXHAUSTION_RECOVERY_THRESHOLD = 30.0;
-    public static final double ATTACK_STAMINA_COST_PCT = 0.15;
-    public static final double LOW_HUNGER_SPRINT_THRESHOLD = 25.0;
+    public static final double STAMINA_DRAIN_PER_SEC = 14.5;
+    public static final double STAMINA_REGEN_IDLE_PER_SEC = 35.0;
+    public static final double STAMINA_REGEN_WALK_PER_SEC = 22.0;
+    public static final double STAMINA_EXHAUSTION_RECOVERY_THRESHOLD = 20.0;
+    public static final double ATTACK_STAMINA_COST_PCT = 0.08;
+    public static final double LOW_HUNGER_SPRINT_THRESHOLD = 20.0;
     public static final double LOW_LIFE_SPEED_MULTIPLIER = 0.78;
 
     private double stamina = 100.0;
@@ -493,7 +493,7 @@ public class Player {
         }
 
         double staminaCost = getAttackStaminaCost();
-        if (isSprintExhausted || stamina < staminaCost) {
+        if (stamina < staminaCost) {
             attackStaminaAlertTimer = 0.30;
             return;
         }

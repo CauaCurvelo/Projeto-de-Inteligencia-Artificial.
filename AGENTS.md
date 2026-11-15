@@ -542,6 +542,30 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - O cálculo foi corrigido para utilizar uma **constante fixa no espaço do mundo** (`FOX_NIGHT_VISION_RADIUS_WORLD = 265.0px`, ~8.3 tiles ao redor da raposa).
   - Agora, ao afastar a câmera (zoom out), o raio físico de visão da raposa permanece rigorosamente constante e a escuridão noturna de 94% preenche toda a tela periférica ao redor da bolha de luz, eliminando qualquer exploit de visão noturna por zoom ou aspect ratio de monitor.
 
+## Feature / Overhaul: Sistema de Stamina Rebalanceado & Física de Terreno para Inimigos (Lama, Água e Gelo)
+- **Rebalanceamento Completo de Stamina ([Player.java](src/main/java/br/edu/unex/sentinela/entity/Player.java)):**
+  - **Duração de Corrida Fluida e Agradável:** Reduzido o dreno contínuo de sprint de `32.0/s` para `14.5/s` (`STAMINA_DRAIN_PER_SEC`), estendendo a corrida ininterrupta de apenas 3.1 segundos para ~7 segundos completos.
+  - **Regeneração Acelerada:** `STAMINA_REGEN_IDLE_PER_SEC` ampliada de `24.0` para `35.0/s` (~2.8 segundos de descanso recuperam a barra de stamina cheia) e `STAMINA_REGEN_WALK_PER_SEC` ampliada de `15.0` para `22.0/s` (~4.5 segundos andando em passo normal).
+  - **Recuperação de Exaustão Suave:** `STAMINA_EXHAUSTION_RECOVERY_THRESHOLD` reduzido de `30.0` para `20.0%`, permitindo ao jogador retomar a corrida com uma pausa breve de menos de 1 segundo.
+  - **Custo e Autodefesa do Ataque Primário:** Custo da mordida reduzido de `15%` para `8%` (`ATTACK_STAMINA_COST_PCT = 0.08`). Em `tryTriggerPrimaryAttack`, o bloqueio agora verifica apenas `stamina < staminaCost`: o jogador não fica mais proibido de morder para se defender enquanto estiver se recuperando do estado de exaustão de corrida, contanto que possua a stamina mínima de uma mordida.
+  - **Limiar de Fome Crítica:** `LOW_HUNGER_SPRINT_THRESHOLD` reduzido de `25.0` para `20.0%`.
+- **Identidade Visual no HUD ([UiIconDrawer.java](src/main/java/br/edu/unex/sentinela/rendering/UiIconDrawer.java), [HudRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/HudRenderer.java)):**
+  - Renomeada a barra e os rótulos de UI de "SPRINT" para "STAMINA": `STAMINA 100%`, `CORRENDO 85%`, `EXAUSTO 15%`, `FOME • STAMINA BLOQ.` e `SEM STAMINA!`.
+  - Método `drawPlayerStaminaBar` padronizado e alias `drawPlayerSprintBar` mantido para retrocompatibilidade.
+- **Física de Terreno & Desaceleração de Inimigos e Chefes ([Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java), [BossArchetype.java](src/main/java/br/edu/unex/sentinela/ai/BossArchetype.java), [PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java)):**
+  - **Atolamento na Lama (`TileType.MUD`):**
+    - Animais terrestres (lobos, cães sabujos, javalis, texugos) sofrem penalidade pesada de atolamento, caindo de `0.55..0.92` para `0.38` (ou `0.60` se adaptados à lama), pareando com a velocidade da raposa na lama (`0.40`).
+    - O Caçador Humano, vestindo roupas pesadas e botas de couro, tem velocidade reduzida para `0.35` e velocidade de recuo tático (*kiting*) reduzida para `0.40`.
+    - A Investida do Javali (`AIState.CHARGING`) perde totalmente a tração na lama, amortecendo a velocidade de `1.55x` para `0.45x` (`chargeMult`), impedindo que o javali atropele o jogador em terrenos lodosos.
+    - Manobras e curvas na lama são viscosas e pesadas: `steerRate = 4.5` (contra `12.0` no solo firme).
+    - Chefes terrestres em `BossArchetype`: Urso Pardo cai de `0.80` para `0.42`, Urso Polar cai de `0.98` para `0.45` e Pantera Negra cai de `0.72` para `0.40`. Apenas o Crocodilo mantém agilidade aquática e anfíbia no pântano (`1.25` na lama e `1.65` na água).
+    - Herbívoros terrestres em `PassiveAnimal` (coelhos e cervos) também sofrem atolamento em lama (`0.45`).
+  - **Água Rasa (`TileType.WATER`):** Inimigos terrestres e presas desaceleram para `0.40`, com taxa de manobra pesada e emissão de marolas contínuas (`WaterRipple`) a cada passada.
+- **Feedback Visual de Atolamento e Marolas ([EntityRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/EntityRenderer.java)):**
+  - Quando um inimigo terrestre pisa na lama (`TileType.MUD`), sua silhueta afunda visualmente `+3.2px` no solo e uma poça de lodo escuro (`#2B170B`) é desenhada sob o corpo.
+  - Ao vadear na água rasa (`TileType.WATER`), um aro ondulante de água clara (`#B2EBF2`) é desenhado ao redor das patas do ser vivo.
+
+
 
 
 

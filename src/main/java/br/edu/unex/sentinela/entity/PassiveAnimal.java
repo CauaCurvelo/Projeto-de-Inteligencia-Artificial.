@@ -1061,8 +1061,19 @@ public class PassiveAnimal {
     private void moveWithCollisionSlide(double dt, TileMap tileMap) {
         double prevX = x;
         double prevY = y;
-        double stepX = vx * dt;
-        double stepY = vy * dt;
+
+        int curC = (int) Math.floor(x / TileMap.TILE_SIZE);
+        int curR = (int) Math.floor(y / TileMap.TILE_SIZE);
+        TileType curTile = tileMap.getTileAt(curC, curR);
+        double terrainMult = 1.0;
+        if (curTile == TileType.MUD && type != PassiveAnimalType.FROG && flightHeight <= 0.1) {
+            terrainMult = 0.45; // Animais terrestres desaceleram ao cruzar a lama
+        } else if (curTile == TileType.WATER && type != PassiveAnimalType.FROG && flightHeight <= 0.1) {
+            terrainMult = 0.40; // Vadeando na água
+        }
+
+        double stepX = vx * dt * terrainMult;
+        double stepY = vy * dt * terrainMult;
         double nextX = x + stepX;
         double nextY = y + stepY;
 
