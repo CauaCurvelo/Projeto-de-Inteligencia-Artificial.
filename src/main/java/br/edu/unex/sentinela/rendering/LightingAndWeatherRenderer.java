@@ -48,6 +48,9 @@ public class LightingAndWeatherRenderer {
         new Stop(1.0, Color.color(0.0, 0.02, 0.0, 0.38))
     );
 
+    /** Raio físico fixo da visão noturna da raposa no espaço do mundo (~8.3 tiles, imune a zoom). */
+    public static final double FOX_NIGHT_VISION_RADIUS_WORLD = 265.0;
+
     private final GraphicsContext gc;
 
     public LightingAndWeatherRenderer(GraphicsContext gc) {
@@ -387,16 +390,23 @@ public class LightingAndWeatherRenderer {
                     gc.setFill(Color.color(0.01, 0.02, 0.06, maxDarkness * 0.88));
                     gc.fillRect(0, 0, visibleW, visibleH);
                 } else {
-                    // Determina o centro focal (se o jogador estiver fora de tela, ex: menu ambiente, usa o centro da tela)
-                    double focalX = playerScreenX;
-                    double focalY = playerScreenY;
-                    if (focalX < -80 || focalX > visibleW + 80 || focalY < -80 || focalY > visibleH + 80) {
+                    // Determina o centro focal e o raio físico no espaço do mundo
+                    boolean isMenuMode = (playerScreenX < -80 || playerScreenX > visibleW + 80 ||
+                                          playerScreenY < -80 || playerScreenY > visibleH + 80);
+                    double focalX;
+                    double focalY;
+                    double lightRadius;
+
+                    if (isMenuMode) {
                         focalX = visibleW * 0.5;
                         focalY = visibleH * 0.5;
+                        lightRadius = Math.max(visibleW, visibleH) * 0.32;
+                    } else {
+                        focalX = playerScreenX;
+                        focalY = playerScreenY;
+                        // Raio físico FIXO no espaço do mundo: imune a zoom in/out e resolução da tela
+                        lightRadius = FOX_NIGHT_VISION_RADIUS_WORLD;
                     }
-
-                    // Raio focal equilibrado: permite enxergar a área imediata com nitidez
-                    double lightRadius = Math.max(visibleW, visibleH) * 0.28;
 
                     RadialGradient nightLight = new RadialGradient(
                         0, 0, focalX, focalY, lightRadius,

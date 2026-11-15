@@ -536,6 +536,12 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - Ao atacar contra aves, o alcance do bote aéreo da raposa é ampliado para `68.0px` com alcance frontal de projeção de `24.0px`.
   - Abates de aves geram explosão de partículas de penugem branca e penas castanhas (`#ECEFF1` e `#8D6E63`), drop de carne miúda rápida (`GAME_MORSEL`), 80 pontos e disparo imediato do evento `BIRD_CAUGHT` (conquista `BIRD_IN_HAND`).
 
+## Fix / Balanceamento: Raio de Visão Noturna Fixo no Mundo (Imune a Zoom da Câmera)
+- **Desacoplamento do Viewport ([LightingAndWeatherRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/LightingAndWeatherRenderer.java)):**
+  - Anteriormente, o raio de visão noturna usava `Math.max(visibleW, visibleH) * 0.28`. Como `visibleW = width / zoom`, ao afastar a câmera no zoom out (`zoom = 0.70`), a área visível do mundo crescia e o raio de luz aumentava proporcionalmente no mundo de 358px para mais de 512px (quase 50% a mais de visão no escuro).
+  - O cálculo foi corrigido para utilizar uma **constante fixa no espaço do mundo** (`FOX_NIGHT_VISION_RADIUS_WORLD = 265.0px`, ~8.3 tiles ao redor da raposa).
+  - Agora, ao afastar a câmera (zoom out), o raio físico de visão da raposa permanece rigorosamente constante e a escuridão noturna de 94% preenche toda a tela periférica ao redor da bolha de luz, eliminando qualquer exploit de visão noturna por zoom ou aspect ratio de monitor.
+
 
 
 
