@@ -1,6 +1,5 @@
 package br.edu.unex.sentinela.rendering;
 
-import br.edu.unex.sentinela.ai.EnemyType;
 import br.edu.unex.sentinela.entity.Enemy;
 import br.edu.unex.sentinela.entity.PassiveAnimal;
 import br.edu.unex.sentinela.entity.Player;

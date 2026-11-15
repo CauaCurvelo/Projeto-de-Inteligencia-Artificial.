@@ -85,12 +85,6 @@ public class LightingAndWeatherRenderer {
             Color currentRainColor = Color.web("#B3E5FC", dropAlpha);
             Color currentRippleColor = Color.web("#E1F5FE", 0.35 * Math.min(1.0, rainIntensity * 1.25));
 
-            Camera cam = world.getCamera();
-            double deltaTime = world.getLastDeltaTime();
-            double camDeltaX = cam.getDeltaX();
-            double camDeltaY = cam.getDeltaY();
-            double safeDt = Math.max(0.001, deltaTime);
-
             // Inclinação e alongamento da gota diretamente proporcionais ao vetor físico de vento
             double windVx = world.getWindVx();
             double windVy = world.getWindVy();

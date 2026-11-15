@@ -138,7 +138,6 @@ public class WindSystem {
 
         double vx = getWindVx();
         double vy = getWindVy();
-        double speed = Math.hypot(vx, vy);
 
         // Dimensões do envelope ao redor da câmera
         double margin = 60.0;
