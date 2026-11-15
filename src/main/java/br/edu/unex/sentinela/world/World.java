@@ -572,9 +572,12 @@ public class World {
 
             // Ataque da Raposa contra a fauna passiva
             if (player.isAttacking() && !player.hasProcessedAttackHit()) {
-                double attackRange = 40.0;
-                double attackX = player.getX() + Math.cos(player.getVisualAngle()) * 18.0;
-                double attackY = player.getY() + Math.sin(player.getVisualAngle()) * 18.0;
+                boolean isBird = (animal.getType() == br.edu.unex.sentinela.entity.PassiveAnimalType.BIRD);
+                // Bote ágil da raposa com alcance aéreo ampliado contra aves em solo e voo rasante
+                double attackRange = isBird ? 68.0 : 42.0;
+                double forwardReach = isBird ? 24.0 : 18.0;
+                double attackX = player.getX() + Math.cos(player.getVisualAngle()) * forwardReach;
+                double attackY = player.getY() + Math.sin(player.getVisualAngle()) * forwardReach;
                 double distToAnimal = Math.hypot(animal.getX() - attackX, animal.getY() - attackY);
 
                 if (distToAnimal <= attackRange) {
@@ -589,12 +592,14 @@ public class World {
                         player.markAttackHitProcessed();
                         boolean dead = animal.takeDamage(1);
                         triggerForestDisturbance(animal.getX(), animal.getY(), 190.0);
-                        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.8, 0, 1.15);
-                        for (int k = 0; k < 5; k++) {
+                        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BITE_WHOOSH, 0.85, 0, isBird ? 1.25 : 1.15);
+                        int numParticles = isBird ? 8 : 5;
+                        for (int k = 0; k < numParticles; k++) {
+                            String pColor = isBird ? (k % 2 == 0 ? "#ECEFF1" : "#8D6E63") : "#D7CCC8";
                             particles.add(new Particle(animal.getX(), animal.getY(),
-                                Math.cos(player.getVisualAngle()) * 50 + (rand.nextDouble() * 40 - 20),
-                                Math.sin(player.getVisualAngle()) * 50 + (rand.nextDouble() * 40 - 20),
-                                0.25, "#D7CCC8", 2.8));
+                                Math.cos(player.getVisualAngle()) * (isBird ? 65 : 50) + (rand.nextDouble() * 40 - 20),
+                                Math.sin(player.getVisualAngle()) * (isBird ? 65 : 50) + (rand.nextDouble() * 40 - 20),
+                                isBird ? 0.35 : 0.25, pColor, isBird ? 3.2 : 2.8));
                         }
                         if (player.isSwimming()) {
                             waterRipples.add(new WaterRipple(animal.getX(), animal.getY(), 22.0, 0.90));
@@ -606,9 +611,9 @@ public class World {
                         }
                         if (dead) {
                             meatItems.addAll(animal.createMorselDrops());
-                            score += 50;
+                            score += isBird ? 80 : 50;
                             GameEventBus.get().post(new GameEvent(GameEvent.Type.PASSIVE_HUNTED));
-                            if (animal.getType() == br.edu.unex.sentinela.entity.PassiveAnimalType.BIRD) {
+                            if (isBird) {
                                 GameEventBus.get().post(new GameEvent(GameEvent.Type.BIRD_CAUGHT));
                             }
                             recordBestiaryDefeatForPassive(animal);

@@ -23,7 +23,7 @@ import java.util.Random;
  */
 public class PassiveAnimal {
     private static final Random RAND = new Random();
-    public static final double BIRD_MAX_CATCHABLE_ALTITUDE = 24.0;
+    public static final double BIRD_MAX_CATCHABLE_ALTITUDE = 56.0;
 
     public enum State {
         FORAGING,
@@ -61,6 +61,7 @@ public class PassiveAnimal {
     private double hopTimer = 0.0;
     private double hopHeight = 0.0;
     private double flightHeight = 0.0;
+    private double birdTakeoffTimer = 0.0;
     private double zigZagTimer = 0.0;
     private double zigZagAngle = 0.0;
     private double rippleCooldown = 0.0;
@@ -180,18 +181,60 @@ public class PassiveAnimal {
             effectivePerception *= 0.85;
         }
 
+        if (type == PassiveAnimalType.BIRD) {
+            // Se o pássaro está no solo debicando sementes (cabeça rente à terra)
+            if (state == State.FORAGING || peckTimer > 0) {
+                effectivePerception *= 0.60;
+            }
+            // Furtividade da raposa predadora
+            if (player != null && nearestThreatDist == Math.hypot(player.getX() - x, player.getY() - y)) {
+                // Caminhada silenciosa sem sprint
+                if (!player.isSprinting()) {
+                    effectivePerception *= 0.68;
+                }
+                // Camuflagem na grama alta
+                int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
+                int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
+                if (tileMap != null && tileMap.getTileAt(pCol, pRow) == TileType.TALL_GRASS) {
+                    effectivePerception *= 0.62;
+                }
+                // Ataque pelas costas (fora do cone de visão de 160° da ave)
+                if (state != State.FLYING_AWAY) {
+                    double angleToPlayer = Math.atan2(player.getY() - y, player.getX() - x);
+                    double angleDiff = Math.abs(normalizeAngle(angleToPlayer - visualAngle));
+                    if (angleDiff > Math.PI * 0.45) {
+                        effectivePerception *= 0.55;
+                    }
+                }
+            }
+            // Clima e Chuva mascaram ruído
+            if (weather == WeatherType.RAIN || weather == WeatherType.STORM) {
+                effectivePerception *= 0.75;
+            }
+        }
+
         boolean sensedThreat = nearestThreatDist <= effectivePerception;
 
         if (state == State.FLYING_AWAY) {
-            flightHeight += dt * 45.0;
-            double flySpeed = type.getBaseSpeed() * 1.35;
-            x += faceDx * flySpeed * dt;
-            y += faceDy * flySpeed * dt;
+            if (birdTakeoffTimer > 0) {
+                birdTakeoffTimer -= dt;
+                // Arrancada de sustentação no solo: sobe lentamente (18 px/s)
+                flightHeight += dt * 18.0;
+                double flySpeed = type.getBaseSpeed() * 0.80;
+                x += faceDx * flySpeed * dt;
+                y += faceDy * flySpeed * dt;
+            } else {
+                // Voo de cruzeiro ascendente
+                flightHeight += dt * 38.0;
+                double flySpeed = type.getBaseSpeed() * 1.30;
+                x += faceDx * flySpeed * dt;
+                y += faceDy * flySpeed * dt;
+            }
             moving = true;
-            walkPhase += dt * 24.0;
+            walkPhase += dt * 26.0;
             double awayAngle = Math.atan2(faceDy, faceDx);
             visualAngle = lerpAngle(visualAngle, awayAngle, Math.min(1.0, dt * 10.0));
-            if (flightHeight >= 90.0) {
+            if (flightHeight >= 125.0) {
                 despawned = true;
             }
             return;
@@ -199,13 +242,22 @@ public class PassiveAnimal {
 
         if (sensedThreat && state != State.BURROWED) {
             if (type == PassiveAnimalType.BIRD) {
-                // Pássaro bate asas e voa para longe
-                state = State.FLYING_AWAY;
-                double awayAngle = Math.atan2(y - threatY, x - threatX);
-                faceDx = Math.cos(awayAngle);
-                faceDy = Math.sin(awayAngle);
-                visualAngle = awayAngle;
-                return;
+                // Se notou ameaça mas ainda está a mais de 50px de distância:
+                // Primeiro entra em ALERT (head-bob desconfiado) por 0.45s antes de decolar
+                if (state != State.ALERT && state != State.FLYING_AWAY && nearestThreatDist > 50.0) {
+                    state = State.ALERT;
+                    stateTimer = 0.45;
+                    vx *= 0.20;
+                    vy *= 0.20;
+                } else if (state != State.FLYING_AWAY && (nearestThreatDist <= 50.0 || (state == State.ALERT && stateTimer <= 0))) {
+                    state = State.FLYING_AWAY;
+                    birdTakeoffTimer = 0.35;
+                    double awayAngle = Math.atan2(y - threatY, x - threatX);
+                    faceDx = Math.cos(awayAngle);
+                    faceDy = Math.sin(awayAngle);
+                    visualAngle = awayAngle;
+                    return;
+                }
             } else {
                 if (state != State.FLEEING) {
                     state = State.FLEEING;
@@ -233,6 +285,15 @@ public class PassiveAnimal {
                 vy *= 0.40;
             }
         } else if (state == State.ALERT && stateTimer <= 0) {
+            if (type == PassiveAnimalType.BIRD && sensedThreat) {
+                state = State.FLYING_AWAY;
+                birdTakeoffTimer = 0.35;
+                double awayAngle = Math.atan2(y - threatY, x - threatX);
+                faceDx = Math.cos(awayAngle);
+                faceDy = Math.sin(awayAngle);
+                visualAngle = awayAngle;
+                return;
+            }
             state = State.FORAGING;
             stateTimer = 2.0 + RAND.nextDouble() * 3.0;
         }
@@ -755,6 +816,7 @@ public class PassiveAnimal {
         if (type == PassiveAnimalType.BIRD) {
             if (state != State.FLYING_AWAY) {
                 state = State.FLYING_AWAY;
+                birdTakeoffTimer = 0.35;
                 double away = Math.atan2(y - originY, x - originX);
                 faceDx = Math.cos(away);
                 faceDy = Math.sin(away);
@@ -769,6 +831,7 @@ public class PassiveAnimal {
         if (state != State.FLEEING && state != State.FLYING_AWAY) {
             if (type == PassiveAnimalType.BIRD) {
                 state = State.FLYING_AWAY;
+                birdTakeoffTimer = 0.35;
                 double awayAngle = Math.atan2(y - threatY, x - threatX);
                 faceDx = Math.cos(awayAngle);
                 faceDy = Math.sin(awayAngle);

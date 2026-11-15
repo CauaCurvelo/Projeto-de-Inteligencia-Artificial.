@@ -520,6 +520,23 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - **Bioluminescência Gradual:** Em `LightingAndWeatherRenderer.renderFireflies`, o brilho dos vaga-lumes é modulado pela intensidade noturna (`nightFactor > 0.45`), acendendo suavemente conforme a noite cai e permanecendo completamente apagados durante o dia.
   - **Sincronização do Menu Principal:** O backdrop de vaga-lumes da UI em `UiMotion.createFireflyBackdrop` foi sincronizado com `World.getNightFactor()`, eliminando os pontinhos amarelos fixos sobrepostos ao diorama da natureza durante o dia e acendendo-os harmonicamente apenas durante a noite.
 
+## Feature / Balanceamento: Predação de Aves & Furtividade da Raposa
+- **Mecânica de Caça e Furtividade Natural ([PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java)):**
+  - **Sensoriamento Orgânico da Ave:** Substituído o sensor esférico onisciente de 115px por percepção ecológica contextual:
+    - Quando a ave está debicando o solo com a cabeça baixa (`FORAGING` ou `peckTimer > 0`), sua percepção visual cai em 40%.
+    - Quando a raposa caminha silenciosamente sem sprintar (`!player.isSprinting()`), o ruído é atenuado, reduzindo a percepção em 32%.
+    - Ao rastejar por dentro da grama alta (`TALL_GRASS`), a camuflagem vegetal reduz a percepção em 38%.
+    - Ao se aproximar pelas costas do pássaro (fora do cone visual de 160° da ave), a percepção cai em 45%, permitindo emboscadas perfeitas.
+    - Na chuva ou tempestade, o barulho das gotas nas folhas amortece o som dos passos em 25%.
+  - **Tempo de Decolagem & Reação ("Startle & Take-Off"):**
+    - Aves não se teleportam mais instantaneamente para o céu supersônico: ao notar a aproximação em média distância (> 50px), entram primeiro em `State.ALERT` por 0.45s (esticando o pescoço e piando em alarme), oferecendo uma janela de bote no solo.
+    - Ao decolar (`FLYING_AWAY`), possuem uma fase inicial de corrida batendo asas no solo (`birdTakeoffTimer = 0.35s`), subindo devagar (18 px/s).
+  - **Altitude Capturável Ampliada:** `BIRD_MAX_CATCHABLE_ALTITUDE` foi estendida de `24.0px` para `56.0px`, permitindo interceptar aves durante todo o voo rasante de ascensão.
+- **Bote Aéreo da Raposa & Penas Esvoaçantes ([World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - Ao atacar contra aves, o alcance do bote aéreo da raposa é ampliado para `68.0px` com alcance frontal de projeção de `24.0px`.
+  - Abates de aves geram explosão de partículas de penugem branca e penas castanhas (`#ECEFF1` e `#8D6E63`), drop de carne miúda rápida (`GAME_MORSEL`), 80 pontos e disparo imediato do evento `BIRD_CAUGHT` (conquista `BIRD_IN_HAND`).
+
+
 
 
 
