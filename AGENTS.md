@@ -494,4 +494,19 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - O `MainMenuScreen` foi reestruturado para preencher 100% da tela sem dependências cíclicas no `Pane` de vaga-lumes, eliminando o deslocamento lateral negativo de 220px ao retornar da partida.
   - O fundo do Menu Principal omite rigorosamente quaisquer inimigos hostis, caçadores e nameplates de combate, exibindo exclusivamente fauna mansa em um diorama natural sereno.
 
+## Correção Crítica de IA e Combate: Reação Imediata ao Dano pelas Costas
+- **Reação Instantânea a Dano ([Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java)):**
+  - Anteriormente, o método `takeDamage` só alterava o estado e o ângulo de visão do inimigo se ele estivesse especificamente em repouso (`RESTING`) ou bebendo água (`DRINKING`). Ao ser atacado durante patrulha (`PATROL`) ou deslocamento (`WANDER`), o inimigo sofria dano e knockback mas continuava virado para frente em seu trajeto, sem mudar de estado ou reagir.
+  - Agora, **qualquer golpe recebido** força imediatamente:
+    1. Giro instantâneo de corpo e cabeça na direção da origem do dano (`faceAngle = Math.atan2(dy, dx)`).
+    2. Alocação imediata da posição do atacante (`targetAimX, targetAimY`) com `alertTimer = 7.0s`, `suspicionMeter = 1.0` e descarte do trajeto pacífico anterior.
+    3. Engajamento de combate dinâmico por espécie: Caçador grita em alarme (`HUNTER_SHOUT`), saca o arco e entra em `KITING` (se colado) ou `AIMING` (se com distância); Lobo, Pantera, Urso e Crocodilo rosnam/rugem e entram em perseguição furiosa (`CHASE`); Javali inicia investida mortal (`CHARGING`).
+- **Defesa Corpo a Corpo e Convocação de Sabujos do Caçador ([Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - **Golpe Defensivo de Curta Distância:** Se a raposa morder o caçador à queima-roupa (`dist < 40px`), o caçador agora revida com uma coronhada/chute de emergência (`HIT_IMPACT`), infligindo 1 vida de dano e repelindo a raposa em 220px de knockback para abrir espaço para o arco.
+  - **Kiting com Disparo:** Mesmo em recuo tático (`KITING`), o caçador agora dispara flechas à queima-roupa se mantiver linha de visão.
+  - **Socorro Mútuo:** Ao ser atacado, o caçador alerta cães sabujos (`HOUND`) em um raio de até 440px, fazendo-os latir e avançar em disparada para protegê-lo.
+- **Sensoriamento por Contato e FOV em Combate ([Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java)):**
+  - Detecção por contato físico imediato (`dist <= 46px`) garante que mordidas pelas costas nunca sejam ignoradas por estarem fora do cone de visão frontal.
+  - Durante alerta e combate, o campo de visão periférica se expande para 160°.
+
 
