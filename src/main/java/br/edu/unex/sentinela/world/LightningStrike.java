@@ -48,6 +48,7 @@ public class LightningStrike {
 
     // Partículas elétricas pré-geradas para o estágio WARNING
     private final List<double[]> sparkOffsets = new ArrayList<>();
+    private boolean playerWasInDangerZone = false;
 
     public LightningStrike(double x, double y) {
         this.x = x;
@@ -67,6 +68,10 @@ public class LightningStrike {
 
         switch (stage) {
             case WARNING:
+                Player checkPlayer = world.getPlayer();
+                if (checkPlayer != null && Math.hypot(checkPlayer.getX() - x, checkPlayer.getY() - y) <= 48.0) {
+                    playerWasInDangerZone = true;
+                }
                 if (timer <= 0) {
                     stage = Stage.STRIKING;
                     timer = STRIKE_DURATION;
@@ -155,6 +160,11 @@ public class LightningStrike {
             double pDist = Math.hypot(player.getX() - x, player.getY() - y);
             if (pDist <= impactRadius) {
                 player.takeDamage(x, y, 350.0, 2);
+            } else if (playerWasInDangerZone) {
+                // Jogador estava na mira do raio durante o aviso e escapou a tempo!
+                br.edu.unex.sentinela.progress.GameEventBus.get().post(
+                    new br.edu.unex.sentinela.progress.GameEvent(br.edu.unex.sentinela.progress.GameEvent.Type.LIGHTNING_DODGED)
+                );
             }
         }
 
@@ -227,3 +237,4 @@ public class LightningStrike {
         return sparkOffsets;
     }
 }
+

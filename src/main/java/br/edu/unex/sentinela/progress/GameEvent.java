@@ -22,6 +22,10 @@ public class GameEvent {
         PASSIVE_HUNTED,
         BIRD_CAUGHT,
         ICE_DRIFT,
+        LIGHTNING_DODGED,
+        WIND_BOOSTED,
+        RABBIT_FLUSHED,
+        STORM_SURVIVED,
         TRAP_TRIGGERED,
         BIOME_VISITED
     }

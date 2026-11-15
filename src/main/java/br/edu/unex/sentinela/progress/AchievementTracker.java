@@ -113,6 +113,22 @@ public final class AchievementTracker {
                 unlock(Achievement.ICE_SKATER);
                 break;
 
+            case LIGHTNING_DODGED:
+                unlock(Achievement.LIGHTNING_DODGER);
+                break;
+
+            case WIND_BOOSTED:
+                unlock(Achievement.WIND_RUNNER);
+                break;
+
+            case RABBIT_FLUSHED:
+                unlock(Achievement.RABBIT_FLUSHER);
+                break;
+
+            case STORM_SURVIVED:
+                unlock(Achievement.STORM_SURVIVOR);
+                break;
+
             case TRAP_TRIGGERED:
                 unlock(Achievement.TRAP_SURVIVOR);
                 break;

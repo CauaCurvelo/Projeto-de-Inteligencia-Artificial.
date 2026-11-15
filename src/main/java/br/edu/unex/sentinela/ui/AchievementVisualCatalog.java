@@ -67,6 +67,14 @@ public final class AchievementVisualCatalog {
                 return new BadgeSpec(EmblemKind.DROPLET, "#2DD4BF", "#99F6E4");
             case ICE_SKATER:
                 return new BadgeSpec(EmblemKind.SNOWFLAKE, "#0284C7", "#BAE6FD");
+            case LIGHTNING_DODGER:
+                return new BadgeSpec(EmblemKind.STORM, "#F59E0B", "#FDE68A");
+            case WIND_RUNNER:
+                return new BadgeSpec(EmblemKind.FEATHER, "#10B981", "#A7F3D0");
+            case RABBIT_FLUSHER:
+                return new BadgeSpec(EmblemKind.FOX_MASK, "#FB923C", "#FDBA74");
+            case STORM_SURVIVOR:
+                return new BadgeSpec(EmblemKind.STORM, "#38BDF8", "#BAE6FD");
             case BIOME_VOYAGER:
                 return new BadgeSpec(EmblemKind.COMPASS, "#10B981", "#A7F3D0");
             case BESTIARY_OBSERVER:

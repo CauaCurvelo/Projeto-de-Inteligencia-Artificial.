@@ -70,6 +70,7 @@ public class Player {
     private double slideVy = 0.0;
     private boolean isOnIce = false;
     private boolean isSlidingOnIce = false;
+    private double iceDriftTimer = 0.0;
 
     private double noiseRadius = 0.0;
 
@@ -87,12 +88,18 @@ public class Player {
 
     public void update(double dx, double dy, boolean sprint, boolean attackPressed, double deltaTime, TileMap tileMap,
                        List<Footprint> scentTrail, List<Particle> particles, List<Burrow> burrows) {
-        update(dx, dy, sprint, attackPressed, deltaTime, tileMap, scentTrail, particles, burrows, 0.0, 0.0, 0.0);
+        update(dx, dy, sprint, attackPressed, deltaTime, tileMap, scentTrail, particles, burrows, 0.0, 0.0, 0.0, 0.0);
     }
 
     public void update(double dx, double dy, boolean sprint, boolean attackPressed, double deltaTime, TileMap tileMap,
                        List<Footprint> scentTrail, List<Particle> particles, List<Burrow> burrows,
                        double windVx, double windVy, double windIntensity) {
+        update(dx, dy, sprint, attackPressed, deltaTime, tileMap, scentTrail, particles, burrows, windVx, windVy, windIntensity, 0.0);
+    }
+
+    public void update(double dx, double dy, boolean sprint, boolean attackPressed, double deltaTime, TileMap tileMap,
+                       List<Footprint> scentTrail, List<Particle> particles, List<Burrow> burrows,
+                       double windVx, double windVy, double windIntensity, double rainIntensity) {
         breathTimer += deltaTime;
         if (invulnerabilityTimer > 0) invulnerabilityTimer -= deltaTime;
         if (adrenalineTimer > 0) adrenalineTimer -= deltaTime;
@@ -153,7 +160,7 @@ public class Player {
         } else if (currentTile == TileType.DIRT_PATH) {
             speedMultiplier = 1.15;
         } else if (currentTile == TileType.ICE) {
-            speedMultiplier = 1.25;
+            speedMultiplier = 1.45;
         }
 
         if (isLowLife()) {
@@ -210,19 +217,47 @@ public class Player {
                     if (isSprinting && dot < -0.3) {
                         stamina = Math.max(0.0, stamina - deltaTime * 3.5 * windIntensity);
                     }
+
+                    // Conquista: Cavalheiro dos Ventos (correr embalado em ventania)
+                    if (isSprinting && dot > 0.75 && windIntensity > 0.75 && Math.hypot(slideVx, slideVy) > 210.0) {
+                        br.edu.unex.sentinela.progress.GameEventBus.get().post(
+                            new br.edu.unex.sentinela.progress.GameEvent(br.edu.unex.sentinela.progress.GameEvent.Type.WIND_BOOSTED)
+                        );
+                    }
                 }
             }
         }
 
-        // Física vetorial de inércia e derrapagem no Gelo
+        // Drenagem metabólica suave para se manter aquecido em chuva torrencial em descampado
+        if (rainIntensity > 0.30 && !isBurrowed && !isHiddenInGrass) {
+            boolean nearTree = isNearTree(tileMap);
+            if (!nearTree) {
+                hunger = Math.max(0.0, hunger - 0.40 * rainIntensity * deltaTime);
+            }
+        }
+
+        // Física vetorial de inércia e derrapagem prolongada no Gelo
         double targetVx = inputActive ? dx * currentSpeed : 0.0;
         double targetVy = inputActive ? dy * currentSpeed : 0.0;
 
         if (isOnIce) {
-            double accelRate = inputActive ? 5.2 : 1.15;
+            // Atrito baixíssimo, inércia estendida e derrapagem espetacular
+            double accelRate = inputActive ? 2.0 : 0.28;
             double blend = 1.0 - Math.pow(0.04, deltaTime * accelRate);
             slideVx += (targetVx - slideVx) * blend;
             slideVy += (targetVy - slideVy) * blend;
+
+            // Se o jogador estiver correndo ou fizer curva no gelo, emite lascas e faíscas de gelo!
+            double speed = Math.hypot(slideVx, slideVy);
+            if (speed > 80.0 && particles != null && Math.random() < 0.35) {
+                particles.add(new Particle(
+                    x + (Math.random() - 0.5) * 14.0,
+                    y + 4.0 + (Math.random() - 0.5) * 6.0,
+                    -slideVx * 0.18 + (Math.random() - 0.5) * 35.0,
+                    -slideVy * 0.18 + (Math.random() - 0.5) * 35.0,
+                    0.28, "#BAE6FD", 2.2
+                ));
+            }
         } else {
             double groundFrictionRate = 18.0;
             double blend = 1.0 - Math.pow(0.001, deltaTime * groundFrictionRate);
@@ -237,6 +272,18 @@ public class Player {
         double actualSlideSpeed = Math.hypot(slideVx, slideVy);
         this.isSlidingOnIce = isOnIce && (actualSlideSpeed > 24.0);
         this.moving = (inputActive || actualSlideSpeed > 12.0) && !isBurrowed;
+
+        // Monitoramento da Conquista de Drift Glacial (deslize contínuo sustentado no gelo)
+        if (isOnIce && actualSlideSpeed > 110.0) {
+            iceDriftTimer += deltaTime;
+            if (iceDriftTimer >= 2.0) {
+                br.edu.unex.sentinela.progress.GameEventBus.get().post(
+                    new br.edu.unex.sentinela.progress.GameEvent(br.edu.unex.sentinela.progress.GameEvent.Type.ICE_DRIFT)
+                );
+            }
+        } else {
+            iceDriftTimer = Math.max(0.0, iceDriftTimer - deltaTime * 1.5);
+        }
 
         if (moving) {
             walkPhase += Math.max(currentSpeed, actualSlideSpeed) * deltaTime * 0.095;
@@ -483,6 +530,20 @@ public class Player {
                 isSprintExhausted = false;
             }
         }
+    }
+
+    public boolean isNearTree(TileMap tileMap) {
+        if (tileMap == null) return false;
+        int col = (int) Math.floor(x / TileMap.TILE_SIZE);
+        int row = (int) Math.floor(y / TileMap.TILE_SIZE);
+        for (int r = row - 1; r <= row + 1; r++) {
+            for (int c = col - 1; c <= col + 1; c++) {
+                if (tileMap.getTileAt(c, r) == br.edu.unex.sentinela.world.TileType.TREE) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public boolean isSprinting() { return isSprinting; }

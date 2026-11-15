@@ -88,17 +88,18 @@ public class LightingAndWeatherRenderer {
             double camDeltaY = cam.getDeltaY();
             double safeDt = Math.max(0.001, deltaTime);
 
-            // Calcula a inclinação e alongamento relativo da gota conforme o vetor de vento e a câmera
+            // Inclinação e alongamento da gota diretamente proporcionais ao vetor físico de vento
             double windVx = world.getWindVx();
             double windVy = world.getWindVy();
-            double apparentVx = (windVx * 260.0 - 45.0) - (camDeltaX / safeDt);
-            double apparentVy = (620.0 + windVy * 110.0) - (camDeltaY / safeDt);
-            double streakScale = 0.024;
-            double streakDx = Math.max(-28.0, Math.min(28.0, apparentVx * streakScale));
-            double streakDy = Math.max(7.0, Math.min(32.0, apparentVy * streakScale));
+            double physicalVx = -35.0 + (windVx * 340.0);
+            double physicalVy = 620.0 + (windVy * 80.0);
+            double streakScale = 0.026;
+            double streakDx = Math.max(-34.0, Math.min(34.0, physicalVx * streakScale));
+            double streakDy = Math.max(8.0, Math.min(36.0, physicalVy * streakScale));
 
+            double stormInt = world.getStormIntensity();
             gc.setStroke(currentRainColor);
-            gc.setLineWidth(1.3);
+            gc.setLineWidth(1.3 + stormInt * 0.4);
             for (int i = 0; i < activeCount; i += step) {
                 WeatherDrop drop = drops.get(i);
                 double dx = drop.getX();
@@ -106,7 +107,7 @@ public class LightingAndWeatherRenderer {
                 gc.strokeLine(dx, dy, dx + streakDx, dy + streakDy);
 
                 // Pequenos anéis de respingo (water splash ripples) no chão quando a gota está no fim do curso
-                if (quality != GraphicsQuality.LOW && rainIntensity > 0.35 && ((int) (dy + dx) % 19) == 0) {
+                if (quality != GraphicsQuality.LOW && rainIntensity > 0.25 && ((int) (dy + dx) % 15) == 0) {
                     gc.setStroke(currentRippleColor);
                     gc.strokeOval(dx + streakDx - 2.5, dy + streakDy - 1.2, 5, 2.5);
                     gc.setStroke(currentRainColor);
@@ -114,7 +115,6 @@ public class LightingAndWeatherRenderer {
             }
 
             // Atmosfera nublada azul-acinzentada fria com reforço gradual de tempestade
-            double stormInt = world.getStormIntensity();
             double cloudAlpha = Math.min(0.55, 0.18 * rainIntensity + 0.25 * stormInt);
             gc.setFill(Color.color(0.04, 0.08, 0.18, cloudAlpha));
             gc.fillRect(0, 0, visibleW, visibleH);

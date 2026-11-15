@@ -469,3 +469,29 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
 - **Mixagem Sonora do Vento ([AmbienceController.java](src/main/java/br/edu/unex/sentinela/audio/AmbienceController.java)):**
   - Loops `LOOP_WIND` e `LOOP_STORM_WIND` têm seus ganhos modulados dinamicamente pela intensidade do vento e tempestade.
 
+## Refinamento: Física e Textura do Gelo, Vento na Chuva, Ecologia das Tempestades e Novas Conquistas
+- **Overhaul da Física e Textura do Gelo ([Player.java](src/main/java/br/edu/unex/sentinela/entity/Player.java), [TerrainRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/TerrainRenderer.java)):**
+  - **Deslize Ultra-Fluido:** Multiplicador de velocidade no gelo elevado para `1.45`, aceleração reduzida para `0.28` em movimento passivo para inércia prolongada de drift, emissão de lascas de gelo azul-claras ao curvar em alta velocidade e rastreamento contínuo de 2.0s de derrapagem para o evento `ICE_DRIFT`.
+  - **Textura Glacial Contínua:** Erradicados os antigos círculos de `32px` por tile que criavam o efeito visual de "plástico bolha". O lago congelado agora possui lâmina contínua de gelo azul-turquesa profundo (`#4F92B3` a `#74B3CF`), fendas/fissuras cristalinas com arestas brancas refletivas, micro-bolhas de ar congeladas em profundidades variadas e franjas de geada nas bordas da tundra.
+- **Novas Conquistas e Catálogo Visual ([Achievement.java](src/main/java/br/edu/unex/sentinela/progress/Achievement.java), [AchievementTracker.java](src/main/java/br/edu/unex/sentinela/progress/AchievementTracker.java), [AchievementVisualCatalog.java](src/main/java/br/edu/unex/sentinela/ui/AchievementVisualCatalog.java)):**
+  - `ICE_SKATER` ("Drift Glacial"): Exige agora manter 2 segundos ininterruptos de drift em alta velocidade na superfície congelada.
+  - `LIGHTNING_DODGER` ("Reflexo de Faísca"): Esquive-se de um raio saindo do círculo elétrico de aviso antes do impacto mortal cair no solo.
+  - `WIND_RUNNER` ("Cavalheiro dos Ventos"): Atinja velocidade máxima correndo impulsionado a favor de uma forte ventania.
+  - `RABBIT_FLUSHER` ("Tocaia Perfeita"): Desentoca um coelho escondido em uma toca usando uma mordida precisa na entrada.
+  - `STORM_SURVIVOR` ("Olho da Tempestade"): Sobreviva a uma tempestade elétrica completa sem sucumbir a danos de raio.
+- **Vento Físico na Chuva e Suavização das Árvores ([WeatherDrop.java](src/main/java/br/edu/unex/sentinela/world/WeatherDrop.java), [LightingAndWeatherRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/LightingAndWeatherRenderer.java), [FoliageAndCliffRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/FoliageAndCliffRenderer.java)):**
+  - As gotas físicas de chuva agora recebem arrasto direto do vetor do vento `(windVx * 340.0, windVy * 80.0)`, fazendo a chuva inclinar dinamicamente no mesmo sentido das folhas e das correntes de ar.
+  - O volume da chuva foi elevado para 220 gotas com poças d'água (`WaterRipple`) e respingos brotando no solo.
+  - O balanço das árvores foi amortecido na base para evitar descolamento da copa em relação ao tronco.
+- **Ecologia dos Seres Vivos na Chuva e Tempestade ([PassiveAnimal.java](src/main/java/br/edu/unex/sentinela/entity/PassiveAnimal.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - **Sapos:** Pulam com mais frequência e velocidade (+25%) na chuva, espalhando marolas de água na terra molhada.
+  - **Pássaros:** Recolhem asas sob copas de árvores em vez de voar alto durante intempéries.
+  - **Coelhos:** Buscam e priorizam abrigo em tocas durante chuva ou tempestade.
+  - **Vaga-lumes:** Apagam as luzes bioluminescentes e abrigam-se sob folhas quando a chuva começa (`rainIntensity > 0.20`).
+  - **Raposa:** Drenagem metabólica de aquecimento suave ao correr exposta em chuva forte em descampado sem árvores ou tocas próximas.
+- **Correções Críticas de UI e Toast ([AchievementToast.java](src/main/java/br/edu/unex/sentinela/ui/AchievementToast.java), [ScreenManager.java](src/main/java/br/edu/unex/sentinela/ui/ScreenManager.java), [MainMenuScreen.java](src/main/java/br/edu/unex/sentinela/ui/MainMenuScreen.java), [Renderer.java](src/main/java/br/edu/unex/sentinela/rendering/Renderer.java)):**
+  - O `AchievementToast` foi corrigido para ancoragem nativa de layout (`Pos.BOTTOM_RIGHT`), eliminando o bug em que o pop-up esticava em uma faixa preta na borda inferior da tela. Textos longos contam com `ELLIPSIS`.
+  - O `MainMenuScreen` foi reestruturado para preencher 100% da tela sem dependências cíclicas no `Pane` de vaga-lumes, eliminando o deslocamento lateral negativo de 220px ao retornar da partida.
+  - O fundo do Menu Principal omite rigorosamente quaisquer inimigos hostis, caçadores e nameplates de combate, exibindo exclusivamente fauna mansa em um diorama natural sereno.
+
+

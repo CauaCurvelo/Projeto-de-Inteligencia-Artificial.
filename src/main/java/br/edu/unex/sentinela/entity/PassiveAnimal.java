@@ -384,7 +384,7 @@ public class PassiveAnimal {
         vx = 0;
         vy = 0;
         moving = false;
-        if (weather != WeatherType.RAIN) {
+        if (weather == null || !weather.isRaining()) {
             state = State.FORAGING;
             stateTimer = 1.4;
         }
@@ -489,6 +489,9 @@ public class PassiveAnimal {
         currentBurrow = null;
 
         br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BURROW_EXIT, 0.85, 0, 1.30);
+        br.edu.unex.sentinela.progress.GameEventBus.get().post(
+            new br.edu.unex.sentinela.progress.GameEvent(br.edu.unex.sentinela.progress.GameEvent.Type.RABBIT_FLUSHED)
+        );
         if (particles != null) {
             for (int k = 0; k < 8; k++) {
                 particles.add(new Particle(x, y,
@@ -520,7 +523,7 @@ public class PassiveAnimal {
                                 List<Burrow> burrows, List<Firefly> fireflies, List<Particle> particles,
                                 TileMap tileMap, List<WaterRipple> ripples, WeatherType weather, double timeProgress) {
         // 1. Abrigo em tocas durante chuva para coelhos
-        if (weather == WeatherType.RAIN && type == PassiveAnimalType.RABBIT && burrows != null && burrowCooldown <= 0) {
+        if (weather != null && weather.isRaining() && type == PassiveAnimalType.RABBIT && burrows != null && burrowCooldown <= 0) {
             Burrow nearestBurrow = null;
             double minBurrowDist = 180.0;
             for (Burrow b : burrows) {

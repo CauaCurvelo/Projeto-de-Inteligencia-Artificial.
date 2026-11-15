@@ -54,7 +54,7 @@ public class AchievementToast extends StackPane {
     private boolean isDisplaying = false;
 
     public AchievementToast() {
-        setManaged(false);
+        setManaged(true);
         setPickOnBounds(false);
         setMouseTransparent(true);
         setVisible(false);
@@ -93,11 +93,14 @@ public class AchievementToast extends StackPane {
         topMeta.setAlignment(Pos.CENTER_LEFT);
 
         titleLabel.setTextFill(Color.web("#F8FAFC"));
+        titleLabel.setMaxWidth(235);
+        titleLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
         UiTypography.bind(titleLabel, UiTypography.TypoRole.LABEL);
 
         descLabel.setTextFill(Color.web("#94A3B8"));
         descLabel.setMaxWidth(235);
         descLabel.setWrapText(false);
+        descLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
         UiTypography.bind(descLabel, UiTypography.TypoRole.MICRO);
 
         VBox textCol = new VBox(2, topMeta, titleLabel, descLabel);

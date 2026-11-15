@@ -96,9 +96,33 @@ public enum Achievement {
     ),
     ICE_SKATER(
         "Drift Glacial",
-        "Deslize e derrape em alta velocidade na superfície de gelo.",
+        "Mantenha um drift em alta velocidade no gelo por 2 segundos contínuos.",
         "❄️",
         "Exploração"
+    ),
+    LIGHTNING_DODGER(
+        "Reflexo de Faísca",
+        "Esquive-se de um raio saindo do círculo de aviso elétrico antes do impacto.",
+        "⚡",
+        "Sobrevivência"
+    ),
+    WIND_RUNNER(
+        "Cavalheiro dos Ventos",
+        "Alcance velocidade máxima correndo com o impulso de uma forte ventania.",
+        "🍃",
+        "Exploração"
+    ),
+    RABBIT_FLUSHER(
+        "Tocaia Perfeita",
+        "Desentoca um coelho escondido em uma toca usando uma mordida precisa.",
+        "🐰",
+        "Combate"
+    ),
+    STORM_SURVIVOR(
+        "Olho da Tempestade",
+        "Sobreviva a uma tempestade elétrica completa sem sofrer dano de raio.",
+        "⛈️",
+        "Sobrevivência"
     ),
     BIOME_VOYAGER(
         "Mochileiro da Natureza",

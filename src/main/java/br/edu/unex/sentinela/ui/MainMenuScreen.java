@@ -27,12 +27,13 @@ public class MainMenuScreen extends StackPane {
         setPickOnBounds(true);
         setStyle("-fx-background-color: linear-gradient(to right, rgba(6,10,9,0.86) 0%, rgba(7,12,10,0.42) 55%, rgba(5,9,8,0.22) 100%);");
 
+        prefWidthProperty().bind(manager.widthProperty());
+        prefHeightProperty().bind(manager.heightProperty());
+
         Canvas fireflies = UiMotion.createFireflyBackdrop();
-        Pane fireflyLayer = new Pane(fireflies);
-        fireflyLayer.setMinSize(0, 0);
-        fireflyLayer.setMouseTransparent(true);
-        fireflies.widthProperty().bind(fireflyLayer.widthProperty());
-        fireflies.heightProperty().bind(fireflyLayer.heightProperty());
+        fireflies.setMouseTransparent(true);
+        fireflies.widthProperty().bind(widthProperty());
+        fireflies.heightProperty().bind(heightProperty());
 
         VBox leftRail = buildLeftRail(manager);
         HBox keyHints = buildBottomKeyHints();
@@ -41,7 +42,7 @@ public class MainMenuScreen extends StackPane {
         StackPane.setAlignment(keyHints, Pos.BOTTOM_RIGHT);
         StackPane.setMargin(keyHints, new Insets(0, 28, 22, 0));
 
-        getChildren().addAll(fireflyLayer, leftRail, keyHints);
+        getChildren().addAll(fireflies, leftRail, keyHints);
         UiMotion.animateEntrance(leftRail);
     }
 
@@ -135,11 +136,10 @@ public class MainMenuScreen extends StackPane {
     }
 
     private HBox buildBottomKeyHints() {
-        HBox box = new HBox(16,
-                UiTheme.createKeyHint("WASD", "Mover"),
-                UiTheme.createKeyHint("SHIFT", "Correr"),
-                UiTheme.createKeyHint("ESPAÇO", "Atacar"),
-                UiTheme.createKeyHint("ESC", "Pausa")
+        HBox box = new HBox(14,
+                UiTheme.createKeyHint("ENTER", "Jogar"),
+                UiTheme.createKeyHint("F11", "Tela Cheia"),
+                UiTheme.createKeyHint("ESC", "Sair")
         );
         box.setAlignment(Pos.CENTER_RIGHT);
         box.setPadding(new Insets(8, 14, 8, 14));

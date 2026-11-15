@@ -230,13 +230,14 @@ public class Renderer {
             }
         }
 
-        for (Enemy enemy : world.getEnemies()) {
-            double ex = enemy.getX() - camX;
-            double ey = enemy.getY() - camY;
-            if (ex < -60 || ex > visibleW + 60 || ey < -60 || ey > visibleH + 60) continue;
-            // No Menu Principal, omite caçadores armados para manter a atmosfera de natureza pura
-            if (!renderHud && (enemy.getType() == EnemyType.HUNTER || enemy.getType() == EnemyType.HOUND)) continue;
-            entityRenderer.renderEnemy(enemy, ex, ey, renderHud);
+        // No Menu Principal, omite todos os inimigos hostis para manter a atmosfera de pura natureza serena
+        if (renderHud) {
+            for (Enemy enemy : world.getEnemies()) {
+                double ex = enemy.getX() - camX;
+                double ey = enemy.getY() - camY;
+                if (ex < -60 || ex > visibleW + 60 || ey < -60 || ey > visibleH + 60) continue;
+                entityRenderer.renderEnemy(enemy, ex, ey, true);
+            }
         }
 
         // Fauna Passiva Silvestre (Coelho, Cervo, Sapo e Pássaro)

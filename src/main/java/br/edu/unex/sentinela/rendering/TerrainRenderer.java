@@ -583,53 +583,57 @@ public class TerrainRenderer {
 
     private void renderDetailedIceStatic(double sx, double sy, int ts, int col, int row,
                                          TileMap tileMap, BiomeType biome, BiomeTerrainPalette pal) {
-        // Variação de matiz e brilho contínua macro (evita efeito xadrez/repetitivo)
-        double macro = coordHash(col / 3, row / 3, 701L);
+        // Variação de matiz e brilho contínua macro de baixa frequência (elimina qualquer efeito xadrez)
+        double macro = coordHash(col / 6, row / 6, 701L);
+        double subMacro = coordHash(col / 3, row / 3, 809L);
         double micro = coordHash(col, row, 709L);
 
-        double hue = 198.0 + (macro - 0.5) * 8.0;
-        double sat = 0.36 + (micro - 0.5) * 0.08;
-        double bri = 0.88 + (macro - 0.5) * 0.07;
-        Color iceBase = Color.hsb(hue, clamp(sat, 0.22, 0.48), clamp(bri, 0.78, 0.95));
+        double hue = 196.0 + (macro - 0.5) * 10.0;
+        double sat = 0.40 + (subMacro - 0.5) * 0.12;
+        double bri = 0.82 + (macro - 0.5) * 0.10 + (micro - 0.5) * 0.04;
+        Color iceBase = Color.hsb(hue, clamp(sat, 0.28, 0.54), clamp(bri, 0.70, 0.92));
 
         gc.setFill(iceBase);
         gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
 
-        // Manchas orgânicas de profundidade e translucidez que fluem entre tiles
-        if (coordHash(col, row, 727L) > 0.40) {
-            double patchOffX = (coordHash(col, row, 731L) - 0.5) * 10.0;
-            double patchOffY = (coordHash(col, row, 733L) - 0.5) * 10.0;
-            gc.setFill(Color.web("#E0F7FA", 0.32));
-            gc.fillOval(sx + patchOffX, sy + patchOffY, ts + 8, ts + 6);
+        // Veios sutis de profundidade azul-glacial translúcida que atravessam vários blocos
+        double depthWave = Math.sin((col * 0.42 + row * 0.38) + subMacro * 2.0);
+        if (depthWave > 0.30) {
+            double alpha = Math.min(0.24, (depthWave - 0.30) * 0.35);
+            gc.setFill(Color.web("#38BDF8", alpha));
+            gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
         }
 
-        // Faixa de reflexo especular polido apenas ocasionalmente (não em cada quadrado!)
-        if (coordHash(col, row, 743L) > 0.68) {
-            double glossOffset = (coordHash(col, row, 751L) - 0.5) * 6.0;
-            gc.setFill(Color.web("#FFFFFF", 0.28));
-            gc.fillPolygon(
-                    new double[]{sx + 2 + glossOffset, sx + 9 + glossOffset, sx + ts - 2, sx + ts - 9},
-                    new double[]{sy + ts - 2, sy + ts - 2, sy + 2, sy + 2},
-                    4
-            );
+        // Micro-bolhas de ar congeladas sob a lâmina de gelo (graciosas e orgânicas, sem círculos de tile)
+        if (coordHash(col, row, 727L) > 0.55) {
+            gc.setFill(Color.web("#FFFFFF", 0.45));
+            int bubbleCount = 2 + (int)(coordHash(col, row, 731L) * 3);
+            for (int b = 0; b < bubbleCount; b++) {
+                double bx = sx + 3.0 + coordHash(col * 5 + b, row * 7 + b, 743L) * (ts - 6.0);
+                double by = sy + 3.0 + coordHash(col * 11 + b, row * 13 + b, 751L) * (ts - 6.0);
+                double br = 0.9 + coordHash(col * 3 + b, row * 9 + b, 757L) * 1.4;
+                gc.fillOval(bx - br, by - br, br * 2.0, br * 2.0);
+            }
         }
 
-        // Fissuras e rachaduras cristalinas no gelo com aspecto natural
-        if (coordHash(col, row, 769L) > 0.52) {
-            double startX = sx + 4 + coordHash(col, row, 773L) * (ts - 8);
-            double startY = sy + 4 + coordHash(col, row, 787L) * (ts - 8);
-            double midX = startX + (coordHash(col, row, 797L) - 0.5) * 14.0;
-            double midY = startY + (coordHash(col, row, 809L) - 0.5) * 14.0;
-            double endX = midX + (coordHash(col, row, 821L) - 0.5) * 12.0;
-            double endY = midY + (coordHash(col, row, 829L) - 0.5) * 12.0;
+        // Fissuras e fraturas cristalinas com aspecto de lâmina trincada
+        if (coordHash(col, row, 769L) > 0.62) {
+            double startX = sx + 2.0 + coordHash(col, row, 773L) * (ts - 4.0);
+            double startY = sy + 2.0 + coordHash(col, row, 787L) * (ts - 4.0);
+            double midX = startX + (coordHash(col, row, 797L) - 0.5) * 16.0;
+            double midY = startY + (coordHash(col, row, 809L) - 0.5) * 16.0;
+            double endX = midX + (coordHash(col, row, 821L) - 0.5) * 14.0;
+            double endY = midY + (coordHash(col, row, 829L) - 0.5) * 14.0;
 
-            gc.setStroke(Color.web("#0284C7", 0.45));
-            gc.setLineWidth(1.4);
+            // Sombra azul-profunda sob a fenda
+            gc.setStroke(Color.web("#0369A1", 0.38));
+            gc.setLineWidth(1.2);
             gc.strokeLine(startX + 0.5, startY + 0.5, midX + 0.5, midY + 0.5);
             gc.strokeLine(midX + 0.5, midY + 0.5, endX + 0.5, endY + 0.5);
 
-            gc.setStroke(Color.web("#FFFFFF", 0.78));
-            gc.setLineWidth(0.8);
+            // Aresta cristalina refletiva branca
+            gc.setStroke(Color.web("#F0F9FF", 0.75));
+            gc.setLineWidth(0.7);
             gc.strokeLine(startX, startY, midX, midY);
             gc.strokeLine(midX, midY, endX, endY);
         }
@@ -641,11 +645,18 @@ public class TerrainRenderer {
         boolean eIce = tileMap.getTileAt(col + 1, row) == TileType.ICE;
 
         if (!nIce || !sIce || !wIce || !eIce) {
-            gc.setFill(Color.web("#FFFFFF", 0.55));
-            if (!nIce) gc.fillRect(sx, sy, ts + 0.6, 2.5);
-            if (!sIce) gc.fillRect(sx, sy + ts - 2.5, ts + 0.6, 2.5);
-            if (!wIce) gc.fillRect(sx, sy, 2.5, ts + 0.6);
-            if (!eIce) gc.fillRect(sx + ts - 2.5, sy, 2.5, ts + 0.6);
+            gc.setFill(Color.web("#F8FAFC", 0.50));
+            if (!nIce) gc.fillRect(sx, sy, ts + 0.6, 2.0);
+            if (!sIce) gc.fillRect(sx, sy + ts - 2.0, ts + 0.6, 2.0);
+            if (!wIce) gc.fillRect(sx, sy, 2.0, ts + 0.6);
+            if (!eIce) gc.fillRect(sx + ts - 2.0, sy, 2.0, ts + 0.6);
+
+            // Geada esponjosa nas pontas
+            gc.setFill(Color.web("#FFFFFF", 0.65));
+            if (!nIce && !wIce) gc.fillRect(sx, sy, 3.5, 3.5);
+            if (!nIce && !eIce) gc.fillRect(sx + ts - 3.5, sy, 3.5, 3.5);
+            if (!sIce && !wIce) gc.fillRect(sx, sy + ts - 3.5, 3.5, 3.5);
+            if (!sIce && !eIce) gc.fillRect(sx + ts - 3.5, sy + ts - 3.5, 3.5, 3.5);
         }
     }
 

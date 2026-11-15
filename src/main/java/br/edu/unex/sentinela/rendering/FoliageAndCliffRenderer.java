@@ -316,11 +316,11 @@ public class FoliageAndCliffRenderer {
         double jitterX = (h1 - 0.5) * 6.0;
         double jitterY = (h2 - 0.5) * 6.0;
 
-        double swaySpeed = 1.6 + windIntensity * 3.2;
-        double swayAmp = (quality == GraphicsQuality.HIGH ? 1.4 : 0.8) + windIntensity * 4.5;
-        double swayOsc = Math.sin(animTime * swaySpeed + col * 0.8 + row * 0.6) * swayAmp;
-        double windOffX = windVx * 6.0;
-        double windOffY = windVy * 3.0;
+        double swaySpeed = 1.2 + windIntensity * 1.3;
+        double swayAmp = (quality == GraphicsQuality.HIGH ? 1.0 : 0.5) + windIntensity * 1.4;
+        double swayOsc = Math.sin(animTime * swaySpeed + col * 0.7 + row * 0.5) * swayAmp;
+        double windOffX = windVx * 2.0;
+        double windOffY = windVy * 1.0;
 
         double cx = sx + ts * 0.5 + jitterX + windOffX + swayOsc;
         double cy = sy + ts * 0.5 + jitterY - 4.0 + windOffY;

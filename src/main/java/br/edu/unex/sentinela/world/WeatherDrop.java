@@ -21,15 +21,19 @@ public class WeatherDrop {
      * Quando o jogador/câmera se move (camDeltaX, camDeltaY), a tela se desloca em (-camDeltaX, -camDeltaY).
      * Isso impede que a chuva pareça desacelerar ou flutuar ao correr para cima!
      */
-    public void update(double deltaTime, double visibleWidth, double visibleHeight, double camDeltaX, double camDeltaY) {
-        x += (speedX * deltaTime) - camDeltaX;
-        y += (speedY * deltaTime) - camDeltaY;
+    public void update(double deltaTime, double visibleWidth, double visibleHeight, double camDeltaX, double camDeltaY,
+                       double windVx, double windVy) {
+        double currentVx = speedX + (windVx * 340.0);
+        double currentVy = speedY + (windVy * 80.0);
 
-        double margin = 35.0;
+        x += (currentVx * deltaTime) - camDeltaX;
+        y += (currentVy * deltaTime) - camDeltaY;
+
+        double margin = 50.0;
         double w = visibleWidth > 0 ? visibleWidth : 960;
         double h = visibleHeight > 0 ? visibleHeight : 640;
 
-        // Wrap around viewport com margem suave
+        // Wrap around viewport com margem suave na direção da queda e do vento
         if (y > h + margin) {
             y = -margin;
             x = Math.random() * (w + margin * 2) - margin;
@@ -40,9 +44,15 @@ public class WeatherDrop {
 
         if (x > w + margin) {
             x = -margin;
+            y = Math.random() * (h + margin * 2) - margin;
         } else if (x < -margin) {
             x = w + margin;
+            y = Math.random() * (h + margin * 2) - margin;
         }
+    }
+
+    public void update(double deltaTime, double visibleWidth, double visibleHeight, double camDeltaX, double camDeltaY) {
+        update(deltaTime, visibleWidth, visibleHeight, camDeltaX, camDeltaY, 0.0, 0.0);
     }
 
     public void update(double deltaTime, double viewportWidth, double viewportHeight) {

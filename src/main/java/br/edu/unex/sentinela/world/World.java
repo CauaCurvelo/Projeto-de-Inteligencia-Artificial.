@@ -83,13 +83,13 @@ public class World {
     private String gameOverReason = "";
 
     public World() {
-        initRainDrops(130);
+        initRainDrops(220);
         initWorld();
     }
 
     public World(long fixedWorldSeed) {
         this.currentWorldSeed = fixedWorldSeed;
-        initRainDrops(130);
+        initRainDrops(220);
         initWorld();
     }
 
@@ -141,7 +141,7 @@ public class World {
         lightningCooldown = 5.0;
         lightningFlash = 0.0;
         activeLightningStrikes.clear();
-        initRainDrops(130);
+        initRainDrops(220);
         currentWorldSeed = generateRandomSeed();
         gameOver = false;
         gameOverReason = "";
@@ -257,6 +257,7 @@ public class World {
                     break;
                 case STORM:
                     currentWeather = (rand.nextDouble() < 0.70) ? WeatherType.RAIN : WeatherType.CLEAR;
+                    GameEventBus.get().post(new GameEvent(GameEvent.Type.STORM_SURVIVED));
                     break;
             }
         }
@@ -346,7 +347,7 @@ public class World {
         // Update Player
         player.update(inputManager.getDx(), inputManager.getDy(), inputManager.isSprinting(), 
                       inputManager.isAttackPressed(), deltaTime, tileMap, scentTrail, particles, burrows,
-                      windSystem.getWindVx(), windSystem.getWindVy(), windSystem.getIntensity());
+                      windSystem.getWindVx(), windSystem.getWindVy(), windSystem.getIntensity(), rainIntensity);
 
         if (player.getHunger() <= 0) {
             triggerGameOver("Você sucumbiu à inanição (Fome esgotada)!");
@@ -402,9 +403,6 @@ public class World {
         }
         if (currentWeather == WeatherType.RAIN) {
             GameEventBus.get().post(new GameEvent(GameEvent.Type.RAIN_SURVIVED));
-        }
-        if (player.isOnIce() && Math.hypot(player.getSlideVx(), player.getSlideVy()) > 130.0) {
-            GameEventBus.get().post(new GameEvent(GameEvent.Type.ICE_DRIFT));
         }
         currentBiome = tileMap.getBiomeAtWorld(player.getX(), player.getY());
         GameEventBus.get().post(new GameEvent(GameEvent.Type.BIOME_VISITED, currentBiome));
@@ -762,8 +760,22 @@ public class World {
             double camDeltaY = camera.getDeltaY();
             double visW = camera.getVisibleWidth();
             double visH = camera.getVisibleHeight();
+            double windVx = windSystem.getWindVx();
+            double windVy = windSystem.getWindVy();
             for (WeatherDrop drop : rainDrops) {
-                drop.update(deltaTime, visW, visH, camDeltaX, camDeltaY);
+                drop.update(deltaTime, visW, visH, camDeltaX, camDeltaY, windVx, windVy);
+            }
+
+            // Geração orgânica de poças/marolas de chuva no solo
+            if (rainIntensity > 0.25 && rand.nextDouble() < 0.22 * rainIntensity) {
+                double rx = camera.getX() + rand.nextDouble() * visW;
+                double ry = camera.getY() + rand.nextDouble() * visH;
+                int c = (int) Math.floor(rx / TileMap.TILE_SIZE);
+                int r = (int) Math.floor(ry / TileMap.TILE_SIZE);
+                TileType t = tileMap.getTileAt(c, r);
+                if (t == TileType.WATER || t == TileType.MUD || t == TileType.DIRT_PATH) {
+                    waterRipples.add(new WaterRipple(rx, ry, 7.0 + rand.nextDouble() * 8.0, 0.45));
+                }
             }
         }
     }
@@ -995,7 +1007,7 @@ public class World {
     }
 
     private void streamFireflies(double dt) {
-        if (!isNight() && !isDusk()) {
+        if ((!isNight() && !isDusk()) || rainIntensity > 0.20) {
             if (!fireflies.isEmpty()) {
                 fireflies.remove(fireflies.size() - 1);
             }

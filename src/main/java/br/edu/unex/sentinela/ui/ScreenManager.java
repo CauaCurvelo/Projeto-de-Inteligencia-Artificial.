@@ -46,7 +46,12 @@ public class ScreenManager extends StackPane {
             }
         };
 
-        toast.setManaged(false);
+        contentLayer.prefWidthProperty().bind(widthProperty());
+        contentLayer.prefHeightProperty().bind(heightProperty());
+
+        toast.setManaged(true);
+        StackPane.setAlignment(toast, javafx.geometry.Pos.BOTTOM_RIGHT);
+        StackPane.setMargin(toast, new javafx.geometry.Insets(0, 24, 24, 0));
         getChildren().addAll(contentLayer, toast);
 
         sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -230,12 +235,5 @@ public class ScreenManager extends StackPane {
     @Override
     protected void layoutChildren() {
         super.layoutChildren();
-        if (toast != null) {
-            double tw = toast.getPrefWidth();
-            double th = toast.getPrefHeight();
-            double tx = Math.max(0, getWidth() - tw - 24);
-            double ty = Math.max(0, getHeight() - th - 24);
-            toast.resizeRelocate(tx, ty, tw, th);
-        }
     }
 }
