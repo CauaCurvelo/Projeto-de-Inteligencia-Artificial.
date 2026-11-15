@@ -875,14 +875,17 @@ public class World {
     public String getGameOverReason() { return gameOverReason; }
 
     public boolean isNight() {
+        return getNightFactor() > 0.45;
+    }
+
+    public double getNightFactor() {
         double cycleProgress = cycleProgressTimer / cycleDuration;
-        return Math.sin(cycleProgress * Math.PI) > 0.40;
+        return Math.sin(cycleProgress * Math.PI);
     }
 
     public boolean isDusk() {
-        double cycleProgress = cycleProgressTimer / cycleDuration;
-        double f = Math.sin(cycleProgress * Math.PI);
-        return f >= 0.20 && f <= 0.60;
+        double f = getNightFactor();
+        return f >= 0.20 && f <= 0.55;
     }
 
     public List<PassiveAnimal> getPassiveAnimals() { return passiveAnimals; }
@@ -1020,22 +1023,26 @@ public class World {
     }
 
     private void streamFireflies(double dt) {
-        if ((!isNight() && !isDusk()) || rainIntensity > 0.20) {
+        // Vagalumes só surgem e permanecem estritamente de noite e sem chuva pesada
+        if (!isNight() || rainIntensity > 0.20) {
             if (!fireflies.isEmpty()) {
-                fireflies.remove(fireflies.size() - 1);
+                fireflies.clear();
             }
             return;
         }
 
-        fireflies.removeIf(f -> Math.hypot(f.getX() - player.getX(), f.getY() - player.getY()) > 560.0);
+        double refX = (player != null) ? player.getX() : (camera != null ? camera.getX() + camera.getViewportWidth() * 0.5 : 0.0);
+        double refY = (player != null) ? player.getY() : (camera != null ? camera.getY() + camera.getViewportHeight() * 0.5 : 0.0);
+
+        fireflies.removeIf(f -> Math.hypot(f.getX() - refX, f.getY() - refY) > 560.0);
 
         fireflyStreamTimer += dt;
         if (fireflyStreamTimer >= 0.35 && fireflies.size() < 34) {
             fireflyStreamTimer = 0.0;
             double ang = rand.nextDouble() * Math.PI * 2.0;
             double r = 60.0 + rand.nextDouble() * 320.0;
-            double fx = player.getX() + Math.cos(ang) * r;
-            double fy = player.getY() + Math.sin(ang) * r;
+            double fx = refX + Math.cos(ang) * r;
+            double fy = refY + Math.sin(ang) * r;
             int col = (int) Math.floor(fx / TileMap.TILE_SIZE);
             int row = (int) Math.floor(fy / TileMap.TILE_SIZE);
             BiomeType biome = tileMap.getBiomeAt(col, row);

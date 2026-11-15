@@ -309,6 +309,11 @@ public class LightingAndWeatherRenderer {
         var fireflies = world.getFireflies();
         if (fireflies.isEmpty()) return;
 
+        double nightFactor = world.getNightFactor();
+        // Os vagalumes só começam a brilhar estritamente de noite
+        if (nightFactor <= 0.45) return;
+        double nightGlowScale = Math.min(1.0, (nightFactor - 0.45) / 0.15);
+
         GraphicsQuality quality = GameSettings.get().getGraphicsQuality();
 
         for (br.edu.unex.sentinela.world.Firefly f : fireflies) {
@@ -317,21 +322,21 @@ public class LightingAndWeatherRenderer {
 
             if (fx < -25 || fx > visibleW + 25 || fy < -25 || fy > visibleH + 25) continue;
 
-            double glow = f.getGlowAlpha();
-            if (glow <= 0.04) continue;
+            double glow = f.getGlowAlpha() * nightGlowScale;
+            if (glow <= 0.02) continue;
 
             if (quality != GraphicsQuality.LOW) {
                 RadialGradient halo = new RadialGradient(
                     0, 0, fx, fy, 18.0, false, CycleMethod.NO_CYCLE,
-                    new Stop(0.0, Color.color(0.85, 0.98, 0.35, glow * 0.38)),
-                    new Stop(0.5, Color.color(0.55, 0.90, 0.25, glow * 0.16)),
+                    new Stop(0.0, Color.color(0.85, 0.98, 0.35, glow * 0.45)),
+                    new Stop(0.5, Color.color(0.55, 0.90, 0.25, glow * 0.20)),
                     new Stop(1.0, Color.color(0.20, 0.70, 0.15, 0.0))
                 );
                 gc.setFill(halo);
                 gc.fillOval(fx - 18, fy - 18, 36, 36);
             }
 
-            gc.setFill(Color.color(0.98, 1.0, 0.70, Math.min(1.0, glow * 1.25)));
+            gc.setFill(Color.color(0.98, 1.0, 0.70, Math.min(1.0, glow * 1.35)));
             gc.fillOval(fx - 1.8, fy - 1.8, 3.6, 3.6);
             gc.setFill(Color.web("#FFFFFF", glow));
             gc.fillOval(fx - 1.0, fy - 1.0, 2.0, 2.0);
@@ -339,13 +344,12 @@ public class LightingAndWeatherRenderer {
     }
 
     public void renderDynamicLightingAndVignette(World world, double playerScreenX, double playerScreenY, double visibleW, double visibleH) {
-        double cycleProgress = world.getCycleProgressTimer() / world.getCycleDuration();
-        double nightFactor = Math.sin(cycleProgress * Math.PI); // 0 = Meio-dia, 1 = Meia-noite
+        double nightFactor = world.getNightFactor(); // 0 = Meio-dia, 1 = Meia-noite
         GraphicsQuality quality = GameSettings.get().getGraphicsQuality();
 
-        // 1. Luz Solar Direcional (Diurna / Golden Hour) vinda de Noroeste (Topo-Esquerda)
-        if (nightFactor < 0.45 && quality != GraphicsQuality.LOW) {
-            double sunStrength = (0.45 - nightFactor) / 0.45;
+        // 1. Luz Solar Direcional (Diurna) vinda de Noroeste (Topo-Esquerda)
+        if (nightFactor < 0.38 && quality != GraphicsQuality.LOW) {
+            double sunStrength = (0.38 - nightFactor) / 0.38;
             gc.save();
             gc.setGlobalAlpha(sunStrength);
             gc.setFill(SUN_BEAM_GRAD);
@@ -353,35 +357,62 @@ public class LightingAndWeatherRenderer {
             gc.restore();
         }
 
-        // 2. Transição Crepúsculo (Golden Hour / Pôr do Sol alaranjado)
-        if (nightFactor >= 0.20 && nightFactor <= 0.60) {
-            double duskIntensity = 1.0 - Math.abs(nightFactor - 0.40) / 0.20;
-            gc.setFill(Color.color(0.85, 0.38, 0.12, 0.16 * duskIntensity));
+        // 2. Transição Crepúsculo (Golden Hour / Pôr do Sol alaranjado quente)
+        if (nightFactor >= 0.24 && nightFactor <= 0.56) {
+            double duskIntensity = 1.0 - Math.abs(nightFactor - 0.40) / 0.16;
+            gc.setFill(Color.color(0.88, 0.40, 0.12, 0.20 * Math.max(0.0, duskIntensity)));
             gc.fillRect(0, 0, visibleW, visibleH);
         }
 
-        // 3. Iluminação Noturna Profunda com Halo Focal ao redor da Raposa
-        if (nightFactor > 0.15) {
-            double maxDarkness = Math.min(0.78, (nightFactor - 0.15) * 0.88);
+        // 3. Iluminação Noturna Densa com Halo Focal de Visão da Raposa
+        if (nightFactor > 0.38) {
+            double normalizedNight = (nightFactor - 0.38) / (1.0 - 0.38); // 0.0 a 1.0
+            double nightDensityCurve = Math.sin(normalizedNight * Math.PI * 0.5); // Curva orgânica ease-out
+            double maxDarkness = 0.38 + 0.56 * nightDensityCurve; // Escuridão densa atingindo até 0.94 na meia-noite profunda
+
+            // Clivagem de relâmpago: dissipa momentaneamente a escuridão durante flashes de tempestade
+            double flash = world.getLightningFlash();
+            if (flash > 0.01) {
+                maxDarkness *= Math.max(0.0, 1.0 - flash * 1.35);
+            }
+
             if (quality == GraphicsQuality.LOW) {
-                gc.setFill(Color.color(0.03, 0.05, 0.14, maxDarkness * 0.72));
+                gc.setFill(Color.color(0.01, 0.02, 0.06, maxDarkness * 0.88));
                 gc.fillRect(0, 0, visibleW, visibleH);
             } else {
-                double lightRadius = Math.max(visibleW, visibleH) * 0.36;
+                // Determina o centro focal (se o jogador estiver fora de tela, ex: menu ambiente, usa o centro da tela)
+                double focalX = playerScreenX;
+                double focalY = playerScreenY;
+                if (focalX < -80 || focalX > visibleW + 80 || focalY < -80 || focalY > visibleH + 80) {
+                    focalX = visibleW * 0.5;
+                    focalY = visibleH * 0.5;
+                }
+
+                // Raio focal equilibrado: permite enxergar a área imediata com nitidez
+                double lightRadius = Math.max(visibleW, visibleH) * 0.28;
 
                 RadialGradient nightLight = new RadialGradient(
-                    0, 0, playerScreenX, playerScreenY, lightRadius,
+                    0, 0, focalX, focalY, lightRadius,
                     false, CycleMethod.NO_CYCLE,
-                    new Stop(0.0,  Color.color(0.05, 0.08, 0.20, maxDarkness * 0.22)),
-                    new Stop(0.45, Color.color(0.04, 0.06, 0.18, maxDarkness * 0.58)),
-                    new Stop(1.0,  Color.color(0.02, 0.03, 0.10, maxDarkness))
+                    new Stop(0.0,  Color.color(0.025, 0.045, 0.12, maxDarkness * 0.05)),
+                    new Stop(0.28, Color.color(0.020, 0.038, 0.10, maxDarkness * 0.20)),
+                    new Stop(0.54, Color.color(0.014, 0.028, 0.08, maxDarkness * 0.52)),
+                    new Stop(0.78, Color.color(0.008, 0.018, 0.05, maxDarkness * 0.82)),
+                    new Stop(1.0,  Color.color(0.003, 0.006, 0.022, maxDarkness))
                 );
                 gc.setFill(nightLight);
                 gc.fillRect(0, 0, visibleW, visibleH);
+
+                // Bruma/Luar noturno azul-obsidiana complementar para noites profundas
+                if (nightFactor > 0.55) {
+                    double moonHaze = (nightFactor - 0.55) / 0.45;
+                    gc.setFill(Color.color(0.01, 0.03, 0.08, 0.14 * moonHaze));
+                    gc.fillRect(0, 0, visibleW, visibleH);
+                }
             }
         }
 
-        // 4. Vinheta Atmosférica Permanente (Oclusão suave nas bordas da tela para dar profundidade)
+        // 4. Vinheta Atmosférica Permanente (Profundidade cinematográfica nas bordas)
         if (quality != GraphicsQuality.LOW) {
             gc.setFill(VIGNETTE_GRAD);
             gc.fillRect(0, 0, visibleW, visibleH);

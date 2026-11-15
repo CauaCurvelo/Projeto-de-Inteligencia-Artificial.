@@ -2,6 +2,7 @@ package br.edu.unex.sentinela.ui;
 
 import br.edu.unex.sentinela.audio.AudioEngine;
 import br.edu.unex.sentinela.audio.SoundId;
+import br.edu.unex.sentinela.world.World;
 import javafx.animation.AnimationTimer;
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
@@ -83,6 +84,14 @@ public final class UiMotion {
      * Pausa automaticamente quando removido da Scene para 0% de custo em partida.
      */
     public static Canvas createFireflyBackdrop() {
+        return createFireflyBackdrop(null);
+    }
+
+    /**
+     * Canvas leve de vagalumes da floresta para o fundo do Menu Principal.
+     * Brilha estritamente durante a noite e pausa automaticamente quando fora da Scene.
+     */
+    public static Canvas createFireflyBackdrop(World world) {
         Canvas canvas = new Canvas(960, 640);
         canvas.setMouseTransparent(true);
 
@@ -122,12 +131,22 @@ public final class UiMotion {
                 GraphicsContext gc = canvas.getGraphicsContext2D();
                 gc.clearRect(0, 0, w, h);
 
+                double nightAlpha = 1.0;
+                if (world != null) {
+                    double nightFactor = world.getNightFactor();
+                    if (nightFactor <= 0.45) {
+                        // Vagalumes apagados de dia e crepúsculo
+                        return;
+                    }
+                    nightAlpha = Math.min(1.0, (nightFactor - 0.45) / 0.15);
+                }
+
                 for (int i = 0; i < count; i++) {
                     y[i] -= speed[i] * dt;
                     if (y[i] < -0.05) y[i] = 1.05;
                     double px = (x[i] + Math.sin(elapsed * 0.65 + phase[i]) * 0.022) * w;
                     double py = y[i] * h;
-                    double pulse = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(elapsed * 2.1 + phase[i] * 1.7));
+                    double pulse = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(elapsed * 2.1 + phase[i] * 1.7))) * nightAlpha;
                     double r = radius[i];
 
                     Color core = emerald[i]

@@ -236,4 +236,8 @@ public class ScreenManager extends StackPane {
     protected void layoutChildren() {
         super.layoutChildren();
     }
+
+    public World getWorld() {
+        return world;
+    }
 }

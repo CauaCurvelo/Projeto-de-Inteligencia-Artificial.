@@ -509,4 +509,15 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - Detecção por contato físico imediato (`dist <= 46px`) garante que mordidas pelas costas nunca sejam ignoradas por estarem fora do cone de visão frontal.
   - Durante alerta e combate, o campo de visão periférica se expande para 160°.
 
+## Feature / Overhaul: Densidade da Escuridão Noturna & Vagalumes Estritamente Noturnos
+- **Densidade Atmosférica e Contraste Dia vs. Noite ([LightingAndWeatherRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/LightingAndWeatherRenderer.java)):**
+  - **Sensação Real de Noite:** O teto da escuridão noturna periférica foi ampliado de `0.78` para até `0.94` na meia-noite profunda com curva senoidal *ease-out* orgânica, transformando a noite em uma experiência tensa, cinematográfica e de alto contraste contra o dia ensolarado.
+  - **Halo Focal de Visão Noturna da Raposa:** Em vez de clarear a tela inteira, a raposa conta com um halo focal ajustado (`0.28` da dimensão da tela) com centro quase 100% nítido (apenas 5% de opacidade no núcleo imediato) caindo suavemente para azul-safira intermediário (`Stop(0.54)`) e mergulhando em escuridão densa obsidiana/índigo (`Stop(1.0)` com `#010206` em `0.94` de alfa) na floresta distante.
+  - **Reatividade Atmosférica a Relâmpagos:** Durante tempestades noturnas, o clarão do raio (`world.getLightningFlash()`) dissipa dinamicamente a escuridão da noite por uma fração de segundo, iluminando a floresta inteira antes de retornar às sombras.
+- **Vaga-lumes Estritamente Noturnos ([World.java](src/main/java/br/edu/unex/sentinela/world/World.java), [LightingAndWeatherRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/LightingAndWeatherRenderer.java), [UiMotion.java](src/main/java/br/edu/unex/sentinela/ui/UiMotion.java), [MainMenuScreen.java](src/main/java/br/edu/unex/sentinela/ui/MainMenuScreen.java)):**
+  - **Desova e Limpeza Ecológica:** `World.streamFireflies` agora verifica estritamente `isNight()` (`nightFactor > 0.45`). Durante o dia e o crepúsculo (`nightFactor <= 0.45`), todos os vaga-lumes são imediatamente removidos (`fireflies.clear()`), impedindo qualquer desova sob a luz do sol.
+  - **Bioluminescência Gradual:** Em `LightingAndWeatherRenderer.renderFireflies`, o brilho dos vaga-lumes é modulado pela intensidade noturna (`nightFactor > 0.45`), acendendo suavemente conforme a noite cai e permanecendo completamente apagados durante o dia.
+  - **Sincronização do Menu Principal:** O backdrop de vaga-lumes da UI em `UiMotion.createFireflyBackdrop` foi sincronizado com `World.getNightFactor()`, eliminando os pontinhos amarelos fixos sobrepostos ao diorama da natureza durante o dia e acendendo-os harmonicamente apenas durante a noite.
+
+
 

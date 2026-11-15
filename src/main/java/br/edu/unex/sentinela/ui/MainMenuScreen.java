@@ -30,7 +30,7 @@ public class MainMenuScreen extends StackPane {
         prefWidthProperty().bind(manager.widthProperty());
         prefHeightProperty().bind(manager.heightProperty());
 
-        Canvas fireflies = UiMotion.createFireflyBackdrop();
+        Canvas fireflies = UiMotion.createFireflyBackdrop(manager != null ? manager.getWorld() : null);
         fireflies.setMouseTransparent(true);
         fireflies.widthProperty().bind(widthProperty());
         fireflies.heightProperty().bind(heightProperty());
