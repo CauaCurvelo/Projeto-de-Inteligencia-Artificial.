@@ -659,6 +659,19 @@ public class World {
                     boolean defeated = enemy.takeDamage(1, player.getX(), player.getY());
                     triggerForestDisturbance(enemy.getX(), enemy.getY(), 190.0);
 
+                    // Caçador atacado alerta cães sabujos próximos
+                    if (enemy.getType() == EnemyType.HUNTER) {
+                        for (Enemy ally : enemies) {
+                            if (ally == enemy || ally.getHp() <= 0) continue;
+                            if (ally.getType() == EnemyType.HOUND) {
+                                double distHound = Math.hypot(ally.getX() - enemy.getX(), ally.getY() - enemy.getY());
+                                if (distHound < 440.0) {
+                                    ally.receiveHoundAlert(player.getX(), player.getY(), tileMap);
+                                }
+                            }
+                        }
+                    }
+
                     for (int k = 0; k < 6; k++) {
                         particles.add(new Particle(
                             enemy.getX(), enemy.getY(),

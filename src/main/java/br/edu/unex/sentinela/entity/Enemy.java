@@ -352,18 +352,16 @@ public class Enemy {
     }
 
     public void receiveHoundAlert(double targetX, double targetY, TileMap tileMap) {
-        if (state == AIState.PATROL || state == AIState.SUSPICIOUS || alertTimer <= 0) {
-            this.alertTimer = 6.0;
-            this.targetAimX = targetX;
-            this.targetAimY = targetY;
-            this.state = AIState.ALERT;
-            this.patrolPauseTimer = 0;
-            int cCol = (int) Math.floor(x / TileMap.TILE_SIZE);
-            int cRow = (int) Math.floor(y / TileMap.TILE_SIZE);
-            int tCol = (int) Math.floor(targetX / TileMap.TILE_SIZE);
-            int tRow = (int) Math.floor(targetY / TileMap.TILE_SIZE);
-            requestPath(tileMap, cCol, cRow, tCol, tRow, false);
-        }
+        this.alertTimer = 6.0;
+        this.targetAimX = targetX;
+        this.targetAimY = targetY;
+        this.state = (type == EnemyType.HOUND) ? AIState.CHASE : AIState.ALERT;
+        this.patrolPauseTimer = 0;
+        int cCol = (int) Math.floor(x / TileMap.TILE_SIZE);
+        int cRow = (int) Math.floor(y / TileMap.TILE_SIZE);
+        int tCol = (int) Math.floor(targetX / TileMap.TILE_SIZE);
+        int tRow = (int) Math.floor(targetY / TileMap.TILE_SIZE);
+        requestPath(tileMap, cCol, cRow, tCol, tRow, false);
     }
 
     private void updateHunter(boolean canSee, boolean canHear, Player player, List<Enemy> allEnemies, TileMap tileMap,
@@ -422,14 +420,26 @@ public class Enemy {
                 double targetAngle = Math.atan2(player.getY() - y, player.getX() - x);
                 faceAngle = lerpAngle(faceAngle, targetAngle, 0.18);
             } else {
-                alertTimer = 5.0;
+                alertTimer = 6.0;
                 targetAimX = player.getX();
                 targetAimY = player.getY();
+
+                // Golpe defensivo de curta distância (coronha/chute de emergência) se a raposa estiver colada
+                if (distToPlayer < 40.0 && attackCooldown <= 0) {
+                    attackCooldown = 1.15;
+                    player.takeDamage(x, y, 220.0, 1);
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.85, 0, 1.05);
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HUNTER_SHOUT, 0.90, 0, 1.15);
+                }
 
                 if (distToPlayer < 65.0) {
                     // Recuo tático (Kiting) da raposa
                     state = AIState.KITING;
                     faceAngle = lerpAngle(faceAngle, Math.atan2(player.getY() - y, player.getX() - x), 0.25);
+                    if (distToPlayer >= 30.0 && shootCooldown <= 0 && tileMap.hasLineOfSight(x, y, player.getX(), player.getY())) {
+                        projectiles.add(new Projectile(x, y, player.getX(), player.getY()));
+                        shootCooldown = 1.65;
+                    }
                 } else if (distToPlayer < 245.0) {
                     state = AIState.AIMING;
                     double aimAngle = Math.atan2(player.getY() - y, player.getX() - x);
@@ -445,8 +455,14 @@ public class Enemy {
             }
         } else if (alertTimer > 0) {
             state = AIState.ALERT;
-            if (isPathFinished()) {
-                handleOrganicPatrolArrival(allEnemies, tileMap, curCol, curRow);
+            faceAngle = lerpAngle(faceAngle, Math.atan2(targetAimY - y, targetAimX - x), 0.25);
+            int tCol = (int) Math.floor(targetAimX / TileMap.TILE_SIZE);
+            int tRow = (int) Math.floor(targetAimY / TileMap.TILE_SIZE);
+            requestPath(tileMap, curCol, curRow, tCol, tRow, false);
+
+            if (tileMap.hasLineOfSight(x, y, targetAimX, targetAimY) && shootCooldown <= 0 && distToPlayer < 240.0) {
+                projectiles.add(new Projectile(x, y, targetAimX, targetAimY));
+                shootCooldown = 1.85;
             }
         } else if (canHear) {
             state = AIState.SUSPICIOUS;
@@ -1248,13 +1264,53 @@ public class Enemy {
         this.hp -= amount;
         this.damageFlashTimer = 0.22;
 
-        if (state == AIState.RESTING || state == AIState.DRINKING) {
-            this.state = AIState.ALERT;
-            this.alertTimer = 4.5;
-            this.satiationTimer = 0.0;
-            this.targetAimX = fromX;
-            this.targetAimY = fromY;
-            this.faceAngle = Math.atan2(fromY - y, fromX - x);
+        // 1. Vira imediatamente para encarar a fonte do golpe
+        double dxFrom = fromX - x;
+        double dyFrom = fromY - y;
+        double distFrom = Math.hypot(dxFrom, dyFrom);
+        if (distFrom > 0.001) {
+            this.faceAngle = Math.atan2(dyFrom, dxFrom);
+        }
+        this.targetAimX = fromX;
+        this.targetAimY = fromY;
+        this.alertTimer = 7.0;
+        this.suspicionMeter = 1.0;
+        this.patrolPauseTimer = 0.0;
+        this.satiationTimer = 0.0;
+        this.currentPath.clear();
+        this.currentPathIndex = 0;
+
+        // 2. Reação de combate imediata da criatura/inimigo
+        if (type == EnemyType.HUNTER) {
+            if (distFrom < 65.0) {
+                this.state = AIState.KITING;
+            } else {
+                this.state = AIState.AIMING;
+            }
+            this.shootCooldown = Math.min(this.shootCooldown, 0.45);
+            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HUNTER_SHOUT, 0.90, 0, 1.05);
+        } else if (type == EnemyType.HOUND) {
+            this.state = AIState.CHASE;
+            br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.DOG_BARK, 0.95, 0, 1.15);
+        } else if (type == EnemyType.RIVAL) {
+            if (skin == EnemySkin.BOAR && chargeCooldown <= 0) {
+                this.state = AIState.CHARGING;
+                this.chargeDuration = 0.95;
+                this.chargeDirX = distFrom > 0.001 ? dxFrom / distFrom : Math.cos(faceAngle);
+                this.chargeDirY = distFrom > 0.001 ? dyFrom / distFrom : Math.sin(faceAngle);
+                br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BOAR_GRUNT, 0.95, 0, 0.95);
+            } else if (skin == EnemySkin.WOLF) {
+                this.state = AIState.CHASE;
+                br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.WOLF_SNARL, 0.90, 0, 1.05);
+            } else if (skin == EnemySkin.BEAR) {
+                this.state = AIState.CHASE;
+                br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.BEAR_ROAR, 0.95, 0, 0.95);
+            } else if (skin == EnemySkin.PANTHER) {
+                this.state = AIState.CHASE;
+                br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.PANTHER_ROAR, 0.95, 0, 1.05);
+            } else {
+                this.state = AIState.CHASE;
+            }
         }
 
         if (bossController != null) {
@@ -1385,9 +1441,18 @@ public class Enemy {
             if (dist > currentVisionRange * 0.25) return false;
         }
 
+        // Se o jogador estiver imediatamente colado (contato físico/mordida < 46px) e não estiver em toca/vegetação alta
+        if (dist <= 46.0 && !player.isHiddenInGrass()) {
+            return tileMap.hasLineOfSight(x, y, player.getX(), player.getY());
+        }
+
         double angleToPlayer = Math.atan2(player.getY() - y, player.getX() - x);
         double diff = Math.abs(normalizeAngle(angleToPlayer - faceAngle));
-        if (diff > (fovAngle / 2.0)) return false;
+        // Em alerta ou combate, campo de percepção periférica se amplia para 160°
+        double effectiveFov = (alertTimer > 0 || state == AIState.CHASE || state == AIState.AIMING || state == AIState.KITING)
+                ? Math.max(fovAngle, Math.toRadians(160.0))
+                : fovAngle;
+        if (diff > (effectiveFov / 2.0)) return false;
 
         return tileMap.hasLineOfSight(x, y, player.getX(), player.getY());
     }
