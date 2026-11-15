@@ -347,28 +347,34 @@ public class LightingAndWeatherRenderer {
         double nightFactor = world.getNightFactor(); // 0 = Meio-dia, 1 = Meia-noite
         GraphicsQuality quality = GameSettings.get().getGraphicsQuality();
 
-        // 1. Luz Solar Direcional (Diurna) vinda de Noroeste (Topo-Esquerda)
-        if (nightFactor < 0.38 && quality != GraphicsQuality.LOW) {
-            double sunStrength = (0.38 - nightFactor) / 0.38;
+        // 1. Luz Solar Direcional (Diurna) vinda de Noroeste - transição suave sem corte abrupto
+        if (nightFactor < 0.48 && quality != GraphicsQuality.LOW) {
+            double sunT = nightFactor / 0.48; // 0.0 no meio-dia, 1.0 no crepúsculo
+            double sunStrength = 1.0 - (sunT * sunT); // Decaimento quadrático contínuo
             gc.save();
-            gc.setGlobalAlpha(sunStrength);
+            gc.setGlobalAlpha(Math.max(0.0, sunStrength));
             gc.setFill(SUN_BEAM_GRAD);
             gc.fillRect(0, 0, visibleW, visibleH);
             gc.restore();
         }
 
-        // 2. Transição Crepúsculo (Golden Hour / Pôr do Sol alaranjado quente)
-        if (nightFactor >= 0.24 && nightFactor <= 0.56) {
-            double duskIntensity = 1.0 - Math.abs(nightFactor - 0.40) / 0.16;
-            gc.setFill(Color.color(0.88, 0.40, 0.12, 0.20 * Math.max(0.0, duskIntensity)));
-            gc.fillRect(0, 0, visibleW, visibleH);
+        // 2. Transição Crepúsculo (Golden Hour / Pôr do Sol alaranjado quente em sino senoidal contínuo)
+        if (nightFactor >= 0.20 && nightFactor <= 0.62) {
+            double duskDist = Math.abs(nightFactor - 0.41) / 0.21;
+            if (duskDist < 1.0) {
+                // Curva de cosseno elevada: derivada zero no início, no pico e no final (sem corte brusco)
+                double duskSmooth = 0.5 + 0.5 * Math.cos(duskDist * Math.PI);
+                gc.setFill(Color.color(0.88, 0.40, 0.12, 0.18 * duskSmooth));
+                gc.fillRect(0, 0, visibleW, visibleH);
+            }
         }
 
-        // 3. Iluminação Noturna Densa com Halo Focal de Visão da Raposa
-        if (nightFactor > 0.38) {
-            double normalizedNight = (nightFactor - 0.38) / (1.0 - 0.38); // 0.0 a 1.0
-            double nightDensityCurve = Math.sin(normalizedNight * Math.PI * 0.5); // Curva orgânica ease-out
-            double maxDarkness = 0.38 + 0.56 * nightDensityCurve; // Escuridão densa atingindo até 0.94 na meia-noite profunda
+        // 3. Iluminação Noturna Densa com Transição Perfeitamente Gradual (Smoothstep sem degrau)
+        if (nightFactor > 0.35) {
+            double t = (nightFactor - 0.35) / (1.0 - 0.35); // 0.0 a 1.0
+            // Hermite Smoothstep cúbico: derivada zero em t=0 e t=1. maxDarkness parte exatamente de 0.0
+            double smoothT = t * t * (3.0 - 2.0 * t);
+            double maxDarkness = 0.94 * smoothT; // Escala suave de 0.0 até 0.94 no ápice da meia-noite
 
             // Clivagem de relâmpago: dissipa momentaneamente a escuridão durante flashes de tempestade
             double flash = world.getLightningFlash();
@@ -376,37 +382,32 @@ public class LightingAndWeatherRenderer {
                 maxDarkness *= Math.max(0.0, 1.0 - flash * 1.35);
             }
 
-            if (quality == GraphicsQuality.LOW) {
-                gc.setFill(Color.color(0.01, 0.02, 0.06, maxDarkness * 0.88));
-                gc.fillRect(0, 0, visibleW, visibleH);
-            } else {
-                // Determina o centro focal (se o jogador estiver fora de tela, ex: menu ambiente, usa o centro da tela)
-                double focalX = playerScreenX;
-                double focalY = playerScreenY;
-                if (focalX < -80 || focalX > visibleW + 80 || focalY < -80 || focalY > visibleH + 80) {
-                    focalX = visibleW * 0.5;
-                    focalY = visibleH * 0.5;
-                }
+            if (maxDarkness > 0.005) {
+                if (quality == GraphicsQuality.LOW) {
+                    gc.setFill(Color.color(0.01, 0.02, 0.06, maxDarkness * 0.88));
+                    gc.fillRect(0, 0, visibleW, visibleH);
+                } else {
+                    // Determina o centro focal (se o jogador estiver fora de tela, ex: menu ambiente, usa o centro da tela)
+                    double focalX = playerScreenX;
+                    double focalY = playerScreenY;
+                    if (focalX < -80 || focalX > visibleW + 80 || focalY < -80 || focalY > visibleH + 80) {
+                        focalX = visibleW * 0.5;
+                        focalY = visibleH * 0.5;
+                    }
 
-                // Raio focal equilibrado: permite enxergar a área imediata com nitidez
-                double lightRadius = Math.max(visibleW, visibleH) * 0.28;
+                    // Raio focal equilibrado: permite enxergar a área imediata com nitidez
+                    double lightRadius = Math.max(visibleW, visibleH) * 0.28;
 
-                RadialGradient nightLight = new RadialGradient(
-                    0, 0, focalX, focalY, lightRadius,
-                    false, CycleMethod.NO_CYCLE,
-                    new Stop(0.0,  Color.color(0.025, 0.045, 0.12, maxDarkness * 0.05)),
-                    new Stop(0.28, Color.color(0.020, 0.038, 0.10, maxDarkness * 0.20)),
-                    new Stop(0.54, Color.color(0.014, 0.028, 0.08, maxDarkness * 0.52)),
-                    new Stop(0.78, Color.color(0.008, 0.018, 0.05, maxDarkness * 0.82)),
-                    new Stop(1.0,  Color.color(0.003, 0.006, 0.022, maxDarkness))
-                );
-                gc.setFill(nightLight);
-                gc.fillRect(0, 0, visibleW, visibleH);
-
-                // Bruma/Luar noturno azul-obsidiana complementar para noites profundas
-                if (nightFactor > 0.55) {
-                    double moonHaze = (nightFactor - 0.55) / 0.45;
-                    gc.setFill(Color.color(0.01, 0.03, 0.08, 0.14 * moonHaze));
+                    RadialGradient nightLight = new RadialGradient(
+                        0, 0, focalX, focalY, lightRadius,
+                        false, CycleMethod.NO_CYCLE,
+                        new Stop(0.0,  Color.color(0.025, 0.045, 0.12, maxDarkness * 0.05)),
+                        new Stop(0.28, Color.color(0.020, 0.038, 0.10, maxDarkness * 0.20)),
+                        new Stop(0.54, Color.color(0.014, 0.028, 0.08, maxDarkness * 0.52)),
+                        new Stop(0.78, Color.color(0.008, 0.018, 0.05, maxDarkness * 0.82)),
+                        new Stop(1.0,  Color.color(0.003, 0.006, 0.022, maxDarkness))
+                    );
+                    gc.setFill(nightLight);
                     gc.fillRect(0, 0, visibleW, visibleH);
                 }
             }

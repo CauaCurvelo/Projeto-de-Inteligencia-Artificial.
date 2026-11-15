@@ -511,13 +511,17 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
 
 ## Feature / Overhaul: Densidade da Escuridão Noturna & Vagalumes Estritamente Noturnos
 - **Densidade Atmosférica e Contraste Dia vs. Noite ([LightingAndWeatherRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/LightingAndWeatherRenderer.java)):**
-  - **Sensação Real de Noite:** O teto da escuridão noturna periférica foi ampliado de `0.78` para até `0.94` na meia-noite profunda com curva senoidal *ease-out* orgânica, transformando a noite em uma experiência tensa, cinematográfica e de alto contraste contra o dia ensolarado.
+  - **Sensação Real de Noite com Transição Hermite Smoothstep:** Corrigido o degrau abrupto onde `maxDarkness` saltava de 0 para 0.38 ao atingir o limiar da tarde. A escuridão noturna agora evolui por interpolação cúbica contínua `smoothstep(t) = t * t * (3 - 2t)` a partir de `nightFactor = 0.35` partindo de exatamente `0.00` até `0.94` na meia-noite profunda, sem qualquer salto perceptível no anoitecer ou no amanhecer.
+  - **Decaimento Contínuo da Luz Solar & Crepúsculo em Sino:** A luz solar direta desvanece por decaimento quadrático contínuo até `0.48`, e o crepúsculo alaranjado utiliza sino de cosseno elevado (`0.5 + 0.5 * cos(dist * PI)`), eliminando cortes secos.
   - **Halo Focal de Visão Noturna da Raposa:** Em vez de clarear a tela inteira, a raposa conta com um halo focal ajustado (`0.28` da dimensão da tela) com centro quase 100% nítido (apenas 5% de opacidade no núcleo imediato) caindo suavemente para azul-safira intermediário (`Stop(0.54)`) e mergulhando em escuridão densa obsidiana/índigo (`Stop(1.0)` com `#010206` em `0.94` de alfa) na floresta distante.
   - **Reatividade Atmosférica a Relâmpagos:** Durante tempestades noturnas, o clarão do raio (`world.getLightningFlash()`) dissipa dinamicamente a escuridão da noite por uma fração de segundo, iluminando a floresta inteira antes de retornar às sombras.
 - **Vaga-lumes Estritamente Noturnos ([World.java](src/main/java/br/edu/unex/sentinela/world/World.java), [LightingAndWeatherRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/LightingAndWeatherRenderer.java), [UiMotion.java](src/main/java/br/edu/unex/sentinela/ui/UiMotion.java), [MainMenuScreen.java](src/main/java/br/edu/unex/sentinela/ui/MainMenuScreen.java)):**
   - **Desova e Limpeza Ecológica:** `World.streamFireflies` agora verifica estritamente `isNight()` (`nightFactor > 0.45`). Durante o dia e o crepúsculo (`nightFactor <= 0.45`), todos os vaga-lumes são imediatamente removidos (`fireflies.clear()`), impedindo qualquer desova sob a luz do sol.
   - **Bioluminescência Gradual:** Em `LightingAndWeatherRenderer.renderFireflies`, o brilho dos vaga-lumes é modulado pela intensidade noturna (`nightFactor > 0.45`), acendendo suavemente conforme a noite cai e permanecendo completamente apagados durante o dia.
   - **Sincronização do Menu Principal:** O backdrop de vaga-lumes da UI em `UiMotion.createFireflyBackdrop` foi sincronizado com `World.getNightFactor()`, eliminando os pontinhos amarelos fixos sobrepostos ao diorama da natureza durante o dia e acendendo-os harmonicamente apenas durante a noite.
+
+
+
 
 
 
