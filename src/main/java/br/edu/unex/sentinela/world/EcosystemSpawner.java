@@ -28,6 +28,10 @@ public class EcosystemSpawner {
     private final Random rand = new Random();
 
     public void populateInitialEcosystem(TileMap tileMap, List<Enemy> enemies, List<FoodItem> foodItems, List<Burrow> burrows) {
+        populateInitialEcosystem(tileMap, enemies, foodItems, burrows, null);
+    }
+
+    public void populateInitialEcosystem(TileMap tileMap, List<Enemy> enemies, List<FoodItem> foodItems, List<Burrow> burrows, List<BearTrap> bearTraps) {
         rand.setSeed(tileMap.getWorldSeed() ^ System.nanoTime());
 
         // 1. Tocas da Raposa distribuídas em direções embaralhadas ao redor do mapa inicial
@@ -67,6 +71,121 @@ public class EcosystemSpawner {
         spawnBossInNativeBiome(tileMap, enemies, EnemySkin.PANTHER, 0, 0, 28, 86, 1.0);
         spawnBossInNativeBiome(tileMap, enemies, EnemySkin.BEAR, 0, 0, 28, 86, 1.0);
         spawnBossInNativeBiome(tileMap, enemies, EnemySkin.POLAR_BEAR, 0, 0, 28, 86, 1.0);
+
+        // 6. Armadilhas de urso iniciais pré-colocadas nos territórios de caça e trilhas florestais
+        spawnInitialTraps(tileMap, bearTraps, enemies);
+    }
+
+    /**
+     * Semeia armadilhas mecânicas no mapa inicial:
+     * - Nos acampamentos e rotas patrulhadas pelos caçadores
+     * - Em trilhas e clareiras estratégicas da floresta/tundra fora da clareira do player
+     */
+    public void spawnInitialTraps(TileMap tileMap, List<BearTrap> bearTraps, List<Enemy> enemies) {
+        if (bearTraps == null) return;
+
+        // 1. Armadilhas próximas a cada caçador inicial
+        for (Enemy enemy : enemies) {
+            if (enemy.getType() != EnemyType.HUNTER) continue;
+            int hCol = (int) Math.floor(enemy.getX() / TileMap.TILE_SIZE);
+            int hRow = (int) Math.floor(enemy.getY() / TileMap.TILE_SIZE);
+
+            int trapsPlaced = 0;
+            for (int attempt = 0; attempt < 24 && trapsPlaced < 2; attempt++) {
+                double ang = rand.nextDouble() * Math.PI * 2.0;
+                double distTiles = 3.0 + rand.nextDouble() * 5.0; // 96 a 256 px
+                int c = hCol + (int) Math.round(Math.cos(ang) * distTiles);
+                int r = hRow + (int) Math.round(Math.sin(ang) * distTiles);
+
+                TileType tile = tileMap.getTileAt(c, r);
+                if (tile.isWalkable() && tile != TileType.WATER) {
+                    double wx = c * TileMap.TILE_SIZE + 16.0;
+                    double wy = r * TileMap.TILE_SIZE + 16.0;
+
+                    boolean tooClose = Math.hypot(wx, wy) < 180.0;
+                    for (BearTrap t : bearTraps) {
+                        if (Math.hypot(t.getX() - wx, t.getY() - wy) < 48.0) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                    if (!tooClose) {
+                        bearTraps.add(new BearTrap(wx, wy));
+                        trapsPlaced++;
+                    }
+                }
+            }
+        }
+
+        // 2. Armadilhas selvagens em trilhas e passagens da floresta
+        int wildTrapsCount = 7 + rand.nextInt(4);
+        int placed = 0;
+        for (int attempt = 0; attempt < 80 && placed < wildTrapsCount; attempt++) {
+            double ang = rand.nextDouble() * Math.PI * 2.0;
+            double distTiles = 15.0 + rand.nextDouble() * 25.0;
+            int c = (int) Math.round(Math.cos(ang) * distTiles);
+            int r = (int) Math.round(Math.sin(ang) * distTiles);
+
+            TileType tile = tileMap.getTileAt(c, r);
+            if (tile.isWalkable() && tile != TileType.WATER) {
+                double wx = c * TileMap.TILE_SIZE + 16.0;
+                double wy = r * TileMap.TILE_SIZE + 16.0;
+
+                boolean tooClose = Math.hypot(wx, wy) < 220.0;
+                for (BearTrap t : bearTraps) {
+                    if (Math.hypot(t.getX() - wx, t.getY() - wy) < 52.0) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (!tooClose) {
+                    bearTraps.add(new BearTrap(wx, wy));
+                    placed++;
+                }
+            }
+        }
+    }
+
+    /**
+     * Repõe armadilhas táticas ao redor de caçadores ativos durante o ciclo contínuo do ecossistema.
+     */
+    public void replenishTrapsNearHunters(TileMap tileMap, List<BearTrap> bearTraps, List<Enemy> enemies, Player player) {
+        if (bearTraps == null || enemies == null || player == null) return;
+        if (bearTraps.size() >= 24) return;
+
+        for (Enemy enemy : enemies) {
+            if (enemy.getType() != EnemyType.HUNTER || enemy.getHp() <= 0) continue;
+            double distToPlayer = Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY());
+            if (distToPlayer > 1200.0) continue;
+
+            int hCol = (int) Math.floor(enemy.getX() / TileMap.TILE_SIZE);
+            int hRow = (int) Math.floor(enemy.getY() / TileMap.TILE_SIZE);
+
+            for (int attempt = 0; attempt < 12; attempt++) {
+                double ang = rand.nextDouble() * Math.PI * 2.0;
+                double distTiles = 3.5 + rand.nextDouble() * 5.0;
+                int c = hCol + (int) Math.round(Math.cos(ang) * distTiles);
+                int r = hRow + (int) Math.round(Math.sin(ang) * distTiles);
+
+                TileType tile = tileMap.getTileAt(c, r);
+                if (tile.isWalkable() && tile != TileType.WATER) {
+                    double wx = c * TileMap.TILE_SIZE + 16.0;
+                    double wy = r * TileMap.TILE_SIZE + 16.0;
+
+                    boolean tooClose = false;
+                    for (BearTrap t : bearTraps) {
+                        if (Math.hypot(t.getX() - wx, t.getY() - wy) < 50.0) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                    if (!tooClose) {
+                        bearTraps.add(new BearTrap(wx, wy));
+                        return; // 1 por ciclo de limpeza
+                    }
+                }
+            }
+        }
     }
 
     public void spawnReinforcementNearPlayer(TileMap tileMap, List<Enemy> enemies, Player player, double survivalTime) {

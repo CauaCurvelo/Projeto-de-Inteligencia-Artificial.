@@ -158,7 +158,7 @@ public class World {
     }
 
     private void spawnInitialSurroundings() {
-        ecosystemSpawner.populateInitialEcosystem(tileMap, enemies, foodItems, burrows);
+        ecosystemSpawner.populateInitialEcosystem(tileMap, enemies, foodItems, burrows, bearTraps);
         for (int i = 0; i < 14; i++) {
             spawnPassiveAnimalNearPlayer();
         }
@@ -815,6 +815,7 @@ public class World {
         foodItems.removeIf(f -> Math.hypot(f.getX() - player.getX(), f.getY() - player.getY()) > 1800.0 || f.isEaten());
         meatItems.removeIf(m -> Math.hypot(m.getX() - player.getX(), m.getY() - player.getY()) > 1800.0 || m.isEaten());
         burrows.removeIf(b -> Math.hypot(b.getX() - player.getX(), b.getY() - player.getY()) > 2200.0);
+        bearTraps.removeIf(t -> Math.hypot(t.getX() - player.getX(), t.getY() - player.getY()) > 2400.0);
 
         // Despawn enemies that got left too far behind (preserva bosses próximos à sua arena territorial)
         enemies.removeIf(e -> {
@@ -840,6 +841,10 @@ public class World {
 
         if (burrows.size() < 7) {
             ecosystemSpawner.spawnBurrowInSector(tileMap, burrows, pCol, pRow, rand.nextDouble() * Math.PI * 2.0, 12, 32, camera);
+        }
+
+        if (bearTraps.size() < 8) {
+            ecosystemSpawner.replenishTrapsNearHunters(tileMap, bearTraps, enemies, player);
         }
     }
 

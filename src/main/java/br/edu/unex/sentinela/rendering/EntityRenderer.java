@@ -126,7 +126,11 @@ public class EntityRenderer {
     }
 
     public void drawBearTrap(br.edu.unex.sentinela.world.BearTrap trap, double tx, double ty) {
-        groundItemRenderer.drawBearTrap(trap, tx, ty);
+        groundItemRenderer.drawBearTrap(trap, tx, ty, 0.0);
+    }
+
+    public void drawBearTrap(br.edu.unex.sentinela.world.BearTrap trap, double tx, double ty, double animTime) {
+        groundItemRenderer.drawBearTrap(trap, tx, ty, animTime);
     }
 
     /**

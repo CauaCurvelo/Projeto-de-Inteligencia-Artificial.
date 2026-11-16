@@ -73,7 +73,7 @@ public class Enemy {
     private double patrolPauseTimer = 0.0;
     private double forageCooldownTimer = 0.0;
     private double trapTimer = 0.0;
-    private double trapDeployCooldown = 18.0 + rand.nextDouble() * 14.0;
+    private double trapDeployCooldown = 2.5 + rand.nextDouble() * 3.5;
     private double patrolHeadingAngle;
     private double stuckTimer = 0.0;
     private double lastCheckX = 0.0;
@@ -371,15 +371,46 @@ public class Enemy {
         requestPath(tileMap, cCol, cRow, tCol, tRow, false);
     }
 
+    private boolean tryDeployBearTrap(TileMap tileMap, List<BearTrap> trapList, int curCol, int curRow, Player player, double minSpacing) {
+        if (trapList == null || trapList.size() >= 48) return false;
+
+        for (BearTrap t : trapList) {
+            double d = Math.hypot(t.getX() - x, t.getY() - y);
+            if (d < minSpacing) {
+                return false;
+            }
+        }
+
+        TileType curTile = tileMap.getTileAt(curCol, curRow);
+        if (!curTile.isWalkable() || curTile == TileType.WATER) {
+            return false;
+        }
+
+        trapList.add(new BearTrap(x, y));
+
+        if (player != null) {
+            double dist = Math.hypot(x - player.getX(), y - player.getY());
+            double maxDist = 18 * 32.0;
+            if (dist < maxDist) {
+                double a = 1.0 - (dist / maxDist);
+                double pan = Math.max(-0.85, Math.min(0.85, (x - player.getX()) / 320.0));
+                br.edu.unex.sentinela.audio.AudioEngine.get().play(
+                    br.edu.unex.sentinela.audio.SoundId.ARROW_THUD, 0.75 * a * a, pan, 0.85
+                );
+            }
+        }
+        return true;
+    }
+
     private void updateHunter(boolean canSee, boolean canHear, Player player, List<Enemy> allEnemies, TileMap tileMap,
                               List<Projectile> projectiles, List<BearTrap> trapList, List<WaterRipple> ripples, double dt,
                               int curCol, int curRow, double distToPlayer) {
         trapDeployCooldown -= dt;
-        if (state == AIState.PATROL && trapList != null && trapDeployCooldown <= 0 && trapList.size() < 14) {
-            TileType curTile = tileMap.getTileAt(curCol, curRow);
-            if (curTile.isWalkable() && curTile != TileType.WATER) {
-                trapList.add(new BearTrap(x, y));
-                trapDeployCooldown = 26.0 + rand.nextDouble() * 18.0;
+        if (state == AIState.PATROL && trapDeployCooldown <= 0) {
+            if (tryDeployBearTrap(tileMap, trapList, curCol, curRow, player, 60.0)) {
+                trapDeployCooldown = 12.0 + rand.nextDouble() * 10.0;
+            } else {
+                trapDeployCooldown = 3.0;
             }
         }
 
@@ -405,6 +436,11 @@ public class Enemy {
                 // Recuo tático com arco (Kiting)
                 state = AIState.KITING;
                 faceAngle = lerpAngle(faceAngle, Math.atan2(targetAimY - y, targetAimX - x), 0.25);
+                if (trapDeployCooldown <= 0) {
+                    if (tryDeployBearTrap(tileMap, trapList, curCol, curRow, player, 45.0)) {
+                        trapDeployCooldown = 8.0 + rand.nextDouble() * 5.0;
+                    }
+                }
             } else {
                 state = AIState.AIMING;
                 faceAngle = lerpAngle(faceAngle, Math.atan2(targetAimY - y, targetAimX - x), 0.25);
@@ -426,6 +462,11 @@ public class Enemy {
                 state = AIState.SUSPICIOUS;
                 double targetAngle = Math.atan2(player.getY() - y, player.getX() - x);
                 faceAngle = lerpAngle(faceAngle, targetAngle, 0.18);
+                if (trapDeployCooldown <= 0) {
+                    if (tryDeployBearTrap(tileMap, trapList, curCol, curRow, player, 52.0)) {
+                        trapDeployCooldown = 12.0 + rand.nextDouble() * 6.0;
+                    }
+                }
             } else {
                 alertTimer = 6.0;
                 targetAimX = player.getX();
@@ -443,6 +484,11 @@ public class Enemy {
                     // Recuo tático (Kiting) da raposa
                     state = AIState.KITING;
                     faceAngle = lerpAngle(faceAngle, Math.atan2(player.getY() - y, player.getX() - x), 0.25);
+                    if (trapDeployCooldown <= 0) {
+                        if (tryDeployBearTrap(tileMap, trapList, curCol, curRow, player, 42.0)) {
+                            trapDeployCooldown = 8.0 + rand.nextDouble() * 5.0;
+                        }
+                    }
                     if (distToPlayer >= 30.0 && shootCooldown <= 0 && tileMap.hasLineOfSight(x, y, player.getX(), player.getY())) {
                         projectiles.add(new Projectile(x, y, player.getX(), player.getY()));
                         shootCooldown = 1.65;
@@ -467,6 +513,12 @@ public class Enemy {
             int tRow = (int) Math.floor(targetAimY / TileMap.TILE_SIZE);
             requestPath(tileMap, curCol, curRow, tCol, tRow, false);
 
+            if (trapDeployCooldown <= 0) {
+                if (tryDeployBearTrap(tileMap, trapList, curCol, curRow, player, 50.0)) {
+                    trapDeployCooldown = 13.0 + rand.nextDouble() * 6.0;
+                }
+            }
+
             if (tileMap.hasLineOfSight(x, y, targetAimX, targetAimY) && shootCooldown <= 0 && distToPlayer < 240.0) {
                 projectiles.add(new Projectile(x, y, targetAimX, targetAimY));
                 shootCooldown = 1.85;
@@ -476,6 +528,12 @@ public class Enemy {
             alertTimer = 3.5;
             patrolPauseTimer = 0;
             requestPath(tileMap, curCol, curRow, (int) Math.floor(player.getX() / TileMap.TILE_SIZE), (int) Math.floor(player.getY() / TileMap.TILE_SIZE), false);
+
+            if (trapDeployCooldown <= 0) {
+                if (tryDeployBearTrap(tileMap, trapList, curCol, curRow, player, 50.0)) {
+                    trapDeployCooldown = 12.0 + rand.nextDouble() * 6.0;
+                }
+            }
         } else {
             // Rotina de beber água na margem se com sede
             if (thirstTimer <= 0 && state == AIState.PATROL) {

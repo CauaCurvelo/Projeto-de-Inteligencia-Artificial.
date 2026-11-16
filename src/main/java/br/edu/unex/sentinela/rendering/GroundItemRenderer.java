@@ -182,40 +182,166 @@ public class GroundItemRenderer {
     }
 
     public void drawBearTrap(br.edu.unex.sentinela.world.BearTrap trap, double tx, double ty) {
+        drawBearTrap(trap, tx, ty, 0.0);
+    }
+
+    public void drawBearTrap(br.edu.unex.sentinela.world.BearTrap trap, double tx, double ty, double animTime) {
         if (trap == null) return;
         boolean armed = trap.isArmed();
 
-        gc.setFill(Color.color(0.01, 0.03, 0.01, 0.50));
-        gc.fillOval(tx - 11, ty - 5, 22, 10);
+        // 1. Sombra de contato no solo (Ground Occlusion Shadow)
+        gc.setFill(Color.color(0.01, 0.02, 0.01, 0.52));
+        gc.fillOval(tx - 14, ty - 6.5, 28, 13);
+        gc.setFill(Color.color(0.0, 0.0, 0.0, 0.40));
+        gc.fillOval(tx - 9, ty - 4.0, 18, 8);
+
+        // 2. Chassi de fixação e molas de torção em aço forjado escuro
+        // Barra transversal principal
+        gc.setFill(Color.web("#1E272C"));
+        gc.fillRoundRect(tx - 13.5, ty - 2.5, 27, 5, 2, 2);
+        gc.setFill(Color.web("#37474F"));
+        gc.fillRoundRect(tx - 12.5, ty - 2.0, 25, 3.8, 2, 2);
+
+        // Haste perpendicular central de ancoragem
+        gc.setFill(Color.web("#263238"));
+        gc.fillRect(tx - 2.2, ty - 7.5, 4.4, 15);
+        gc.setFill(Color.web("#455A64"));
+        gc.fillRect(tx - 1.2, ty - 6.5, 2.4, 13);
+
+        // Molas espirais laterais (tension coil brackets)
+        gc.setFill(Color.web("#37474F"));
+        gc.fillOval(tx - 14.5, ty - 3.5, 5.0, 7.0);
+        gc.fillOval(tx + 9.5, ty - 3.5, 5.0, 7.0);
+        gc.setFill(Color.web("#78909C"));
+        gc.fillOval(tx - 13.5, ty - 2.5, 2.5, 4.5);
+        gc.fillOval(tx + 11.0, ty - 2.5, 2.5, 4.5);
 
         if (armed) {
-            gc.setStroke(Color.web("#37474F"));
-            gc.setLineWidth(2.4);
-            gc.strokeOval(tx - 9, ty - 4.5, 18, 9);
+            // ==================== ARMADILHA ARMADA (ABERTA E PRONTA) ====================
+            // Mandíbulas semicirculares abertas espalmadas sobre o terreno
+            // Aro externo (arco de aço forjado com chanfro metálico)
+            gc.setStroke(Color.web("#212121"));
+            gc.setLineWidth(3.4);
+            gc.strokeOval(tx - 11.5, ty - 6.0, 23, 12);
 
-            gc.setFill(Color.web("#263238"));
-            gc.fillOval(tx - 3.5, ty - 2, 7, 4);
-            gc.setFill(Color.web("#78909C"));
-            gc.fillOval(tx - 2, ty - 1.2, 4, 2.4);
+            gc.setStroke(Color.web("#546E7A"));
+            gc.setLineWidth(2.2);
+            gc.strokeOval(tx - 11.5, ty - 6.0, 23, 12);
 
-            gc.setFill(Color.web("#CFD8DC"));
-            for (int i = 0; i < 6; i++) {
-                double ang = i * Math.PI / 3.0;
-                double dx = Math.cos(ang) * 8.5;
-                double dy = Math.sin(ang) * 4.2;
-                gc.fillPolygon(new double[]{tx + dx - 1.2, tx + dx + 1.2, tx + dx},
-                               new double[]{ty + dy, ty + dy, ty + dy - 3.5}, 3);
+            gc.setStroke(Color.web("#90A4AE"));
+            gc.setLineWidth(1.0);
+            gc.strokeOval(tx - 11.5, ty - 6.5, 22.5, 11);
+
+            // Dentes afiados triangulares de aço serrilhado (8 dentes proeminentes)
+            double[][] teethPositions = {
+                {-8.5, -4.5, 1.0},
+                {-3.5, -6.5, 1.0},
+                { 3.5, -6.5, 1.0},
+                { 8.5, -4.5, 1.0},
+                {-8.5,  4.5, -1.0},
+                {-3.5,  6.5, -1.0},
+                { 3.5,  6.5, -1.0},
+                { 8.5,  4.5, -1.0}
+            };
+
+            for (double[] tp : teethPositions) {
+                double tpx = tx + tp[0];
+                double tpy = ty + tp[1];
+                double toothH = 4.2 * tp[2];
+
+                // Sombra/Contorno do dente
+                gc.setFill(Color.web("#1A252C"));
+                gc.fillPolygon(
+                    new double[]{tpx - 1.8, tpx + 1.8, tpx},
+                    new double[]{tpy, tpy, tpy + toothH + (tp[2] * 0.8)},
+                    3
+                );
+                // Núcleo em aço cromado reluzente
+                gc.setFill(Color.web("#ECEFF1"));
+                gc.fillPolygon(
+                    new double[]{tpx - 1.2, tpx + 1.2, tpx},
+                    new double[]{tpy, tpy, tpy + toothH},
+                    3
+                );
+                // Acento de fio cortante no gume
+                gc.setFill(Color.web("#FFFFFF"));
+                gc.fillPolygon(
+                    new double[]{tpx - 0.4, tpx + 0.4, tpx},
+                    new double[]{tpy, tpy, tpy + toothH},
+                    3
+                );
+            }
+
+            // Placa de pressão circular central (Pedal / Pressure Pan)
+            gc.setFill(Color.web("#1B2631"));
+            gc.fillOval(tx - 4.5, ty - 2.8, 9.0, 5.6);
+            gc.setFill(Color.web("#37474F"));
+            gc.fillOval(tx - 4.0, ty - 2.4, 8.0, 4.8);
+            gc.setFill(Color.web("#607D8B"));
+            gc.fillOval(tx - 3.2, ty - 2.0, 6.4, 3.8);
+
+            // Pino/gatilho de retenção em latão dourado (Brass Trip Dog / Sear)
+            gc.setFill(Color.web("#E65100"));
+            gc.fillRect(tx - 0.8, ty - 3.5, 1.6, 7.0);
+            gc.setFill(Color.web("#FFB300"));
+            gc.fillOval(tx - 1.5, ty - 1.5, 3.0, 3.0);
+            gc.setFill(Color.web("#FFF59D"));
+            gc.fillOval(tx - 0.8, ty - 0.8, 1.6, 1.6);
+
+            // Brilho / Glint metálico sutil intermitente para auxiliar a percepção do jogador atento
+            double phase = (animTime * 1.2 + (trap.getCol() * 0.47 + trap.getRow() * 0.31)) % 2.6;
+            if (phase < 0.35) {
+                double glintNorm = phase / 0.35;
+                double glintAlpha = Math.sin(glintNorm * Math.PI);
+                double glintX = tx - 9.0 + (glintNorm * 18.0);
+                double glintY = ty - 4.0 + (Math.sin(glintNorm * Math.PI) * 1.5);
+
+                gc.setFill(Color.color(1.0, 1.0, 1.0, 0.75 * glintAlpha));
+                gc.fillOval(glintX - 2.0, glintY - 2.0, 4.0, 4.0);
+                gc.setFill(Color.color(0.80, 0.95, 1.0, 0.90 * glintAlpha));
+                gc.fillOval(glintX - 1.0, glintY - 1.0, 2.0, 2.0);
             }
         } else {
-            gc.setStroke(Color.web("#455A64"));
-            gc.setLineWidth(2.8);
-            gc.strokeArc(tx - 7, ty - 9, 14, 13, 30, 120, javafx.scene.shape.ArcType.OPEN);
-            gc.strokeArc(tx - 7, ty - 9, 14, 13, 210, 120, javafx.scene.shape.ArcType.OPEN);
+            // ==================== ARMADILHA DISPARADA (MORDIDA FECHADA) ====================
+            // Mandíbulas travadas verticalmente no ar após o bote mecânico
+            double closeAlpha = Math.max(0.35, 1.0 - (trap.getSprungTimer() / 18.0));
+            gc.save();
+            gc.setGlobalAlpha(closeAlpha);
 
-            gc.setFill(Color.web("#263238"));
-            gc.fillOval(tx - 4, ty - 3, 8, 5);
-            gc.setFill(Color.web("#B0BEC5"));
-            gc.fillRect(tx - 1, ty - 7, 2, 8);
+            // Jaws fechadas (dois arcos semicirculares verticais prensados)
+            gc.setStroke(Color.web("#1A252C"));
+            gc.setLineWidth(3.5);
+            gc.strokeArc(tx - 8, ty - 13.5, 16, 15, 25, 130, javafx.scene.shape.ArcType.OPEN);
+            gc.strokeArc(tx - 8, ty - 13.5, 16, 15, 205, 130, javafx.scene.shape.ArcType.OPEN);
+
+            gc.setStroke(Color.web("#455A64"));
+            gc.setLineWidth(2.2);
+            gc.strokeArc(tx - 8, ty - 13.5, 16, 15, 25, 130, javafx.scene.shape.ArcType.OPEN);
+            gc.strokeArc(tx - 8, ty - 13.5, 16, 15, 205, 130, javafx.scene.shape.ArcType.OPEN);
+
+            // Dentes cruzados entrelaçados no topo
+            gc.setFill(Color.web("#ECEFF1"));
+            for (int i = 0; i < 5; i++) {
+                double dx = -5.0 + i * 2.5;
+                gc.fillPolygon(
+                    new double[]{tx + dx - 1.0, tx + dx + 1.0, tx + dx},
+                    new double[]{ty - 11.5, ty - 11.5, ty - 7.5},
+                    3
+                );
+            }
+
+            // Placa de pressão abaixada e desarmada no solo
+            gc.setFill(Color.web("#212121"));
+            gc.fillOval(tx - 4.5, ty - 2.5, 9.0, 5.0);
+            gc.setFill(Color.web("#37474F"));
+            gc.fillRect(tx - 1.2, ty - 5.5, 2.4, 7.0);
+
+            // Manchas de arranhão / ferrugem pós-impacto
+            gc.setFill(Color.web("#8D6E63"));
+            gc.fillOval(tx - 3.5, ty - 9.0, 2.5, 2.0);
+            gc.fillOval(tx + 2.0, ty - 8.0, 2.0, 2.0);
+
+            gc.restore();
         }
     }
 

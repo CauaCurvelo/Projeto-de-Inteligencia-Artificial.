@@ -199,7 +199,7 @@ public class Renderer {
                 double tx = trap.getX() - camX;
                 double ty = trap.getY() - camY;
                 if (tx >= -25 && tx <= visibleW + 25 && ty >= -25 && ty <= visibleH + 25) {
-                    entityRenderer.drawBearTrap(trap, tx, ty);
+                    entityRenderer.drawBearTrap(trap, tx, ty, animTime);
                 }
             }
         }

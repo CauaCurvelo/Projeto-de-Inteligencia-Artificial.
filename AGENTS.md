@@ -578,8 +578,26 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - Pula cálculo de sombras projetadas solares, renderização de overlays animados de água/grama e gradientes volumétricos pesados de iluminação.
 - **Executável Único Puro Standalone ([packaging/SingleFileBootstrapper.cs](packaging/SingleFileBootstrapper.cs), [scripts/build_release.ps1](scripts/build_release.ps1)):**
   - Implementado bootstrapper nativo em C# compilado com o `csc.exe` nativo do Windows em modo `/target:winexe`.
-  - Empacota o bundle completo (JRE 17 otimizado + binários JavaFX + assets) em um **único arquivo `.exe` de ~28.5 MB** (`dist/InstintoSelvagem.exe`).
+  - Empacota o bundle completo (JRE 17 otimizado + binários JavaFX + assets) em um **único arquivo `.exe` de ~27.2 MB** (`dist/InstintoSelvagem.exe`).
   - Sem assistente de instalação, sem telas de extração, sem janelas de console e sem exigir Java instalado na máquina de quem receber: basta dar dois cliques no `.exe` e o jogo abre imediatamente.
+
+## Feature / Overhaul: Sistema de Armadilhas do Caçador (Bear Traps) & Ecossistema de Caça
+- **Inteligência Tática de Colocação de Armadilhas ([Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java)):**
+  - **Cooldown Inicial Reduzido:** Reduzido de `18.0 - 32.0s` para `2.5 - 6.0s` (`2.5 + rand.nextDouble() * 3.5`), permitindo que caçadores montem armadilhas logo nos primeiros momentos de sua patrulha.
+  - **Colocação Multifásica Orgânica (`tryDeployBearTrap`):**
+    - `PATROL`: Caçador monta armadilhas periódicas em seus pontos de ronda e passagens na floresta com espaçamento de segurança (`minSpacing >= 60.0px`, cooldown de `12-22s`).
+    - `ALERT` / `SUSPICIOUS`: Ao farejar, escutar passos ou desconfiar de aproximação (`canHear` ou `canSee`), o caçador monta uma armadilha tática de emboscada para cobrir seu flanco.
+    - `KITING` (Recuo Tático com Arco): Durante o recuo de feras selvagens agressivas ou da raposa em combate próximo (`< 65px`), o caçador solta uma armadilha imediatamente atrás de si no seu rastro de fuga (`minSpacing >= 42.0px`, cooldown de `8-13s`), neutralizando perseguidores desatentos.
+  - **Limite e Validação:** Teto global expandido de 14 para 48 armadilhas, validação rigorosa de piso caminhável (não água) e verificação anti-empilhamento.
+  - **Feedback Sonoro Espacial:** Disparo sonoro atenuado de estalo mecânico/impacto (`ARROW_THUD`) audível espacialmente no alcance auditivo da raposa ao armar.
+- **Sementeira Inicial e Manutenção Contínua do Ecossistema ([EcosystemSpawner.java](src/main/java/br/edu/unex/sentinela/world/EcosystemSpawner.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - `EcosystemSpawner.spawnInitialTraps(...)`: Popula de 10 a 14 armadilhas pré-colocadas logo no início da partida — 2 armadilhas ao redor do perímetro de cada caçador inicial e 7 a 10 armadilhas espalhadas pelas trilhas de terra e clareiras florestais (a mais de 180px da clareira inicial da raposa).
+  - `World.cleanupDistantEntities(...)`: Limpa armadilhas a mais de 2400px do jogador e aciona `replenishTrapsNearHunters(...)` quando o total de armadilhas cair abaixo de 8, mantendo os territórios de caça sempre perigosos e vivos.
+- **Overhaul Gráfico 2.5D da Armadilha de Urso ([GroundItemRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/GroundItemRenderer.java), [EntityRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/EntityRenderer.java), [Renderer.java](src/main/java/br/edu/unex/sentinela/rendering/Renderer.java)):**
+  - **Dimensão e Oclusão:** Expandida de 18x9px para 26x14px com perspectiva 2.5D, sombra elíptica de contato no solo e chassi com barras de aço forjado (`#1E272C` / `#37474F`), ancoragem transversal e molas de torção laterais.
+  - **Mandíbulas Abertas (Armada):** Aro de mandíbula com contorno espesso de aço temperado e chanfro metálico (`#546E7A` / `#90A4AE`), 8 dentes triangulares proeminentes em aço cromado reluzente (`#ECEFF1` / `#FFFFFF`) com contorno escuro contrastante, placa de pressão central (pedal) e pino/gatilho em latão dourado vibrante (`#FFB300` / `#FFF59D`).
+  - **Glint Metálico Animado (Sheen Specular):** Efeito de brilho de aço periódico que varre os dentes e o pino a cada 2.6s com fase individual por coordenadas de tile, permitindo que jogadores atentos avistem a armadilha mesmo camuflada na relva.
+  - **Mandíbulas Clamped (Disparada):** Quando ativada (`!armed`), as mandíbulas se fecham verticalmente no ar com dentes entrelaçados em mordida agressiva, placa rebaixada e marcas de ferrugem/arranhão com esmaecimento progressivo até expirar.
 
 
 
