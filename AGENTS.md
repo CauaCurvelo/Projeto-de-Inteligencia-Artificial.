@@ -616,6 +616,14 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - **Mestre do Bestiário (`BESTIARY_MASTER`):** "Catalogue e derrote todas as 14 espécies da fauna silvestre, rivais e chefes no Bestiário." Desbloqueada quando todas as 14 criaturas são catalogadas.
   - **Espírito da Floresta (`FOREST_SPIRIT`):** Conquista de Platina Máxima: "Desbloqueie todas as outras conquistas de Instinto Selvagem e alcance a transcendência eterna." Desbloqueada automaticamente quando todas as outras 25 conquistas forem obtidas, com medalhão de coroa dourada radiante (`#FFD700`), som triunfante e aba "Lendária" na galeria.
 
+## Feature: Integração de Conquistas e Bestiário no Menu de Pausa
+- **Acesso In-Game via Pausa ([PauseMenuScreen.java](src/main/java/br/edu/unex/sentinela/ui/PauseMenuScreen.java)):**
+  - Adicionados os botões **`BESTIÁRIO`** (ícone vetorial `BOOK`) e **`CONQUISTAS`** (ícone vetorial `TROPHY`) diretamente no painel suspenso de pausa acionado via tecla `ESC`.
+  - Layout compacto redesenhado em vidro translúcido (largura 350px, espaçamento 9px) com navegação fluida por teclado ou mouse.
+- **Controle de Estado e Retorno Bidirecional ([ScreenManager.java](src/main/java/br/edu/unex/sentinela/ui/ScreenManager.java)):**
+  - Implementada a flag de sessão ativa `matchPaused`: quando o jogador entra no Bestiário ou nas Conquistas durante uma partida pausada, clicar em "Voltar" ou pressionar `ESC` retorna instantaneamente para o menu de pausa suspenso (sem resetar a partida e sem voltar para o Menu Principal).
+  - Preservado o áudio ambiental abafado de pausa e a suspensão dos ticks do mundo de jogo via `isInMatchMenu()`.
+
 
 
 
