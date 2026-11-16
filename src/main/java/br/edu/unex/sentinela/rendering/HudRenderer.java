@@ -261,8 +261,8 @@ public class HudRenderer {
         gc.translate(width, 0);
         gc.scale(uiScale, uiScale);
 
-        double rightW = 235;
-        double rightH = 92;
+        double rightW = 252;
+        double rightH = 112;
         double rightX = -rightW - 18;
         double rightY = 16;
 
@@ -275,37 +275,50 @@ public class HudRenderer {
         double statRowY = rightY + 21;
         // Badge Tempo
         gc.setFill(Color.web("#090D12", 0.75));
-        gc.fillRoundRect(rightX + 10, rightY + 9, 104, 25, 8, 8);
+        gc.fillRoundRect(rightX + 10, rightY + 9, 110, 25, 8, 8);
         gc.setFill(Color.web("#4FC3F7"));
-        gc.fillOval(rightX + 17, statRowY - 6, 12, 12);
+        gc.fillOval(rightX + 18, statRowY - 6, 12, 12);
         gc.setStroke(Color.web("#090D12"));
         gc.setLineWidth(1.5);
-        gc.strokeLine(rightX + 23, statRowY - 4, rightX + 23, statRowY);
-        gc.strokeLine(rightX + 23, statRowY, rightX + 26, statRowY);
+        gc.strokeLine(rightX + 24, statRowY - 4, rightX + 24, statRowY);
+        gc.strokeLine(rightX + 24, statRowY, rightX + 27, statRowY);
 
-        iconDrawer.drawStyledText(String.format("%02d:%02d", mins, secs), rightX + 68, statRowY,
+        iconDrawer.drawStyledText(String.format("%02d:%02d", mins, secs), rightX + 70, statRowY,
                 statValueFont, Color.web("#E1F5FE"), Color.BLACK, 2.6, TextAlignment.CENTER);
 
         // Badge Abates com Caveira
         gc.setFill(Color.web("#090D12", 0.75));
-        gc.fillRoundRect(rightX + 120, rightY + 9, 105, 25, 8, 8);
-        iconDrawer.drawSkullIcon(rightX + 135, statRowY, 16, Color.web("#FF5252"));
-        iconDrawer.drawStyledText(world.getEnemiesDefeated() + " ABATES", rightX + 182, statRowY,
+        gc.fillRoundRect(rightX + 128, rightY + 9, 114, 25, 8, 8);
+        iconDrawer.drawSkullIcon(rightX + 144, statRowY, 16, Color.web("#FF5252"));
+        iconDrawer.drawStyledText(world.getEnemiesDefeated() + " ABATES", rightX + 192, statRowY,
                  labelFont, Color.web("#FF8A80"), Color.BLACK, 2.6, TextAlignment.CENTER);
 
-        // Bloco 2: Teclas de Comando Desenhadas (Keycaps)
-        double keyRow1Y = rightY + 42;
-        iconDrawer.drawKeycap("ESPAÇO", rightX + 12, keyRow1Y, 54, 18, keycapFont);
-        iconDrawer.drawStyledText("Morder / Atacar", rightX + 74, keyRow1Y + 9,
+        // Bloco 2: Teclas de Comando Desenhadas (Keycaps em Grade 2 Colunas x 3 Linhas)
+        double keyRow1Y = rightY + 41;
+        iconDrawer.drawKeycap("WASD", rightX + 12, keyRow1Y, 44, 18, keycapFont);
+        iconDrawer.drawStyledText("Mover", rightX + 62, keyRow1Y + 9,
                 hintTextFont, Color.web("#ECEFF1"), Color.BLACK, 2.2, TextAlignment.LEFT);
 
-        double keyRow2Y = rightY + 66;
-        iconDrawer.drawKeycap("H", rightX + 12, keyRow2Y, 24, 18, keycapFont);
-        iconDrawer.drawStyledText("Auras", rightX + 42, keyRow2Y + 9,
+        iconDrawer.drawKeycap("SHIFT", rightX + 130, keyRow1Y, 44, 18, keycapFont);
+        iconDrawer.drawStyledText("Correr", rightX + 180, keyRow1Y + 9,
+                hintTextFont, Color.web("#ECEFF1"), Color.BLACK, 2.2, TextAlignment.LEFT);
+
+        double keyRow2Y = rightY + 64;
+        iconDrawer.drawKeycap("ESPAÇO", rightX + 12, keyRow2Y, 52, 18, keycapFont);
+        iconDrawer.drawStyledText("Atacar", rightX + 70, keyRow2Y + 9,
+                hintTextFont, Color.web("#ECEFF1"), Color.BLACK, 2.2, TextAlignment.LEFT);
+
+        iconDrawer.drawKeycap("ESC", rightX + 130, keyRow2Y, 32, 18, keycapFont);
+        iconDrawer.drawStyledText("Pausa", rightX + 168, keyRow2Y + 9,
+                hintTextFont, Color.web("#ECEFF1"), Color.BLACK, 2.2, TextAlignment.LEFT);
+
+        double keyRow3Y = rightY + 87;
+        iconDrawer.drawKeycap("H", rightX + 12, keyRow3Y, 22, 18, keycapFont);
+        iconDrawer.drawStyledText("Auras", rightX + 40, keyRow3Y + 9,
                 hintTextFont, Color.web("#B0BEC5"), Color.BLACK, 2.2, TextAlignment.LEFT);
 
-        iconDrawer.drawKeycap("+ / -", rightX + 92, keyRow2Y, 36, 18, keycapFont);
-        iconDrawer.drawStyledText("Zoom Câmera", rightX + 134, keyRow2Y + 9,
+        iconDrawer.drawKeycap("+ / -", rightX + 130, keyRow3Y, 34, 18, keycapFont);
+        iconDrawer.drawStyledText("Zoom", rightX + 170, keyRow3Y + 9,
                 hintTextFont, Color.web("#B0BEC5"), Color.BLACK, 2.2, TextAlignment.LEFT);
 
         gc.restore();

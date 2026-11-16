@@ -648,14 +648,13 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - Tratamento idêntico aplicado para inimigos em [Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java) com `enemy.trapImmobilize(3.5, trap.getX(), trap.getY())`, garantindo que animais também fiquem fisicamente presos nas garras da armadilha em vez de serem arremessados para longe.
 - **Feedback Visual e HUD ([HudRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/HudRenderer.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
   - A armadilha ao disparar aciona tremor de tela (`camera.triggerShake(5.0, 0.22)`), partículas de faíscas metálicas e o HUD exibe o status de alerta luminoso `PRESO EM ARMADILHA!` em vermelho carmesim vibrante.
-  - **Game Over Garantido ao Morrer para Armadilha ou Raio ([World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):** Corrigido o bug em que o jogador com 1 coração ao pisar em uma armadilha de urso (ou ser atingido por raio) ficava com 0 corações e continuava jogando como um "fantasma invulnerável" porque não havia chamada a `triggerGameOver`. Agora aciona Game Over imediato com causa personalizada (*"A armadilha de urso do caçador o subjugou fatalmente!"*) e inclui uma trava universal definitiva de segurança no final do loop do mundo.
-
-
-
-
-
-
-
-
-
+  ## Polish: Painel Completo de Controles no HUD Superior Direito ([HudRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/HudRenderer.java))
+- **Interface e Simetria Visual:**
+  - O painel superior direito foi expandido para `rightW = 252` e `rightH = 112`, alinhando perfeitamente a altura e simetria com o painel superior esquerdo do jogador (`panelH = 112`).
+  - O cabeçalho mantém os mostradores estilizados de Tempo de Sobrevivência (`00:00`) com relógio circular azul e contador de Abates (`0 ABATES`) com caveira rubi.
+- **Grade Completa de Controles Físicos (Keycaps 2x3):**
+  - **Linha 1:** `WASD` (Mover) e `SHIFT` (Correr / Sprint).
+  - **Linha 2:** `ESPAÇO` (Atacar / Morder) e `ESC` (Pausa / Menu de Pausa).
+  - **Linha 3:** `H` (Auras Táticas / Visão) e `+ / -` (Zoom da Câmera).
+  - Hierarquia tipográfica com fontes contrastantes: comandos primários de locomoção e combate em branco prateado reluzente (`#ECEFF1`) e atalhos auxiliares em cinza suave (`#B0BEC5`).
 
