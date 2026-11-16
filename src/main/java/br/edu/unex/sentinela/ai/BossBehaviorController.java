@@ -26,6 +26,8 @@ public class BossBehaviorController {
     private boolean engagedInCombat = false;
     private double retreatReaggroCooldown = 0.0;
     private double provokedTimer = 0.0;
+    private Enemy lastAttackerMob = null;
+    private double provokedMobTimer = 0.0;
 
     private double roarTimer = 0.0;
     private double roarTotalDuration = 0.5;
@@ -62,9 +64,14 @@ public class BossBehaviorController {
     public void tickTimers(double deltaTime, int hp, int maxHp, boolean isWindup, double windupLeft, boolean isLunging) {
         if (retreatReaggroCooldown > 0) retreatReaggroCooldown = Math.max(0.0, retreatReaggroCooldown - deltaTime);
         if (provokedTimer > 0) provokedTimer = Math.max(0.0, provokedTimer - deltaTime);
+        if (provokedMobTimer > 0) provokedMobTimer = Math.max(0.0, provokedMobTimer - deltaTime);
         if (specialCooldownTimer > 0) specialCooldownTimer = Math.max(0.0, specialCooldownTimer - deltaTime);
         if (roarTimer > 0) roarTimer = Math.max(0.0, roarTimer - deltaTime);
         if (secondSlashTimer > 0) secondSlashTimer = Math.max(0.0, secondSlashTimer - deltaTime);
+
+        if (lastAttackerMob != null && (lastAttackerMob.getHp() <= 0 || provokedMobTimer <= 0)) {
+            lastAttackerMob = null;
+        }
 
         this.windupRemaining = isWindup ? windupLeft : 0.0;
         if (isLunging) {
@@ -75,6 +82,30 @@ public class BossBehaviorController {
 
         if (!enraged && hp > 0 && hp <= Math.max(1, (int) Math.floor(maxHp * 0.5))) {
             this.enraged = true;
+        }
+    }
+
+    /** Notifica provocação com identificação de atacante (jogador ou mob rival/caçador). */
+    public void onDamagedBy(int hp, int maxHp, Enemy attacker, double attackerX, double attackerY, double selfX, double selfY) {
+        if (attacker != null && attacker.getHp() > 0) {
+            this.lastAttackerMob = attacker;
+            this.provokedMobTimer = 6.0;
+            this.retreating = false;
+            this.retreatReaggroCooldown = 0.0;
+            this.engagedInCombat = true;
+            if (hp > 0 && hp <= Math.max(1, (int) Math.floor(maxHp * 0.5))) {
+                this.enraged = true;
+                if (!rageRoarTriggered) {
+                    this.rageRoarTriggered = true;
+                    startRoar(archetype.getRoarDuration() * 1.15, attackerX, attackerY);
+                }
+            }
+            double distHome = Math.hypot(selfX - homeX, selfY - homeY);
+            if (distHome < archetype.getLeashRadius() * 1.20) {
+                this.retreating = false;
+            }
+        } else {
+            onDamaged(hp, maxHp, attackerX, attackerY, selfX, selfY);
         }
     }
 
@@ -105,18 +136,24 @@ public class BossBehaviorController {
 
         if (enraged && !rageRoarTriggered) {
             rageRoarTriggered = true;
-            startRoar(archetype.getRoarDuration() * 1.15, player.getX(), player.getY());
-            double targetAngle = Math.atan2(player.getY() - self.getY(), player.getX() - self.getX());
+            double roarX = (lastAttackerMob != null && lastAttackerMob.getHp() > 0) ? lastAttackerMob.getX() : player.getX();
+            double roarY = (lastAttackerMob != null && lastAttackerMob.getHp() > 0) ? lastAttackerMob.getY() : player.getY();
+            startRoar(archetype.getRoarDuration() * 1.15, roarX, roarY);
+            double targetAngle = Math.atan2(roarY - self.getY(), roarX - self.getX());
             return BossTickDecision.roar(targetAngle);
         }
 
         double distHome = Math.hypot(self.getX() - homeX, self.getY() - homeY);
         double playerDistHome = Math.hypot(player.getX() - homeX, player.getY() - homeY);
         double distToPlayer = Math.hypot(player.getX() - self.getX(), player.getY() - self.getY());
-        boolean wasHostile = engagedInCombat || self.getState() == AIState.CHASE || self.getState() == AIState.ROARING;
+        boolean wasHostile = engagedInCombat || self.getState() == AIState.CHASE || self.getState() == AIState.ROARING || self.getState() == AIState.FIGHTING_ENEMY;
 
-        boolean brokeLeash = distHome > archetype.getLeashRadius() && playerDistHome > archetype.getLeashRadius() * 1.02;
-        boolean targetHidOutsideCore = wasHostile && player.isBurrowed() && distHome > archetype.getTerritoryRadius() * 0.65;
+        // Limite de perseguição estendido caso um inimigo (ex: caçador) esteja atacando o chefe de fora do núcleo
+        boolean hasActiveMobAttacker = (lastAttackerMob != null && lastAttackerMob.getHp() > 0 && provokedMobTimer > 0);
+        double effectiveLeash = archetype.getLeashRadius() * (hasActiveMobAttacker ? 1.45 : 1.0);
+
+        boolean brokeLeash = distHome > effectiveLeash && playerDistHome > archetype.getLeashRadius() * 1.02;
+        boolean targetHidOutsideCore = wasHostile && player.isBurrowed() && distHome > archetype.getTerritoryRadius() * 0.65 && !hasActiveMobAttacker;
         if (!retreating && (brokeLeash || targetHidOutsideCore)) {
             enterRetreatState(self);
         }
@@ -126,7 +163,7 @@ public class BossBehaviorController {
             if (distHome <= archetype.getTerritoryRadius() * 0.45) {
                 retreating = false;
                 engagedInCombat = false;
-            } else if ((provokedTimer > 0 || enteredCore) && retreatReaggroCooldown <= 0.0 && distHome < archetype.getLeashRadius() * 0.88) {
+            } else if ((provokedTimer > 0 || enteredCore || hasActiveMobAttacker) && retreatReaggroCooldown <= 0.0 && distHome < archetype.getLeashRadius() * 0.95) {
                 retreating = false;
             } else {
                 int homeCol = (int) Math.floor(homeX / TileMap.TILE_SIZE);
@@ -135,6 +172,18 @@ public class BossBehaviorController {
             }
         }
 
+        // 1. Prioridade Absoluta: Contra-ataque no inimigo que atacou ou atirou contra o chefe
+        if (hasActiveMobAttacker) {
+            double attackerHomeDist = Math.hypot(lastAttackerMob.getX() - homeX, lastAttackerMob.getY() - homeY);
+            if (attackerHomeDist <= archetype.getLeashRadius() * 1.45) {
+                engagedInCombat = true;
+                int aCol = (int) Math.floor(lastAttackerMob.getX() / TileMap.TILE_SIZE);
+                int aRow = (int) Math.floor(lastAttackerMob.getY() / TileMap.TILE_SIZE);
+                return BossTickDecision.fightingEnemy(lastAttackerMob, aCol, aRow);
+            }
+        }
+
+        // 2. Ameaça do Jogador no domínio
         boolean insideTerritory = playerDistHome <= archetype.getTerritoryRadius() * 1.08;
         boolean insideLeashWhileChasing = wasHostile && playerDistHome <= archetype.getLeashRadius();
         boolean closeAggro = distToPlayer <= archetype.getAggroRadius() && distHome <= archetype.getLeashRadius() && retreatReaggroCooldown <= 0;
@@ -153,8 +202,9 @@ public class BossBehaviorController {
             return BossTickDecision.moveTo(AIState.CHASE, pCol, pRow);
         }
 
+        // 3. Feras e Inimigos Rivais nas imediações do território
         engagedInCombat = false;
-        Enemy rival = findNearbyRival(self, allEnemies);
+        Enemy rival = findNearbyRival(self, allEnemies, tileMap);
         if (rival != null) {
             int rCol = (int) Math.floor(rival.getX() / TileMap.TILE_SIZE);
             int rRow = (int) Math.floor(rival.getY() / TileMap.TILE_SIZE);
@@ -190,16 +240,16 @@ public class BossBehaviorController {
         return null;
     }
 
-    /** Tenta iniciar o ataque primário ou especial apropriado à distância e linha de visão atual. */
-    public BossAttackType selectAttackForPlayer(Enemy self, Player player, TileMap tileMap, double distToPlayer) {
+    /** Tenta iniciar o ataque primário ou especial apropriado contra um alvo específico (jogador ou mob rival). */
+    public BossAttackType selectAttackForTarget(Enemy self, double targetX, double targetY, double distToTarget, TileMap tileMap) {
         if (retreating || roarTimer > 0 || self.isWindup() || self.isLunging() || self.getAttackCooldown() > 0) {
             return null;
         }
 
         BossAttackType special = archetype.getSpecialAttack();
-        if (specialCooldownTimer <= 0 && distToPlayer <= special.getTriggerRange() && distToPlayer >= archetype.getSpecialMinRange()) {
+        if (specialCooldownTimer <= 0 && distToTarget <= special.getTriggerRange() && distToTarget >= archetype.getSpecialMinRange()) {
             boolean corridorClear = special != BossAttackType.PANTHER_SHADOW_POUNCE
-                    || Pathfinder.hasClearWorldCorridor(tileMap, self.getX(), self.getY(), player.getX(), player.getY(), false);
+                    || Pathfinder.hasClearWorldCorridor(tileMap, self.getX(), self.getY(), targetX, targetY, false);
             if (corridorClear) {
                 specialCooldownTimer = archetype.getSpecialCooldown() * (enraged ? 0.78 : 1.0);
                 prepareAttackState(special);
@@ -208,11 +258,16 @@ public class BossBehaviorController {
         }
 
         BossAttackType primary = archetype.getPrimaryAttack();
-        if (distToPlayer <= primary.getTriggerRange()) {
+        if (distToTarget <= primary.getTriggerRange()) {
             prepareAttackState(primary);
             return primary;
         }
         return null;
+    }
+
+    /** Tenta iniciar o ataque primário ou especial apropriado à distância e linha de visão atual do jogador. */
+    public BossAttackType selectAttackForPlayer(Enemy self, Player player, TileMap tileMap, double distToPlayer) {
+        return selectAttackForTarget(self, player.getX(), player.getY(), distToPlayer, tileMap);
     }
 
     /** Prepara duração ajustada do windup (ligeiramente mais ágil em estado de fúria). */
@@ -277,20 +332,41 @@ public class BossBehaviorController {
         self.cancelActiveAttackForRetreat();
     }
 
-    private Enemy findNearbyRival(Enemy self, List<Enemy> allEnemies) {
-        Enemy nearest = null;
-        double minEnemyDist = 220.0;
+    private Enemy findNearbyRival(Enemy self, List<Enemy> allEnemies, TileMap tileMap) {
+        Enemy bestCandidate = null;
+        double bestScore = Double.MAX_VALUE;
+        double maxDetectDist = 340.0;
+
         for (Enemy other : allEnemies) {
-            if (other != self && other.getHp() > 0 && other.getType() != EnemyType.BEAR_BOSS) {
-                double d = Math.hypot(other.getX() - self.getX(), other.getY() - self.getY());
-                double otherHomeDist = Math.hypot(other.getX() - homeX, other.getY() - homeY);
-                if (d < minEnemyDist && otherHomeDist <= archetype.getLeashRadius() * 0.90) {
-                    minEnemyDist = d;
-                    nearest = other;
-                }
+            if (other == self || other.getHp() <= 0 || other.getType() == EnemyType.BEAR_BOSS) continue;
+
+            double d = Math.hypot(other.getX() - self.getX(), other.getY() - self.getY());
+            double otherHomeDist = Math.hypot(other.getX() - homeX, other.getY() - homeY);
+
+            // Permite engajar inimigos dentro do domínio ou nas bordas externas de patrulha
+            if (otherHomeDist > archetype.getLeashRadius() * 1.15) continue;
+
+            boolean hasLos = tileMap != null && tileMap.hasLineOfSight(self.getX(), self.getY(), other.getX(), other.getY());
+            double effectiveRange = hasLos ? maxDetectDist : (maxDetectDist * 0.72);
+            if (d > effectiveRange) continue;
+
+            // Prioriza caçadores mirando/atirando e inimigos agressivos
+            double threatWeight = 1.0;
+            if (other.getType() == EnemyType.HUNTER) {
+                threatWeight = 0.55;
+            } else if (other.getState() == AIState.AIMING || other.getState() == AIState.KITING || other.getState() == AIState.FIGHTING_ENEMY) {
+                threatWeight = 0.65;
+            } else if (other.getState() == AIState.CHASE) {
+                threatWeight = 0.75;
+            }
+
+            double score = d * threatWeight;
+            if (score < bestScore) {
+                bestScore = score;
+                bestCandidate = other;
             }
         }
-        return nearest;
+        return bestCandidate;
     }
 
     // --- Telemetria de Expressão & Animação para Renderizadores ---
@@ -377,6 +453,8 @@ public class BossBehaviorController {
     public boolean isHitLandedSecond() { return hitLandedSecond; }
     public void markHitLandedSecond() { this.hitLandedSecond = true; }
     public boolean isSecondSlashWindowReady() { return secondSlashTimer <= 0; }
+    public Enemy getLastAttackerMob() { return lastAttackerMob; }
+    public boolean isProvokedByMob() { return lastAttackerMob != null && provokedMobTimer > 0; }
 
     /** Resultado compacto da avaliação de turno do comportamento do chefe. */
     public static final class BossTickDecision {

@@ -342,11 +342,28 @@ public class Enemy {
             requestPath(tileMap, curCol, curRow, decision.targetCol, decision.targetRow, false);
         } else if (decision.state == AIState.FIGHTING_ENEMY && decision.rivalTarget != null) {
             patrolPauseTimer = 0;
+            Enemy rival = decision.rivalTarget;
             requestPath(tileMap, curCol, curRow, decision.targetCol, decision.targetRow, false);
-            double distRival = Math.hypot(decision.rivalTarget.getX() - x, decision.rivalTarget.getY() - y);
-            if (distRival < 34.0 && attackCooldown <= 0) {
-                decision.rivalTarget.takeDamage(2, x, y);
-                attackCooldown = 0.9;
+            double distRival = Math.hypot(rival.getX() - x, rival.getY() - y);
+
+            // Gira o chefe suavemente para encarar o alvo inimigo
+            double targetAngle = Math.atan2(rival.getY() - y, rival.getX() - x);
+            this.faceAngle = lerpAngle(this.faceAngle, targetAngle, Math.min(1.0, deltaTime * 12.0));
+
+            // Tenta engajar com ataque do arquétipo (windup + bote com patada sísmica/garras/mordida)
+            if (bossController != null && attackCooldown <= 0 && !isWindup() && !isLunging()) {
+                BossAttackType chosen = bossController.selectAttackForTarget(this, rival.getX(), rival.getY(), distRival, tileMap);
+                if (chosen != null) {
+                    startBossAttackWindup(rival.getX(), rival.getY(), bossController.getScaledWindupDuration(chosen));
+                }
+            }
+
+            // Golpe de contato corpo a corpo direto com alcance físico realista do chefe
+            if (distRival <= 56.0 && attackCooldown <= 0 && !isWindup() && !isLunging()) {
+                rival.takeDamageFrom(2, this, x, y);
+                rival.applyKnockback(x, y, 220.0);
+                this.attackCooldown = 0.95;
+                br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.85, 0, 1.1);
             }
         } else {
             if (isPathFinished()) {
@@ -445,7 +462,7 @@ public class Enemy {
                 state = AIState.AIMING;
                 faceAngle = lerpAngle(faceAngle, Math.atan2(targetAimY - y, targetAimX - x), 0.25);
                 if (shootCooldown <= 0) {
-                    projectiles.add(new Projectile(x, y, threateningBeast.getX(), threateningBeast.getY()));
+                    projectiles.add(new Projectile(this, x, y, threateningBeast.getX(), threateningBeast.getY()));
                     shootCooldown = 1.65;
                 }
             }
@@ -490,7 +507,7 @@ public class Enemy {
                         }
                     }
                     if (distToPlayer >= 30.0 && shootCooldown <= 0 && tileMap.hasLineOfSight(x, y, player.getX(), player.getY())) {
-                        projectiles.add(new Projectile(x, y, player.getX(), player.getY()));
+                        projectiles.add(new Projectile(this, x, y, player.getX(), player.getY()));
                         shootCooldown = 1.65;
                     }
                 } else if (distToPlayer < 245.0) {
@@ -498,7 +515,7 @@ public class Enemy {
                     double aimAngle = Math.atan2(player.getY() - y, player.getX() - x);
                     faceAngle = lerpAngle(faceAngle, aimAngle, 0.25);
                     if (shootCooldown <= 0) {
-                        projectiles.add(new Projectile(x, y, player.getX(), player.getY()));
+                        projectiles.add(new Projectile(this, x, y, player.getX(), player.getY()));
                         shootCooldown = 1.75;
                     }
                 } else {
@@ -520,7 +537,7 @@ public class Enemy {
             }
 
             if (tileMap.hasLineOfSight(x, y, targetAimX, targetAimY) && shootCooldown <= 0 && distToPlayer < 240.0) {
-                projectiles.add(new Projectile(x, y, targetAimX, targetAimY));
+                projectiles.add(new Projectile(this, x, y, targetAimX, targetAimY));
                 shootCooldown = 1.85;
             }
         } else if (canHear) {
@@ -584,7 +601,7 @@ public class Enemy {
                         requestPath(tileMap, curCol, curRow, wCol, wRow, false);
                         if (distToWolf <= 38.0 && attackCooldown <= 0) {
                             attackCooldown = 1.15;
-                            other.takeDamage(1, x, y);
+                            other.takeDamageFrom(1, this, x, y);
                             br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.DOG_BARK, 0.80, 0, 1.25);
                             notifyHuntersInRadius(allEnemies, x, y, 440.0, tileMap);
                         }
@@ -843,7 +860,7 @@ public class Enemy {
 
                     if (distFaction <= 38.0 && attackCooldown <= 0) {
                         attackCooldown = 1.20;
-                        other.takeDamage(1, x, y);
+                        other.takeDamageFrom(1, this, x, y);
                         br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.WOLF_SNARL, 0.80, 0, 1.0);
                     }
                     return;
@@ -1340,7 +1357,7 @@ public class Enemy {
                tileMap.isWalkable(cx + r, cy + r);
     }
 
-    public boolean takeDamage(int amount, double fromX, double fromY) {
+    public boolean takeDamageFrom(int amount, Enemy attacker, double fromX, double fromY) {
         this.hp -= amount;
         this.damageFlashTimer = 0.22;
 
@@ -1394,7 +1411,7 @@ public class Enemy {
         }
 
         if (bossController != null) {
-            bossController.onDamaged(hp, maxHp, fromX, fromY, x, y);
+            bossController.onDamagedBy(hp, maxHp, attacker, fromX, fromY, x, y);
         }
 
         double dx = x - fromX;
@@ -1406,6 +1423,20 @@ public class Enemy {
             this.knockbackVy = (dy / dist) * knockForce;
         }
         return hp <= 0;
+    }
+
+    public boolean takeDamage(int amount, double fromX, double fromY) {
+        return takeDamageFrom(amount, null, fromX, fromY);
+    }
+
+    public void applyKnockback(double fromX, double fromY, double force) {
+        double dx = x - fromX;
+        double dy = y - fromY;
+        double dist = Math.hypot(dx, dy);
+        if (dist > 0.001) {
+            this.knockbackVx = (dx / dist) * force;
+            this.knockbackVy = (dy / dist) * force;
+        }
     }
 
     public boolean takeDamage(int amount) {

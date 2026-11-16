@@ -27,9 +27,12 @@ public final class MobSteeringHelper {
         for (Enemy other : allEnemies) {
             if (other == self || other.getHp() <= 0) continue;
 
-            // Não aplica repulsão entre combatentes rivais em combate territorial (Lobo x Cão)
+            // Não aplica repulsão entre combatentes em duelo territorial (Lobo x Cão ou Chefe x Inimigo)
+            boolean isBossFight = (self.getType() == EnemyType.BEAR_BOSS || other.getType() == EnemyType.BEAR_BOSS)
+                               && (self.getState() == AIState.FIGHTING_ENEMY || other.getState() == AIState.FIGHTING_ENEMY);
             boolean isRivalFight = (self.getSkin() == EnemySkin.WOLF && other.getType() == EnemyType.HOUND)
-                                || (self.getType() == EnemyType.HOUND && other.getSkin() == EnemySkin.WOLF);
+                                || (self.getType() == EnemyType.HOUND && other.getSkin() == EnemySkin.WOLF)
+                                || isBossFight;
             if (isRivalFight && (self.getState() == AIState.FIGHTING_ENEMY || other.getState() == AIState.FIGHTING_ENEMY)) {
                 continue;
             }

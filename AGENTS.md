@@ -624,6 +624,22 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - Implementada a flag de sessão ativa `matchPaused`: quando o jogador entra no Bestiário ou nas Conquistas durante uma partida pausada, clicar em "Voltar" ou pressionar `ESC` retorna instantaneamente para o menu de pausa suspenso (sem resetar a partida e sem voltar para o Menu Principal).
   - Preservado o áudio ambiental abafado de pausa e a suspensão dos ticks do mundo de jogo via `isInMatchMenu()`.
 
+## Bugfix & Overhaul: IA e Combate de Chefes Alfa Contra Mobs e Atiradores ([BossBehaviorController.java](src/main/java/br/edu/unex/sentinela/ai/BossBehaviorController.java), [BossCombatExecutor.java](src/main/java/br/edu/unex/sentinela/ai/BossCombatExecutor.java), [Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java), [Projectile.java](src/main/java/br/edu/unex/sentinela/world/Projectile.java), [MobSteeringHelper.java](src/main/java/br/edu/unex/sentinela/ai/MobSteeringHelper.java))
+- **Retaliação Contra Atiradores e Sniper Kiting ([BossBehaviorController.java](src/main/java/br/edu/unex/sentinela/ai/BossBehaviorController.java), [Projectile.java](src/main/java/br/edu/unex/sentinela/world/Projectile.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - Projéteis agora registram o atirador original (`shooter`), permitindo que flechas de caçadores identifiquem a fonte do dano.
+  - Criado o método `onDamagedBy(..., Enemy attacker, ...)` no controlador do chefe: ao levar dano de um caçador ou fera rival, o chefe foca o atacante com prioridade absoluta por 6 segundos (`provokedMobTimer = 6.0s`), impedindo confusão com o jogador e eliminando o travamento onde o chefe levava flechadas sem reagir.
+  - Implementado **Leash Estendido Dinâmico (`1.45x`)** para contra-ataques: caso um caçador fique atirando da borda externa ou kiting, o chefe estende seu limite territorial para caçar e neutralizar o atirador em vez de entrar em loop infinito de recuo desarmado.
+  - Raio de detecção de flechas em chefes ampliado para 34px em `World.java`, garantindo acerto preciso de projéteis em hitboxes volumosas.
+- **Detecção Territorial e Ponderação de Ameaças ([BossBehaviorController.java](src/main/java/br/edu/unex/sentinela/ai/BossBehaviorController.java)):**
+  - Raio de busca de rivais ampliado de 220px para até 340px com linha de visão.
+  - Ponderação inteligente de ameaça (`threatWeight`): caçadores armados recebem multiplicador `0.55x` (máxima prioridade de neutralização) e inimigos em postura de combate/mira recebem `0.65x`.
+- **Ataques, Telégrafos e Animações de Chefe Contra Mobs ([BossBehaviorController.java](src/main/java/br/edu/unex/sentinela/ai/BossBehaviorController.java), [Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java)):**
+  - Corrigido o bug crítico onde a distância de golpe contra rivais em `Enemy.java` exigia `distRival < 34.0` (impossível de atingir devido à soma dos raios de colisão e repulsão física). Alcance corrigido para `56.0px` com orientação angular suave (`faceAngle`) para encarar o alvo.
+  - O chefe agora utiliza seu toolkit completo de ataques (`selectAttackForTarget`): inicia preparação (windup), executa o bote/lunge com impulso físico, partículas e tremor de tela, e desfere patadas sísmicas, giros da morte ou botes predatórios contra feras e caçadores.
+- **Dano Colateral em Área e Neutralização de Conflito ([BossCombatExecutor.java](src/main/java/br/edu/unex/sentinela/ai/BossCombatExecutor.java), [MobSteeringHelper.java](src/main/java/br/edu/unex/sentinela/ai/MobSteeringHelper.java)):**
+  - `BossCombatExecutor.processBossCombat` agora avalia todos os inimigos da vizinhança dentro da hitbox do golpe do chefe (`isTargetInsideAttackHitbox`). Golpes em área (como a Patada Sísmica do Urso ou Impacto Glacial) atingem simultaneamente o jogador e qualquer mob próximo, aplicando 2 a 3 pontos de dano e impulso de recuo massivo.
+  - `MobSteeringHelper.computeSeparationForce` isenta forças excessivas de repulsão entre chefes e alvos em `FIGHTING_ENEMY`, permitindo que cheguem à distância física de golpe corpo a corpo sem emperrar.
+
 
 
 

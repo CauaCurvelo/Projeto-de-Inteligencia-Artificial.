@@ -20,11 +20,11 @@ public final class BossCombatExecutor {
     private BossCombatExecutor() {}
 
     /**
-     * Avalia preparação de ataque, efeitos visuais e colisão de golpe de um Chefe contra a Raposa.
+     * Avalia preparação de ataque, efeitos visuais e colisão de golpe de um Chefe contra a Raposa e outros mobs.
      *
      * @return mensagem de derrota caso o jogador chegue a 0 vidas neste ataque, ou null caso contrário.
      */
-    public static String processBossCombat(Enemy boss, Player player, List<Particle> particles,
+    public static String processBossCombat(Enemy boss, Player player, List<Enemy> allEnemies, List<Particle> particles,
                                            Camera camera, TileMap tileMap, double distToPlayer) {
         BossBehaviorController ctrl = boss.getBossController();
         if (ctrl == null || boss.getHp() <= 0) return null;
@@ -37,9 +37,12 @@ public final class BossCombatExecutor {
         }
 
         if (!ctrl.isRetreating() && !ctrl.isRoaring()) {
-            BossAttackType chosen = ctrl.selectAttackForPlayer(boss, player, tileMap, distToPlayer);
-            if (chosen != null) {
-                boss.startBossAttackWindup(player.getX(), player.getY(), ctrl.getScaledWindupDuration(chosen));
+            // Se o chefe estiver perseguindo o jogador, avalia ataque contra ele
+            if (boss.getState() == AIState.CHASE && distToPlayer < 260.0) {
+                BossAttackType chosen = ctrl.selectAttackForPlayer(boss, player, tileMap, distToPlayer);
+                if (chosen != null) {
+                    boss.startBossAttackWindup(player.getX(), player.getY(), ctrl.getScaledWindupDuration(chosen));
+                }
             }
         }
 
@@ -64,25 +67,51 @@ public final class BossCombatExecutor {
             return null;
         }
 
-        if (!isPlayerInsideAttackHitbox(boss, player, atk, distToPlayer)) {
-            return null;
+        boolean hitLandedOnAny = false;
+        String gameOverReason = null;
+
+        // 1. Conexão física do golpe com a Raposa (Player)
+        if (isPlayerInsideAttackHitbox(boss, player, atk, distToPlayer)) {
+            boolean struck = player.takeDamage(boss.getX(), boss.getY(), atk.getPlayerKnockback());
+            if (struck) {
+                hitLandedOnAny = true;
+                spawnHitSparks(player.getX(), player.getY(), ctrl.getArchetype().getParticleColorHex(), 13, particles);
+                if (GameSettings.get().isScreenShake()) {
+                    camera.triggerShake(5.0, 0.20);
+                }
+                if (player.getLives() <= 0) {
+                    gameOverReason = boss.getSkin().getDisplayName() + " o subjugou com " + atk.getDisplayName() + "!";
+                }
+            }
         }
 
-        boolean struck = player.takeDamage(boss.getX(), boss.getY(), atk.getPlayerKnockback());
-        if (!struck) {
-            return null;
+        // 2. Conexão física de área com outros Inimigos/Fauna hostil
+        if (allEnemies != null) {
+            for (Enemy other : allEnemies) {
+                if (other == boss || other.getHp() <= 0 || other.getType() == EnemyType.BEAR_BOSS) continue;
+                double distOther = Math.hypot(other.getX() - boss.getX(), other.getY() - boss.getY());
+                if (isTargetInsideAttackHitbox(boss, other.getX(), other.getY(), atk, distOther)) {
+                    int damage = (atk.isAreaAttack() || atk.isDoubleHit()) ? 3 : 2;
+                    other.takeDamageFrom(damage, boss, boss.getX(), boss.getY());
+                    double knock = atk.getPlayerKnockback() * 0.90;
+                    other.applyKnockback(boss.getX(), boss.getY(), knock);
+                    hitLandedOnAny = true;
+                    spawnHitSparks(other.getX(), other.getY(), "#E53935", 8, particles);
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.85, 0, 1.05);
+                }
+            }
         }
 
-        markHitExecuted(ctrl, atk);
-        spawnHitSparks(player, ctrl.getArchetype().getParticleColorHex(), 13, particles);
-        if (GameSettings.get().isScreenShake()) {
-            camera.triggerShake(5.0, 0.20);
+        if (hitLandedOnAny) {
+            markHitExecuted(ctrl, atk);
         }
 
-        if (player.getLives() <= 0) {
-            return boss.getSkin().getDisplayName() + " o subjugou com " + atk.getDisplayName() + "!";
-        }
-        return null;
+        return gameOverReason;
+    }
+
+    public static String processBossCombat(Enemy boss, Player player, List<Particle> particles,
+                                           Camera camera, TileMap tileMap, double distToPlayer) {
+        return processBossCombat(boss, player, null, particles, camera, tileMap, distToPlayer);
     }
 
     private static boolean shouldAttemptHitThisWindow(BossBehaviorController ctrl, BossAttackType atk) {
@@ -101,16 +130,23 @@ public final class BossCombatExecutor {
         }
     }
 
-    private static boolean isPlayerInsideAttackHitbox(Enemy boss, Player player, BossAttackType atk, double distToPlayer) {
-        if (player.isBurrowed() || distToPlayer > atk.getHitRange()) {
+    private static boolean isTargetInsideAttackHitbox(Enemy boss, double targetX, double targetY, BossAttackType atk, double distToTarget) {
+        if (distToTarget > atk.getHitRange()) {
             return false;
         }
-        if (atk.isAreaAttack() || distToPlayer < 16.0) {
+        if (atk.isAreaAttack() || distToTarget < 20.0) {
             return true;
         }
-        double angleToPlayer = Math.atan2(player.getY() - boss.getY(), player.getX() - boss.getX());
-        double diff = normalizeAngle(angleToPlayer - boss.getFaceAngle());
+        double angleToTarget = Math.atan2(targetY - boss.getY(), targetX - boss.getX());
+        double diff = normalizeAngle(angleToTarget - boss.getFaceAngle());
         return Math.abs(diff) <= atk.getHitHalfArcRad();
+    }
+
+    private static boolean isPlayerInsideAttackHitbox(Enemy boss, Player player, BossAttackType atk, double distToPlayer) {
+        if (player.isBurrowed()) {
+            return false;
+        }
+        return isTargetInsideAttackHitbox(boss, player.getX(), player.getY(), atk, distToPlayer);
     }
 
     private static void spawnRoarParticles(Enemy boss, BossArchetype archetype, List<Particle> particles) {
@@ -155,11 +191,11 @@ public final class BossCombatExecutor {
         }
     }
 
-    private static void spawnHitSparks(Player player, String colorHex, int count, List<Particle> particles) {
+    private static void spawnHitSparks(double x, double y, String colorHex, int count, List<Particle> particles) {
         for (int i = 0; i < count; i++) {
             particles.add(new Particle(
-                player.getX(),
-                player.getY(),
+                x,
+                y,
                 RAND.nextDouble() * 140 - 70,
                 RAND.nextDouble() * 140 - 70,
                 0.36,

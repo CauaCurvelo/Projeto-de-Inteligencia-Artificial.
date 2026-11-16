@@ -454,9 +454,10 @@ public class World {
                     for (Enemy enemy : enemies) {
                         if (enemy.getHp() <= 0 || enemy.getType() == EnemyType.HUNTER || enemy.getType() == EnemyType.HOUND) continue;
                         double distE = Math.hypot(proj.getX() - enemy.getX(), proj.getY() - enemy.getY());
-                        if (distE < 22.0) {
+                        double hitRadius = (enemy.getType() == EnemyType.BEAR_BOSS) ? 34.0 : 22.0;
+                        if (distE < hitRadius) {
                             proj.deactivate();
-                            enemy.takeDamage(1, proj.getX(), proj.getY());
+                            enemy.takeDamageFrom(1, proj.getShooter(), proj.getX(), proj.getY());
                             br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.85, 0, 1.1);
                             for (int k = 0; k < 6; k++) {
                                 particles.add(new Particle(enemy.getX(), enemy.getY(),
@@ -717,7 +718,7 @@ public class World {
 
             // Boss Combat: ataques primário e especial com hitbox própria, partículas e tremor de câmera
             if (enemy.getType() == EnemyType.BEAR_BOSS) {
-                String bossDeathReason = BossCombatExecutor.processBossCombat(enemy, player, particles, camera, tileMap, distToPlayer);
+                String bossDeathReason = BossCombatExecutor.processBossCombat(enemy, player, enemies, particles, camera, tileMap, distToPlayer);
                 if (bossDeathReason != null) {
                     triggerGameOver(bossDeathReason);
                     return;

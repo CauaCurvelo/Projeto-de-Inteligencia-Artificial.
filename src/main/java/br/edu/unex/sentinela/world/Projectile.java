@@ -1,6 +1,9 @@
 package br.edu.unex.sentinela.world;
 
+import br.edu.unex.sentinela.entity.Enemy;
+
 public class Projectile {
+    private final Enemy shooter;
     private double x;
     private double y;
     private final double vx;
@@ -11,6 +14,11 @@ public class Projectile {
     private boolean active = true;
 
     public Projectile(double startX, double startY, double targetX, double targetY) {
+        this(null, startX, startY, targetX, targetY);
+    }
+
+    public Projectile(Enemy shooter, double startX, double startY, double targetX, double targetY) {
+        this.shooter = shooter;
         this.x = startX;
         this.y = startY;
         double dx = targetX - startX;
@@ -54,6 +62,7 @@ public class Projectile {
 
     public boolean isActive() { return active; }
     public void deactivate() { this.active = false; }
+    public Enemy getShooter() { return shooter; }
     public double getX() { return x; }
     public double getY() { return y; }
     public double getVx() { return vx; }
