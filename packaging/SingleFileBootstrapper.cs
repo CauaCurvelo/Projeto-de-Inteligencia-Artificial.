@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Security.Cryptography;
 
 namespace InstintoSelvagem
 {
@@ -11,7 +12,6 @@ namespace InstintoSelvagem
         private const string AppDirName = "InstintoSelvagem";
         private const string SubDirName = "game_bundle";
         private const string ExeName = "InstintoSelvagem.exe";
-        private const string VersionMarker = "1.0.1";
 
         [STAThread]
         static int Main(string[] args)
@@ -24,9 +24,26 @@ namespace InstintoSelvagem
                 string targetExe = Path.Combine(gameDir, ExeName);
                 string markerFile = Path.Combine(gameDir, ".version");
 
+                Assembly asm = Assembly.GetExecutingAssembly();
+                string currentPayloadHash = null;
+
+                using (Stream zipStream = asm.GetManifestResourceStream("game_payload.zip"))
+                {
+                    if (zipStream == null)
+                    {
+                        return 1;
+                    }
+
+                    using (SHA256 sha = SHA256.Create())
+                    {
+                        byte[] hashBytes = sha.ComputeHash(zipStream);
+                        currentPayloadHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                    }
+                }
+
                 bool needsExtract = !File.Exists(targetExe) ||
                                     !File.Exists(markerFile) ||
-                                    File.ReadAllText(markerFile).Trim() != VersionMarker;
+                                    File.ReadAllText(markerFile).Trim() != currentPayloadHash;
 
                 if (needsExtract)
                 {
@@ -36,7 +53,6 @@ namespace InstintoSelvagem
                     }
                     Directory.CreateDirectory(gameDir);
 
-                    Assembly asm = Assembly.GetExecutingAssembly();
                     using (Stream zipStream = asm.GetManifestResourceStream("game_payload.zip"))
                     {
                         if (zipStream == null)
@@ -74,7 +90,7 @@ namespace InstintoSelvagem
                         }
                     }
 
-                    File.WriteAllText(markerFile, VersionMarker);
+                    File.WriteAllText(markerFile, currentPayloadHash);
                 }
 
                 if (!File.Exists(targetExe))
