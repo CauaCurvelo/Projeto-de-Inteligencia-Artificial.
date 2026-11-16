@@ -32,7 +32,8 @@ public class AchievementsScreen extends StackPane {
         SURVIVAL("Sobrevivência"),
         NUTRITION("Nutrição"),
         EXPLORATION("Exploração"),
-        SCORE("Pontuação");
+        SCORE("Pontuação"),
+        LEGENDARY("Lendária");
 
         final String label;
         FilterTab(String label) { this.label = label; }

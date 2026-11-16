@@ -136,6 +136,12 @@ public enum Achievement {
         "📜",
         "Exploração"
     ),
+    BESTIARY_MASTER(
+        "Mestre do Bestiário",
+        "Catalogue e derrote todas as 14 espécies da fauna silvestre, rivais e chefes no Bestiário.",
+        "📖",
+        "Exploração"
+    ),
     SCORE_1500(
         "Mestre da Trilha",
         "Alcance 1.500 pontos em uma partida.",
@@ -147,6 +153,12 @@ public enum Achievement {
         "Alcance 7.500 pontos em uma partida lendária.",
         "🌟",
         "Pontuação"
+    ),
+    FOREST_SPIRIT(
+        "Espírito da Floresta",
+        "Desbloqueie todas as outras conquistas de Instinto Selvagem e alcance a transcendência eterna.",
+        "✨",
+        "Lendária"
     );
 
     private final String title;

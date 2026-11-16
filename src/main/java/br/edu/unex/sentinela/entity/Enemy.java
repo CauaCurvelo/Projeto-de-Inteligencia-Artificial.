@@ -255,7 +255,7 @@ public class Enemy {
             this.currentHearingSensitivity = baseHearingSensitivity * 0.35;
         }
 
-        double duskBoost = 1.0 + (timeProgress * 0.15);
+        double duskBoost = 1.0 + Math.min(0.12, (timeProgress * 0.08));
         TileType currentTile = tileMap.getTileAt(curCol, curRow);
         this.currentTile = currentTile;
 

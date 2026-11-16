@@ -599,6 +599,23 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - **Glint Metálico Animado (Sheen Specular):** Efeito de brilho de aço periódico que varre os dentes e o pino a cada 2.6s com fase individual por coordenadas de tile, permitindo que jogadores atentos avistem a armadilha mesmo camuflada na relva.
   - **Mandíbulas Clamped (Disparada):** Quando ativada (`!armed`), as mandíbulas se fecham verticalmente no ar com dentes entrelaçados em mordida agressiva, placa rebaixada e marcas de ferrugem/arranhão com esmaecimento progressivo até expirar.
 
+## Feature / Balanceamento: Sobrevivência Pós-4 Minutos, Cura em Tocas, Ajuste de Raios e Novas Conquistas
+- **Balanceamento do Escalonamento Inimigo ([EcosystemSpawner.java](src/main/java/br/edu/unex/sentinela/world/EcosystemSpawner.java), [Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - **Suavização de Velocidade e Visão:** O multiplicador de sobrevivência que anteriormente dobrava linearmente aos 4 minutos (`1.0 + survivalTime/240.0`, gerando cães sabujos a 364 px/s e chefes inalcançáveis) foi substituído por uma curva assintótica suave com teto de `+20%` aos 8 minutos (`1.0 + Math.min(0.20, (survivalTime / 480.0) * 0.20)`), garantindo que a raposa em corrida ainda consiga se desvencilhar de perseguições.
+  - **Spawn de Chefes Equilibrado:** Intervalo de spawn de novos chefes alfa aumentado de `40.0s` para `75.0s`, e limite de chefes simultâneos ativos perto do jogador reduzido de 4 para 2.
+- **Sobrevivência da Raposa e Cura Diegética ([Player.java](src/main/java/br/edu/unex/sentinela/entity/Player.java), [MeatTier.java](src/main/java/br/edu/unex/sentinela/world/MeatTier.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - **Cura e Descanso em Tocas:** Esconder-se em uma toca por 4.5s sem interrupção recupera **+1 coração de vida** se a raposa estiver ferida, transformando as tocas em refúgios estratégicos de recuperação de ferimentos.
+  - **Fome e Estamina Rebalanceadas:** Dreno de fome ao correr reduzido de `3.8 * dt` para `2.4 * dt` e parado de `0.5 * dt` para `0.35 * dt`.
+  - **Nutrição de Presas:** `GAME_MORSEL` aumentado para `14%` de nutrição com 50% de chance de cura emergencial em vida crítica (`<= 1` coração).
+- **Ajuste da Conquista do Raio na Raposa ([LightningStrike.java](src/main/java/br/edu/unex/sentinela/world/LightningStrike.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - **Foco no Jogador:** Em tempestades, 45% dos raios agora miram na vizinhança imediata da raposa (offset de 10 a 34px), garantindo visibilidade clara do círculo de aviso elétrico sob o personagem.
+  - **Detecção Ampla de Esquiva:** Raio de aviso de perigo expandido de 48px para 68px.
+  - **Concessão Justa da Conquista:** A conquista `LIGHTNING_DODGER` ("Reflexo de Faísca") é concedida tanto ao correr para fora do círculo elétrico a tempo quanto ao sobreviver ao impacto direto de um raio com vida restante.
+  - **Ciclo Climático Dinâmico:** Duração de clima reduzida para 36s e probabilidade de tempestade durante chuva aumentada para 45%.
+- **Novas Conquistas ([Achievement.java](src/main/java/br/edu/unex/sentinela/progress/Achievement.java), [AchievementTracker.java](src/main/java/br/edu/unex/sentinela/progress/AchievementTracker.java), [BestiaryUnlockManager.java](src/main/java/br/edu/unex/sentinela/bestiary/BestiaryUnlockManager.java), [AchievementVisualCatalog.java](src/main/java/br/edu/unex/sentinela/ui/AchievementVisualCatalog.java), [AchievementsScreen.java](src/main/java/br/edu/unex/sentinela/ui/AchievementsScreen.java)):**
+  - **Mestre do Bestiário (`BESTIARY_MASTER`):** "Catalogue e derrote todas as 14 espécies da fauna silvestre, rivais e chefes no Bestiário." Desbloqueada quando todas as 14 criaturas são catalogadas.
+  - **Espírito da Floresta (`FOREST_SPIRIT`):** Conquista de Platina Máxima: "Desbloqueie todas as outras conquistas de Instinto Selvagem e alcance a transcendência eterna." Desbloqueada automaticamente quando todas as outras 25 conquistas forem obtidas, com medalhão de coroa dourada radiante (`#FFD700`), som triunfante e aba "Lendária" na galeria.
+
 
 
 

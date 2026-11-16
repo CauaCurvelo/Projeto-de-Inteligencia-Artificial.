@@ -41,6 +41,9 @@ public final class BestiaryUnlockManager {
         String normalized = creatureId.toLowerCase().trim();
         if (unlockedIds.add(normalized)) {
             save();
+            try {
+                br.edu.unex.sentinela.progress.AchievementTracker.get().checkBestiaryCompletion();
+            } catch (Exception ignored) {}
             return true;
         }
         return false;

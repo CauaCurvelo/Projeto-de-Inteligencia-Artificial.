@@ -7,11 +7,11 @@ import br.edu.unex.sentinela.ai.EnemyType;
  * Centraliza os ganhos de fome, cura, pontuação bônus e tempo de permanência no solo.
  */
 public enum MeatTier {
-    GAME_MORSEL(8.0, 0, 75, 28.0, 0.65),
-    SMALL_CUT(16.0, 1, 150, 38.0, 0.85),
-    HUNTER_RATION(20.0, 1, 180, 42.0, 1.00),
-    BEAST_HAUNCH(26.0, 1, 250, 42.0, 1.15),
-    APEX_PRIME_CUT(45.0, 1, 500, 55.0, 1.45);
+    GAME_MORSEL(14.0, 0, 75, 32.0, 0.70),
+    SMALL_CUT(18.0, 1, 150, 38.0, 0.85),
+    HUNTER_RATION(22.0, 1, 180, 42.0, 1.00),
+    BEAST_HAUNCH(30.0, 1, 250, 45.0, 1.15),
+    APEX_PRIME_CUT(50.0, 1, 500, 60.0, 1.45);
 
     private final double nutritionGain;
     private final int healHearts;

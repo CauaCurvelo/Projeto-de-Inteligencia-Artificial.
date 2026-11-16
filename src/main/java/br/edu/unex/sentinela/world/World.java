@@ -49,7 +49,7 @@ public class World {
     // Dynamic Weather & Wind System
     private WeatherType currentWeather = WeatherType.CLEAR;
     private double weatherTimer = 0.0;
-    private final double weatherDuration = 45.0;
+    private final double weatherDuration = 36.0;
     private static final double WEATHER_TRANSITION_DURATION = 4.0;
     private double rainIntensity = 0.0;
     private double fogIntensity = 0.0;
@@ -247,10 +247,10 @@ public class World {
             weatherTimer = 0.0;
             switch (currentWeather) {
                 case CLEAR:
-                    currentWeather = (rand.nextDouble() < 0.50) ? WeatherType.RAIN : WeatherType.FOG;
+                    currentWeather = (rand.nextDouble() < 0.55) ? WeatherType.RAIN : WeatherType.FOG;
                     break;
                 case RAIN:
-                    currentWeather = (rand.nextDouble() < 0.38) ? WeatherType.STORM : (rand.nextBoolean() ? WeatherType.CLEAR : WeatherType.FOG);
+                    currentWeather = (rand.nextDouble() < 0.45) ? WeatherType.STORM : (rand.nextBoolean() ? WeatherType.CLEAR : WeatherType.FOG);
                     break;
                 case FOG:
                     currentWeather = rand.nextBoolean() ? WeatherType.CLEAR : WeatherType.RAIN;
@@ -337,9 +337,9 @@ public class World {
             }
         }
 
-        // Boss Spawn with Varied Skins (every 40s)
+        // Boss Spawn with Varied Skins (every 75s para balanceamento orgânico)
         bossSpawnTimer += deltaTime;
-        if (bossSpawnTimer >= 40.0) {
+        if (bossSpawnTimer >= 75.0) {
             bossSpawnTimer = 0.0;
             ecosystemSpawner.spawnApexBossNearPlayer(tileMap, enemies, player, survivalTime, camera);
         }
@@ -386,7 +386,11 @@ public class World {
                     meat.setEaten(true);
                     MeatTier tier = meat.getTier();
                     player.feed(tier.getNutritionGain());
-                    player.healLife(tier.getHealHearts());
+                    int heal = tier.getHealHearts();
+                    if (heal == 0 && tier == MeatTier.GAME_MORSEL && player.getLives() <= 1 && rand.nextBoolean()) {
+                        heal = 1;
+                    }
+                    player.healLife(heal);
                     meatsEaten++;
                     score += tier.getEatScoreBonus();
                     highScoreManager.checkAndSave(score, survivalTime);
@@ -916,31 +920,36 @@ public class World {
         double strikeX;
         double strikeY;
 
-        if (rand.nextDouble() < 0.80) {
-            List<double[]> potentialTargets = new ArrayList<>();
-            if (player != null) {
-                potentialTargets.add(new double[]{player.getX(), player.getY()});
-            }
-            for (Enemy e : enemies) {
-                if (e.getHp() > 0 && camera != null && camera.isPointInView(e.getX(), e.getY(), 60.0)) {
-                    potentialTargets.add(new double[]{e.getX(), e.getY()});
-                }
-            }
-            for (PassiveAnimal a : passiveAnimals) {
-                if (!a.isDead() && camera != null && camera.isPointInView(a.getX(), a.getY(), 60.0)) {
-                    potentialTargets.add(new double[]{a.getX(), a.getY()});
-                }
-            }
-
-            if (!potentialTargets.isEmpty()) {
-                double[] target = potentialTargets.get(rand.nextInt(potentialTargets.size()));
+        if (rand.nextDouble() < 0.85) {
+            // Alta prioridade para a vizinhança da raposa durante a tempestade (facilita percepção e conquista do raio)
+            if (player != null && rand.nextDouble() < 0.45) {
                 double angle = rand.nextDouble() * 2.0 * Math.PI;
-                double offsetDist = 26.0 + rand.nextDouble() * 32.0;
-                strikeX = target[0] + Math.cos(angle) * offsetDist;
-                strikeY = target[1] + Math.sin(angle) * offsetDist;
+                double offsetDist = 10.0 + rand.nextDouble() * 24.0;
+                strikeX = player.getX() + Math.cos(angle) * offsetDist;
+                strikeY = player.getY() + Math.sin(angle) * offsetDist;
             } else {
-                strikeX = camX + 40.0 + rand.nextDouble() * (vpW - 80.0);
-                strikeY = camY + 40.0 + rand.nextDouble() * (vpH - 80.0);
+                List<double[]> potentialTargets = new ArrayList<>();
+                for (Enemy e : enemies) {
+                    if (e.getHp() > 0 && camera != null && camera.isPointInView(e.getX(), e.getY(), 60.0)) {
+                        potentialTargets.add(new double[]{e.getX(), e.getY()});
+                    }
+                }
+                for (PassiveAnimal a : passiveAnimals) {
+                    if (!a.isDead() && camera != null && camera.isPointInView(a.getX(), a.getY(), 60.0)) {
+                        potentialTargets.add(new double[]{a.getX(), a.getY()});
+                    }
+                }
+
+                if (!potentialTargets.isEmpty()) {
+                    double[] target = potentialTargets.get(rand.nextInt(potentialTargets.size()));
+                    double angle = rand.nextDouble() * 2.0 * Math.PI;
+                    double offsetDist = 20.0 + rand.nextDouble() * 28.0;
+                    strikeX = target[0] + Math.cos(angle) * offsetDist;
+                    strikeY = target[1] + Math.sin(angle) * offsetDist;
+                } else {
+                    strikeX = camX + 40.0 + rand.nextDouble() * (vpW - 80.0);
+                    strikeY = camY + 40.0 + rand.nextDouble() * (vpH - 80.0);
+                }
             }
         } else {
             strikeX = camX + 30.0 + rand.nextDouble() * (vpW - 60.0);

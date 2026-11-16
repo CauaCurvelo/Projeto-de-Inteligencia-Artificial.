@@ -181,15 +181,15 @@ public class Player {
         if (isSprinting && inputActive) {
             currentSpeed = baseSpeed * 1.55 * speedMultiplier;
             noiseRadius = 240.0;
-            hunger -= 3.8 * deltaTime;
+            hunger -= 2.4 * deltaTime;
         } else if (inputActive) {
             currentSpeed = baseSpeed * speedMultiplier;
             noiseRadius = 100.0;
-            hunger -= 1.4 * deltaTime;
+            hunger -= 1.1 * deltaTime;
         } else if (!isAttacking) {
             currentSpeed = 0;
             noiseRadius = 0.0;
-            hunger -= 0.5 * deltaTime;
+            hunger -= 0.35 * deltaTime;
         }
 
         if (hunger < 0) hunger = 0;
@@ -398,6 +398,11 @@ public class Player {
         if (isBurrowed) {
             burrowTimeLeft -= deltaTime;
             if (burrowTimeLeft <= 0 || dx != 0 || dy != 0) {
+                // Descanso completo na toca recupera 1 coração de vida se ferido
+                if (burrowTimeLeft <= 0 && lives < maxLives) {
+                    healLife(1);
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.EAT_APPLE, 0.85, 0, 1.25);
+                }
                 isBurrowed = false;
                 burrowCooldown = 6.0;
             }

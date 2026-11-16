@@ -79,9 +79,14 @@ public final class AchievementVisualCatalog {
                 return new BadgeSpec(EmblemKind.COMPASS, "#10B981", "#A7F3D0");
             case BESTIARY_OBSERVER:
                 return new BadgeSpec(EmblemKind.EYE, "#22D3EE", "#A5F3FC");
+            case BESTIARY_MASTER:
+                return new BadgeSpec(EmblemKind.EYE, "#06B6D4", "#67E8F9");
             case SCORE_1500:
                 return new BadgeSpec(EmblemKind.STAR, "#FBBF24", "#FEF08A");
             case SCORE_7500:
+                return new BadgeSpec(EmblemKind.TROPHY, "#E8B948", "#FEF08A");
+            case FOREST_SPIRIT:
+                return new BadgeSpec(EmblemKind.CROWN, "#FFD700", "#FFF9C4");
             default:
                 return new BadgeSpec(EmblemKind.TROPHY, "#E8B948", "#FEF08A");
         }

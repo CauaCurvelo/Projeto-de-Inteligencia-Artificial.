@@ -76,6 +76,8 @@ public final class AchievementTracker {
         if (runScore >= 7500) {
             unlock(Achievement.SCORE_7500);
         }
+        checkBestiaryCompletion();
+        checkPlatinumUnlock();
     }
 
     private void handleEvent(GameEvent e) {
@@ -204,6 +206,32 @@ public final class AchievementTracker {
         if (unlockListener != null) {
             unlockListener.accept(a);
         }
+
+        // Conquista de Platina: se desbloqueou todas as outras conquistas, desbloqueia o Espírito da Floresta!
+        if (a != Achievement.FOREST_SPIRIT) {
+            checkPlatinumUnlock();
+        }
+    }
+
+    public void checkBestiaryCompletion() {
+        if (unlocked.containsKey(Achievement.BESTIARY_MASTER)) return;
+        int totalCreatures = br.edu.unex.sentinela.bestiary.CreatureCatalog.getAll().size();
+        if (br.edu.unex.sentinela.bestiary.BestiaryUnlockManager.get().getUnlockedCount() >= totalCreatures) {
+            unlock(Achievement.BESTIARY_MASTER);
+        }
+    }
+
+    public void checkPlatinumUnlock() {
+        if (unlocked.containsKey(Achievement.FOREST_SPIRIT)) return;
+        int nonPlatinumCount = 0;
+        for (Achievement ach : Achievement.values()) {
+            if (ach != Achievement.FOREST_SPIRIT && unlocked.containsKey(ach)) {
+                nonPlatinumCount++;
+            }
+        }
+        if (nonPlatinumCount >= Achievement.values().length - 1) {
+            unlock(Achievement.FOREST_SPIRIT);
+        }
     }
 
     public boolean isUnlocked(Achievement a) {
@@ -253,6 +281,8 @@ public final class AchievementTracker {
                 }
             }
         } catch (Exception ignored) {}
+        checkBestiaryCompletion();
+        checkPlatinumUnlock();
     }
 
     public void save() {

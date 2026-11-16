@@ -23,7 +23,7 @@ public class EcosystemSpawner {
     private static final double CROWD_CHECK_RADIUS = 280.0;
     private static final int MAX_CROWD_NEIGHBORS = 1;
     private static final double MIN_BOSS_TERRITORY_SPACING = 620.0;
-    private static final int MAX_ACTIVE_BOSSES = 4;
+    private static final int MAX_ACTIVE_BOSSES = 2;
 
     private final Random rand = new Random();
 
@@ -195,7 +195,8 @@ public class EcosystemSpawner {
     public void spawnReinforcementNearPlayer(TileMap tileMap, List<Enemy> enemies, Player player, double survivalTime, Camera camera) {
         int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
         int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
-        double scale = 1.0 + (survivalTime / 240.0);
+        // Escalonamento suave e balanceado de velocidade/detecção (máximo +20% aos 8 minutos)
+        double scale = 1.0 + Math.min(0.20, (survivalTime / 480.0) * 0.20);
 
         double angle = rand.nextDouble() * Math.PI * 2.0;
         int sampleCol = pCol + (int) Math.round(Math.cos(angle) * 26.0);
@@ -229,7 +230,8 @@ public class EcosystemSpawner {
 
         int pCol = (int) Math.floor(player.getX() / TileMap.TILE_SIZE);
         int pRow = (int) Math.floor(player.getY() / TileMap.TILE_SIZE);
-        double scale = 1.0 + (survivalTime / 240.0);
+        // Escalonamento equilibrado de chefes (máximo +16% aos 8 minutos)
+        double scale = 1.0 + Math.min(0.16, (survivalTime / 480.0) * 0.16);
 
         BiomeType playerBiome = tileMap.getBiomeAt(pCol, pRow);
         BossArchetype preferred = BossArchetype.forBiome(playerBiome);
