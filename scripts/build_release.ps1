@@ -100,7 +100,7 @@ if (Test-Path $IconPath) {
 & $JpackageExe @JpkgArgs
 if ($LASTEXITCODE -ne 0) { throw "jpackage falhou (exit $LASTEXITCODE)." }
 
-Write-Host '[4/4] Empacotando distribuicao ZIP em dist\InstintoSelvagem-Windows.zip...'
+Write-Host '[4/5] Empacotando distribuicao ZIP em dist\InstintoSelvagem-Windows.zip...'
 $AppDir = Join-Path $JpkgOut 'InstintoSelvagem'
 Copy-Item (Join-Path $RepoRoot 'packaging\LEIA-ME.txt') -Destination $AppDir -Force
 
@@ -116,4 +116,24 @@ if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 Compress-Archive -Path $DistAppDir -DestinationPath $ZipPath -CompressionLevel Optimal
 
 $ZipSizeMb = [math]::Round((Get-Item $ZipPath).Length / 1MB, 1)
-Write-Host "Build portatil pronto: $ZipPath ($ZipSizeMb MB)"
+Write-Host "Pacote ZIP pronto: $ZipPath ($ZipSizeMb MB)"
+
+Write-Host '[5/5] Gerando executavel unico autoextrator em dist\InstintoSelvagem-Instalador.exe...'
+$SfxModule = 'C:\Program Files\7-Zip\7z.sfx'
+$SevenZip = Get-Command 7z.exe -ErrorAction SilentlyContinue
+if ((Test-Path $SfxModule) -and $SevenZip) {
+    $Temp7z = Join-Path $DistDir 'temp_bundle.7z'
+    if (Test-Path $Temp7z) { Remove-Item $Temp7z -Force }
+    & $SevenZip.Source a -t7z -mx=9 $Temp7z "$DistAppDir\*" | Out-Null
+
+    $ExePath = Join-Path $DistDir 'InstintoSelvagem-Instalador.exe'
+    if (Test-Path $ExePath) { Remove-Item $ExePath -Force }
+
+    cmd.exe /c "copy /b `"$SfxModule`" + `"$Temp7z`" `"$ExePath`"" | Out-Null
+    Remove-Item $Temp7z -Force -ErrorAction SilentlyContinue
+
+    $ExeSizeMb = [math]::Round((Get-Item $ExePath).Length / 1MB, 1)
+    Write-Host "Executavel unico pronto: $ExePath ($ExeSizeMb MB)"
+} else {
+    Write-Host "Modulo 7z.sfx nao encontrado. Pacote ZIP mantido como principal."
+}

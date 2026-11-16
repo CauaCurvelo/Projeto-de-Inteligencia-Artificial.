@@ -11,5 +11,7 @@ if %ERRORLEVEL% neq 0 (
     exit /b %ERRORLEVEL%
 )
 echo.
-echo Pronto! Envie o arquivo em dist\InstintoSelvagem-Windows.zip
+echo Pronto! Arquivos gerados para envio em dist\:
+echo   - dist\InstintoSelvagem-Instalador.exe (Executavel unico autoextrator, ~18 MB)
+echo   - dist\InstintoSelvagem-Windows.zip     (Pacote compactado tradicional, ~27 MB)
 pause
