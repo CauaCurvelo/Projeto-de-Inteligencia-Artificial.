@@ -307,6 +307,11 @@ public class World {
             }
         }
 
+        if (player.getLives() <= 0) {
+            triggerGameOver("Um raio fulminante atingiu a raposa!");
+            return;
+        }
+
         if (stormIntensity > 0.25 || currentWeather == WeatherType.STORM) {
             lightningCooldown -= deltaTime;
             if (lightningCooldown <= 0) {
@@ -534,6 +539,10 @@ public class World {
                         particles.add(new Particle(trap.getX(), trap.getY(),
                             (rand.nextDouble() - 0.5) * 65, (rand.nextDouble() - 0.5) * 65,
                             0.35, (k % 2 == 0) ? "#ECEFF1" : "#B0BEC5", 3.2));
+                    }
+                    if (player.getLives() <= 0) {
+                        triggerGameOver("A armadilha de urso do caçador o subjugou fatalmente!");
+                        return;
                     }
                 }
 
@@ -805,6 +814,12 @@ public class World {
                     waterRipples.add(new WaterRipple(rx, ry, 7.0 + rand.nextDouble() * 8.0, 0.45));
                 }
             }
+        }
+
+        // Trava de segurança definitiva: se em qualquer momento as vidas chegarem a 0, Game Over imediato!
+        if (player.getLives() <= 0 && !gameOver) {
+            triggerGameOver("A raposa sucumbiu aos perigos da floresta!");
+            return;
         }
     }
 
