@@ -60,6 +60,14 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>br.edu.unex.sentinela/br.edu.unex.sentinela.app.Main</mainClass>
+                    <options>
+                        <option>-Xms64m</option>
+                        <option>-Xmx384m</option>
+                        <option>-XX:+UseG1GC</option>
+                        <option>-XX:+UseStringDeduplication</option>
+                        <option>-Dprism.order=d3d,sw</option>
+                        <option>-Dprism.vsync=true</option>
+                    </options>
                 </configuration>
             </plugin>
         </plugins>

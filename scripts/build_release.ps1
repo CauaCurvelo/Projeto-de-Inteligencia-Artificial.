@@ -24,6 +24,8 @@ function Resolve-JavaHome {
 function Resolve-MavenCmd {
     $mvnCmd = Get-Command mvn.cmd -ErrorAction SilentlyContinue
     if ($mvnCmd) { return $mvnCmd.Source }
+    $chocoMvn = 'C:\ProgramData\chocolatey\lib\maven\apache-maven-3.9.16\bin\mvn.cmd'
+    if (Test-Path $chocoMvn) { return $chocoMvn }
     $localMvn = 'C:\Users\pedro\.gemini\antigravity\scratch\apache-maven-3.9.6\bin\mvn.cmd'
     if (Test-Path $localMvn) { return $localMvn }
     throw 'Apache Maven (mvn.cmd) nao encontrado no PATH.'
@@ -82,7 +84,14 @@ $JpkgArgs = @(
     '--description', 'Instinto Selvagem (Wild Instinct)',
     '--module-path', $ModuleStage,
     '--module', 'br.edu.unex.sentinela/br.edu.unex.sentinela.app.Main',
-    '--dest', $JpkgOut
+    '--dest', $JpkgOut,
+    '--java-options', '-Xms64m',
+    '--java-options', '-Xmx384m',
+    '--java-options', '-XX:+UseG1GC',
+    '--java-options', '-XX:+UseStringDeduplication',
+    '--java-options', '-Dprism.order=d3d,sw',
+    '--java-options', '-Dprism.vsync=true',
+    '--jlink-options', '--strip-debug --no-man-pages --no-header-files'
 )
 if (Test-Path $IconPath) {
     $JpkgArgs += @('--icon', $IconPath)

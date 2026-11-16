@@ -17,8 +17,8 @@ public final class GameSettings {
 
     private final KeyBindings keyBindings = new KeyBindings();
 
-    // Gráficos
-    private GraphicsQuality graphicsQuality = GraphicsQuality.HIGH;
+    // Gráficos (auto-detecta preset leve em hardware modesto / dual-core)
+    private GraphicsQuality graphicsQuality = detectOptimalDefaultQuality();
     private int targetFps = 60;
     private boolean showVisionCones = true;
     private boolean showPathTrails = true;
@@ -126,7 +126,7 @@ public final class GameSettings {
         try (FileInputStream in = new FileInputStream(f)) {
             props.load(in);
             keyBindings.loadFromProperties(props);
-            graphicsQuality = GraphicsQuality.valueOf(props.getProperty("gfx.quality", GraphicsQuality.HIGH.name()));
+            graphicsQuality = GraphicsQuality.valueOf(props.getProperty("gfx.quality", detectOptimalDefaultQuality().name()));
             targetFps = Integer.parseInt(props.getProperty("gfx.fps", "60"));
             showVisionCones = Boolean.parseBoolean(props.getProperty("gfx.visionCones", "true"));
             showPathTrails = Boolean.parseBoolean(props.getProperty("gfx.pathTrails", "true"));
@@ -169,5 +169,19 @@ public final class GameSettings {
         try (FileOutputStream out = new FileOutputStream(outFile)) {
             props.store(out, "Instinto Selvagem - Preferencias do Jogador");
         } catch (IOException ignored) {}
+    }
+
+    /**
+     * Auto-detecta a fidelidade visual padrão ideal com base no poder computacional do dispositivo.
+     * Dispositivos de 1 a 2 núcleos (Celerons, netbooks e PCs antigos) iniciam em modo BAIXA para máxima fluidez.
+     */
+    public static GraphicsQuality detectOptimalDefaultQuality() {
+        int cores = Runtime.getRuntime().availableProcessors();
+        if (cores <= 2) {
+            return GraphicsQuality.LOW;
+        } else if (cores <= 4) {
+            return GraphicsQuality.MEDIUM;
+        }
+        return GraphicsQuality.HIGH;
     }
 }

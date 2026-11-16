@@ -28,7 +28,8 @@ public class TerrainChunkCache {
     private final Map<Long, WritableImage> chunkImages = new LinkedHashMap<>(64, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Long, WritableImage> eldest) {
-            return size() > MAX_CACHED_CHUNKS;
+            int limit = (cachedQuality == GraphicsQuality.LOW) ? 20 : MAX_CACHED_CHUNKS;
+            return size() > limit;
         }
     };
 
