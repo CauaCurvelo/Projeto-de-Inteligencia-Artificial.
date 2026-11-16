@@ -118,22 +118,30 @@ Compress-Archive -Path $DistAppDir -DestinationPath $ZipPath -CompressionLevel O
 $ZipSizeMb = [math]::Round((Get-Item $ZipPath).Length / 1MB, 1)
 Write-Host "Pacote ZIP pronto: $ZipPath ($ZipSizeMb MB)"
 
-Write-Host '[5/5] Gerando executavel unico autoextrator em dist\InstintoSelvagem-Instalador.exe...'
-$SfxModule = 'C:\Program Files\7-Zip\7z.sfx'
-$SevenZip = Get-Command 7z.exe -ErrorAction SilentlyContinue
-if ((Test-Path $SfxModule) -and $SevenZip) {
-    $Temp7z = Join-Path $DistDir 'temp_bundle.7z'
-    if (Test-Path $Temp7z) { Remove-Item $Temp7z -Force }
-    & $SevenZip.Source a -t7z -mx=9 $Temp7z "$DistAppDir\*" | Out-Null
+Write-Host '[5/5] Gerando executavel puro standalone em dist\InstintoSelvagem.exe...'
+$CscPath = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+$BootstrapCs = Join-Path $RepoRoot 'packaging\SingleFileBootstrapper.cs'
+if ((Test-Path $CscPath) -and (Test-Path $BootstrapCs) -and (Test-Path $ZipPath)) {
+    $PureExePath = Join-Path $DistDir 'InstintoSelvagem.exe'
+    if (Test-Path $PureExePath) { Remove-Item $PureExePath -Force }
 
-    $ExePath = Join-Path $DistDir 'InstintoSelvagem-Instalador.exe'
-    if (Test-Path $ExePath) { Remove-Item $ExePath -Force }
+    $CscArgs = @(
+        '/target:winexe',
+        '/optimize+',
+        '/platform:x64',
+        "/resource:$ZipPath,game_payload.zip",
+        '/reference:System.IO.Compression.dll',
+        '/reference:System.IO.Compression.FileSystem.dll',
+        "/out:$PureExePath"
+    )
+    if (Test-Path $IconPath) {
+        $CscArgs += "/win32icon:$IconPath"
+    }
+    $CscArgs += $BootstrapCs
 
-    cmd.exe /c "copy /b `"$SfxModule`" + `"$Temp7z`" `"$ExePath`"" | Out-Null
-    Remove-Item $Temp7z -Force -ErrorAction SilentlyContinue
-
-    $ExeSizeMb = [math]::Round((Get-Item $ExePath).Length / 1MB, 1)
-    Write-Host "Executavel unico pronto: $ExePath ($ExeSizeMb MB)"
-} else {
-    Write-Host "Modulo 7z.sfx nao encontrado. Pacote ZIP mantido como principal."
+    & $CscPath $CscArgs | Out-Null
+    if ($LASTEXITCODE -eq 0 -and (Test-Path $PureExePath)) {
+        $PureExeMb = [math]::Round((Get-Item $PureExePath).Length / 1MB, 1)
+        Write-Host "Executavel puro standalone pronto: $PureExePath ($PureExeMb MB)"
+    }
 }

@@ -12,6 +12,6 @@ if %ERRORLEVEL% neq 0 (
 )
 echo.
 echo Pronto! Arquivos gerados para envio em dist\:
-echo   - dist\InstintoSelvagem-Instalador.exe (Executavel unico autoextrator, ~18 MB)
-echo   - dist\InstintoSelvagem-Windows.zip     (Pacote compactado tradicional, ~27 MB)
+echo   - dist\InstintoSelvagem.exe         (Executavel puro standalone, ~28 MB)
+echo   - dist\InstintoSelvagem-Windows.zip (Pacote zip portatil tradicional, ~27 MB)
 pause

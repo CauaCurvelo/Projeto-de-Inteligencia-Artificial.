@@ -576,8 +576,11 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
 - **Modo Baixa Fidelidade Otimizado ([TerrainChunkCache.java](src/main/java/br/edu/unex/sentinela/rendering/TerrainChunkCache.java), [Renderer.java](src/main/java/br/edu/unex/sentinela/rendering/Renderer.java)):**
   - Em `LOW`, o limite do cache de chunks de terreno cai de 48 para 20 imagens, economizando mais de 50% de VRAM.
   - Pula cálculo de sombras projetadas solares, renderização de overlays animados de água/grama e gradientes volumétricos pesados de iluminação.
-- **Scripts de Execução Portáteis ([compiler.bat](compiler.bat), [run.bat](run.bat)):**
-  - Atualizados com auto-detecção de `JAVA_HOME` e `MAVEN_OPTS` leves para compilação rápida em qualquer máquina.
+- **Executável Único Puro Standalone ([packaging/SingleFileBootstrapper.cs](packaging/SingleFileBootstrapper.cs), [scripts/build_release.ps1](scripts/build_release.ps1)):**
+  - Implementado bootstrapper nativo em C# compilado com o `csc.exe` nativo do Windows em modo `/target:winexe`.
+  - Empacota o bundle completo (JRE 17 otimizado + binários JavaFX + assets) em um **único arquivo `.exe` de ~28.5 MB** (`dist/InstintoSelvagem.exe`).
+  - Sem assistente de instalação, sem telas de extração, sem janelas de console e sem exigir Java instalado na máquina de quem receber: basta dar dois cliques no `.exe` e o jogo abre imediatamente.
+
 
 
 
