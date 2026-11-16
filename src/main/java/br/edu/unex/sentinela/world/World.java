@@ -15,6 +15,7 @@ import br.edu.unex.sentinela.progress.GameEvent;
 import br.edu.unex.sentinela.progress.GameEventBus;
 import br.edu.unex.sentinela.progress.MatchHistoryRepository;
 import br.edu.unex.sentinela.progress.MatchRecord;
+import br.edu.unex.sentinela.settings.GameSettings;
 
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -521,14 +522,18 @@ public class World {
                 double distPlayer = Math.hypot(player.getX() - trap.getX(), player.getY() - trap.getY());
                 if (distPlayer < 14.0 && !player.isBurrowed()) {
                     trap.snap();
-                    player.takeDamage(trap.getX(), trap.getY());
-                    player.trapImmobilize(2.5);
+                    // Prende a raposa no solo sem knockback (0.0 de impulso)
+                    player.takeDamage(trap.getX(), trap.getY(), 0.0, 1);
+                    player.trapImmobilize(2.5, trap.getX(), trap.getY());
+                    if (camera != null && GameSettings.get().isScreenShake()) {
+                        camera.triggerShake(5.0, 0.22);
+                    }
                     GameEventBus.get().post(new GameEvent(GameEvent.Type.TRAP_TRIGGERED));
-                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.95, 0, 0.70);
-                    for (int k = 0; k < 6; k++) {
+                    br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.95, 0, 0.65);
+                    for (int k = 0; k < 8; k++) {
                         particles.add(new Particle(trap.getX(), trap.getY(),
-                            (rand.nextDouble() - 0.5) * 60, (rand.nextDouble() - 0.5) * 60,
-                            0.35, "#B0BEC5", 3.0));
+                            (rand.nextDouble() - 0.5) * 65, (rand.nextDouble() - 0.5) * 65,
+                            0.35, (k % 2 == 0) ? "#ECEFF1" : "#B0BEC5", 3.2));
                     }
                 }
 
@@ -539,12 +544,12 @@ public class World {
                     if (distEnemy < 15.0) {
                         trap.snap();
                         enemy.takeDamage(2, trap.getX(), trap.getY());
-                        enemy.trapImmobilize(3.5);
-                        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.90, 0, 0.75);
-                        for (int k = 0; k < 6; k++) {
+                        enemy.trapImmobilize(3.5, trap.getX(), trap.getY());
+                        br.edu.unex.sentinela.audio.AudioEngine.get().play(br.edu.unex.sentinela.audio.SoundId.HIT_IMPACT, 0.90, 0, 0.70);
+                        for (int k = 0; k < 8; k++) {
                             particles.add(new Particle(trap.getX(), trap.getY(),
-                                (rand.nextDouble() - 0.5) * 60, (rand.nextDouble() - 0.5) * 60,
-                                0.35, "#B0BEC5", 3.0));
+                                (rand.nextDouble() - 0.5) * 65, (rand.nextDouble() - 0.5) * 65,
+                                0.35, (k % 2 == 0) ? "#ECEFF1" : "#B0BEC5", 3.2));
                         }
                         break;
                     }

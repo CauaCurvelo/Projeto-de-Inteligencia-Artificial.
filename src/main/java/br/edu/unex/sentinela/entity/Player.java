@@ -109,8 +109,11 @@ public class Player {
             attackStaminaAlertTimer = Math.max(0.0, attackStaminaAlertTimer - deltaTime);
         }
 
-        // Apply physical knockback when struck
-        if (Math.abs(knockbackVx) > 0.1 || Math.abs(knockbackVy) > 0.1) {
+        // Apply physical knockback when struck (anulado se preso em armadilha)
+        if (trappedTimer > 0) {
+            knockbackVx = 0;
+            knockbackVy = 0;
+        } else if (Math.abs(knockbackVx) > 0.1 || Math.abs(knockbackVy) > 0.1) {
             double nextKx = x + knockbackVx * deltaTime;
             double nextKy = y + knockbackVy * deltaTime;
             if (!isColliding(nextKx, y, tileMap)) x = nextKx;
@@ -174,6 +177,10 @@ public class Player {
         if (trappedTimer > 0) {
             trappedTimer -= deltaTime;
             speedMultiplier = 0.0;
+            slideVx = 0.0;
+            slideVy = 0.0;
+            knockbackVx = 0.0;
+            knockbackVy = 0.0;
         }
 
         boolean inputActive = (dx != 0 || dy != 0) && !isBurrowed;
@@ -271,7 +278,7 @@ public class Player {
 
         double actualSlideSpeed = Math.hypot(slideVx, slideVy);
         this.isSlidingOnIce = isOnIce && (actualSlideSpeed > 24.0);
-        this.moving = (inputActive || actualSlideSpeed > 12.0) && !isBurrowed;
+        this.moving = (inputActive || actualSlideSpeed > 12.0) && !isBurrowed && (trappedTimer <= 0);
 
         // Monitoramento da Conquista de Drift Glacial (deslize contínuo sustentado no gelo)
         if (isOnIce && actualSlideSpeed > 110.0) {
@@ -570,8 +577,22 @@ public class Player {
     public double getSlideVx() { return slideVx; }
     public double getSlideVy() { return slideVy; }
     public boolean isBurrowed() { return isBurrowed; }
+    public void trapImmobilize(double duration, double trapX, double trapY) {
+        this.trappedTimer = Math.max(this.trappedTimer, duration);
+        this.x = trapX;
+        this.y = trapY;
+        this.slideVx = 0.0;
+        this.slideVy = 0.0;
+        this.knockbackVx = 0.0;
+        this.knockbackVy = 0.0;
+    }
+
     public void trapImmobilize(double duration) {
         this.trappedTimer = Math.max(this.trappedTimer, duration);
+        this.slideVx = 0.0;
+        this.slideVy = 0.0;
+        this.knockbackVx = 0.0;
+        this.knockbackVy = 0.0;
     }
     public boolean isTrapped() { return trappedTimer > 0; }
     public boolean isInvulnerable() { return invulnerabilityTimer > 0; }

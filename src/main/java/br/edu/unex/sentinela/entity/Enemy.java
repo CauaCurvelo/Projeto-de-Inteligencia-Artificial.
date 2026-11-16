@@ -186,6 +186,8 @@ public class Enemy {
             state = AIState.TRAPPED;
             vx = 0;
             vy = 0;
+            knockbackVx = 0;
+            knockbackVy = 0;
             moving = false;
             return;
         }
@@ -1601,11 +1603,25 @@ public class Enemy {
     public int getMaxHp() { return maxHp; }
     public boolean isFlashing() { return damageFlashTimer > 0; }
     public boolean isTrapped() { return trapTimer > 0; }
+    public void trapImmobilize(double duration, double trapX, double trapY) {
+        this.trapTimer = Math.max(this.trapTimer, duration);
+        this.state = AIState.TRAPPED;
+        this.x = trapX;
+        this.y = trapY;
+        this.vx = 0;
+        this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
+        this.moving = false;
+    }
+
     public void trapImmobilize(double duration) {
         this.trapTimer = Math.max(this.trapTimer, duration);
         this.state = AIState.TRAPPED;
         this.vx = 0;
         this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
         this.moving = false;
     }
     public AIState getState() { return state; }

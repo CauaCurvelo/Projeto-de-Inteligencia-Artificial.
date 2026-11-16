@@ -640,6 +640,15 @@ Síntese em tempo real com `javax.sound.sampled` (módulo `java.desktop`). Banco
   - `BossCombatExecutor.processBossCombat` agora avalia todos os inimigos da vizinhança dentro da hitbox do golpe do chefe (`isTargetInsideAttackHitbox`). Golpes em área (como a Patada Sísmica do Urso ou Impacto Glacial) atingem simultaneamente o jogador e qualquer mob próximo, aplicando 2 a 3 pontos de dano e impulso de recuo massivo.
   - `MobSteeringHelper.computeSeparationForce` isenta forças excessivas de repulsão entre chefes e alvos em `FIGHTING_ENEMY`, permitindo que cheguem à distância física de golpe corpo a corpo sem emperrar.
 
+## Bugfix & Polish: Fixação Física da Armadilha de Urso no Solo (Fim do Arremesso / Knockback)
+- **Eliminação do Knockback Explosivo ([Player.java](src/main/java/br/edu/unex/sentinela/entity/Player.java), [Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - Corrigido o bug onde `player.takeDamage(trap.getX(), trap.getY())` aplicava o impulso padrão de 280 px/s para longe da armadilha, arremessando a raposa pelo cenário antes de imobilizá-la no ar.
+  - Agora o dano da armadilha é aplicado com `0.0` de knockback (`player.takeDamage(trap.getX(), trap.getY(), 0.0, 1)`).
+  - Implementado `player.trapImmobilize(2.5, trap.getX(), trap.getY())`: ancora a raposa exatamente nas coordenadas das mandíbulas de aço da armadilha e anula `knockbackVx`, `knockbackVy`, `slideVx` e `slideVy`.
+  - Tratamento idêntico aplicado para inimigos em [Enemy.java](src/main/java/br/edu/unex/sentinela/entity/Enemy.java) com `enemy.trapImmobilize(3.5, trap.getX(), trap.getY())`, garantindo que animais também fiquem fisicamente presos nas garras da armadilha em vez de serem arremessados para longe.
+- **Feedback Visual e HUD ([HudRenderer.java](src/main/java/br/edu/unex/sentinela/rendering/HudRenderer.java), [World.java](src/main/java/br/edu/unex/sentinela/world/World.java)):**
+  - A armadilha ao disparar aciona tremor de tela (`camera.triggerShake(5.0, 0.22)`), partículas de faíscas metálicas e o HUD exibe o status de alerta luminoso `PRESO EM ARMADILHA!` em vermelho carmesim vibrante.
+
 
 
 

@@ -170,7 +170,10 @@ public class HudRenderer {
         double statusY = panelY + 93;
         String stealthStatus;
         Color stealthColor;
-        if (player.isBurrowed()) {
+        if (player.isTrapped()) {
+            stealthStatus = "PRESO EM ARMADILHA!";
+            stealthColor = Color.web("#FF1744");
+        } else if (player.isBurrowed()) {
             stealthStatus = "ABRIGO NA TOCA";
             stealthColor = Color.web("#FFD54F");
         } else if (player.isSwimming()) {
