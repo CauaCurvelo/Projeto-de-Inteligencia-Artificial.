@@ -313,14 +313,41 @@ public class HudRenderer {
                 hintTextFont, Color.web("#ECEFF1"), Color.BLACK, 2.2, TextAlignment.LEFT);
 
         double keyRow3Y = rightY + 87;
-        iconDrawer.drawKeycap("H", rightX + 12, keyRow3Y, 22, 18, keycapFont);
-        iconDrawer.drawStyledText("Auras", rightX + 40, keyRow3Y + 9,
+        iconDrawer.drawKeycap("+ / -", rightX + 64, keyRow3Y, 38, 18, keycapFont);
+        iconDrawer.drawStyledText("Zoom Câmera", rightX + 108, keyRow3Y + 9,
                 hintTextFont, Color.web("#B0BEC5"), Color.BLACK, 2.2, TextAlignment.LEFT);
 
-        iconDrawer.drawKeycap("+ / -", rightX + 130, keyRow3Y, 34, 18, keycapFont);
-        iconDrawer.drawStyledText("Zoom", rightX + 170, keyRow3Y + 9,
-                hintTextFont, Color.web("#B0BEC5"), Color.BLACK, 2.2, TextAlignment.LEFT);
+        gc.restore();
 
+        // 4. Barra flutuante de Legenda da IA (exclusiva do Modo Demonstração H)
+        if (inputManager != null && inputManager.isDebugOverlay()) {
+            renderDemoLegendBar(world, width, height, uiScale);
+        }
+    }
+
+    private void renderDemoLegendBar(World world, double width, double height, double uiScale) {
+        gc.save();
+        gc.translate(width * 0.5, height);
+        gc.scale(uiScale, uiScale);
+
+        int activeAgents = world.getEnemies().size() + world.getPassiveAnimals().size();
+        String text = String.format(
+                "MODO DEMONSTRAÇÃO IA (H)   |   Agentes: %d   |   Cones: Visão (Raycast)   ·   Linhas: Rota A* (8-Dir)   ·   Roxo: Rastro Olfativo   ·   Ciano: Sonar Acústico",
+                activeAgents
+        );
+        double pillW = Math.min(width / uiScale - 36.0, 860.0);
+        double pillH = 26.0;
+        double px = -pillW * 0.5;
+        double py = -38.0;
+
+        gc.setFill(Color.web("#080D12", 0.84));
+        gc.fillRoundRect(px, py, pillW, pillH, 13, 13);
+        gc.setStroke(Color.web("#38BDF8", 0.65));
+        gc.setLineWidth(1.2);
+        gc.strokeRoundRect(px, py, pillW, pillH, 13, 13);
+
+        iconDrawer.drawStyledText(text, 0, py + pillH * 0.5,
+                hintTextFont, Color.web("#E0F2FE"), Color.BLACK, 2.0, TextAlignment.CENTER);
         gc.restore();
     }
 

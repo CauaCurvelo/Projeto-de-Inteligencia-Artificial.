@@ -22,6 +22,7 @@ public final class AudioEngine {
 
     private final Map<SoundId, float[][]> bank = new EnumMap<>(SoundId.class);
     private final int[] lastVariantIndex = new int[SoundId.values().length];
+    private final long[] lastPlayedNs = new long[SoundId.values().length];
     private final Map<AudioChannel, Double> channelVolumes = new EnumMap<>(AudioChannel.class);
     private final ConcurrentLinkedQueue<Voice> pending = new ConcurrentLinkedQueue<>();
     private final List<Voice> active = new ArrayList<>();
@@ -44,7 +45,8 @@ public final class AudioEngine {
         running = true;
         Thread t = new Thread(this::runLoop, "audio-mixer");
         t.setDaemon(true);
-        t.setPriority(Thread.MAX_PRIORITY);
+        // Inicia abaixo da thread UI/Render durante a síntese inicial para evitar engasgos no boot
+        t.setPriority(Thread.NORM_PRIORITY - 1);
         t.start();
     }
 
@@ -61,6 +63,7 @@ public final class AudioEngine {
                 variants = SfxSynthesizer.createVariants(id);
             }
             bank.put(id, variants);
+            Thread.yield();
         }
         ready = true;
     }
@@ -71,9 +74,23 @@ public final class AudioEngine {
         double chVol = getChannelVolume(id.getChannel());
         double finalGain = gain * chVol;
         if (finalGain < 0.01) return;
+
+        // Trava global anti-metralhadora: impede disparo repetido do mesmo som em milissegundos
+        long nowNs = System.nanoTime();
+        int ord = id.ordinal();
+        long minIntervalNs = isRapidSfx(id) ? 45_000_000L : 180_000_000L;
+        if (nowNs - lastPlayedNs[ord] < minIntervalNs) return;
+        lastPlayedNs[ord] = nowNs;
+
         float[] sample = pickVariant(id);
         if (sample == null) return;
         pending.add(new Voice(sample, finalGain, clamp(pan), pitch, false));
+    }
+
+    private static boolean isRapidSfx(SoundId id) {
+        String n = id.name();
+        return n.startsWith("STEP_") || n.equals("HIT_IMPACT") || n.equals("BOW_SHOT")
+                || n.equals("SPLASH") || n.equals("LEAVES_RUSTLE") || n.equals("BITE_WHOOSH");
     }
 
     /** Inicia um loop e devolve o handle (ou null se ainda não estiver pronto). */
@@ -119,6 +136,8 @@ public final class AudioEngine {
 
     private void runLoop() {
         synthesizeBank();
+        // Após sintetizar o banco, eleva a prioridade para manter o mixer de áudio sem falhas
+        Thread.currentThread().setPriority(Thread.NORM_PRIORITY + 2);
         AudioFormat fmt = new AudioFormat(DspToolkit.SAMPLE_RATE, 16, 2, true, false);
         try (SourceDataLine line = AudioSystem.getSourceDataLine(fmt)) {
             line.open(fmt, FRAMES * 4 * 4);

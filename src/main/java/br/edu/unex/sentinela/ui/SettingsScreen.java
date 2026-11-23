@@ -128,7 +128,10 @@ public class SettingsScreen extends StackPane {
         col.setPercentWidth(50);
         grid.getColumnConstraints().addAll(col, col);
 
-        GameAction[] actions = GameAction.values();
+        // Exibe apenas os controles reais de gameplay (exclui DEBUG_OVERLAY, usado apenas na demonstração da IA)
+        GameAction[] actions = java.util.Arrays.stream(GameAction.values())
+                .filter(act -> act != GameAction.DEBUG_OVERLAY)
+                .toArray(GameAction[]::new);
         int half = (actions.length + 1) / 2;
         for (int i = 0; i < actions.length; i++) {
             GameAction act = actions[i];

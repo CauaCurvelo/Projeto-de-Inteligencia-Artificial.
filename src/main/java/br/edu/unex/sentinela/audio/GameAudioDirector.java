@@ -38,7 +38,15 @@ public final class GameAudioDirector {
     private WeatherType lastWeather;
 
     private static final class EnemySnapshot {
-        AIState state; boolean windup; long stepIndex; double voiceCooldown; int hp;
+        AIState state;
+        boolean windup;
+        long stepIndex;
+        double voiceCooldown;
+        double sniffCooldown;
+        double alertCooldown;
+        double eatCooldown;
+        double stepCooldown;
+        int hp;
     }
 
     public void update(World world, double dt) {
@@ -114,15 +122,20 @@ public final class GameAudioDirector {
         enemySnaps.keySet().retainAll(world.getEnemies());
         for (Enemy e : world.getEnemies()) {
             EnemySnapshot s = enemySnaps.computeIfAbsent(e, k -> snapshotOf(e));
-            s.voiceCooldown -= dt;
+            s.voiceCooldown = Math.max(0.0, s.voiceCooldown - dt);
+            s.sniffCooldown = Math.max(0.0, s.sniffCooldown - dt);
+            s.alertCooldown = Math.max(0.0, s.alertCooldown - dt);
+            s.eatCooldown = Math.max(0.0, s.eatCooldown - dt);
+            s.stepCooldown = Math.max(0.0, s.stepCooldown - dt);
             double x = e.getX(), y = e.getY();
             double pitch = 0.96 + rand.nextDouble() * 0.08;
 
             long step = (long) Math.floor(e.getWalkPhase() / Math.PI);
-            if (e.isMoving() && step != s.stepIndex) {
+            if (e.isMoving() && step != s.stepIndex && s.stepCooldown <= 0) {
                 TileType t = tileAt(world, x, y);
                 double stepGain = CreatureSoundMap.footstepGain(e.getSkin()) * (0.92 + rand.nextDouble() * 0.16);
                 spatial.playAt(CreatureSoundMap.footstep(e.getSkin(), t), x, y, stepGain, pitch);
+                s.stepCooldown = 0.14;
             }
             s.stepIndex = step;
 
@@ -142,17 +155,29 @@ public final class GameAudioDirector {
         AIState now = e.getState();
         boolean wasHostile = s.state == AIState.CHASE || s.state == AIState.ALERT || s.state == AIState.AIMING || s.state == AIState.ROARING;
         if ((now == AIState.CHASE || now == AIState.ALERT || now == AIState.AIMING || now == AIState.ROARING) && !wasHostile) {
-            spatial.playAt(SoundId.ALERT_STINGER, x, y, 0.9, 1);
+            if (s.alertCooldown <= 0) {
+                spatial.playAt(SoundId.ALERT_STINGER, x, y, 0.9, 1);
+                s.alertCooldown = 2.0;
+            }
             if (s.voiceCooldown <= 0 || now == AIState.ROARING) {
                 spatial.playAt(CreatureSoundMap.alertVoice(e.getSkin()), x, y, 1.0, pitch);
                 s.voiceCooldown = VOICE_COOLDOWN;
             }
         } else if (now == AIState.SNIFFING_TRACK || now == AIState.SUSPICIOUS) {
-            spatial.playAt(SoundId.SNIFF, x, y, 0.8, pitch);
+            if (s.sniffCooldown <= 0) {
+                spatial.playAt(SoundId.SNIFF, x, y, 0.8, pitch);
+                s.sniffCooldown = 1.8;
+            }
         } else if (now == AIState.EATING) {
-            spatial.playAt(SoundId.EAT_MEAT, x, y, 0.6, 0.90 + rand.nextDouble() * 0.08);
+            if (s.eatCooldown <= 0) {
+                spatial.playAt(SoundId.EAT_MEAT, x, y, 0.6, 0.90 + rand.nextDouble() * 0.08);
+                s.eatCooldown = 1.2;
+            }
         } else if (wasHostile && (now == AIState.PATROL || now == AIState.RETREATING)) {
-            spatial.playAt(SoundId.LOST_TARGET, x, y, 0.75, 1);
+            if (s.alertCooldown <= 0) {
+                spatial.playAt(SoundId.LOST_TARGET, x, y, 0.75, 1);
+                s.alertCooldown = 2.0;
+            }
         }
         s.state = now;
     }

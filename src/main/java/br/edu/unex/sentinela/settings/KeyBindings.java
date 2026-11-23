@@ -56,6 +56,7 @@ public class KeyBindings {
         if (action == GameAction.MOVE_LEFT && activeKeys.contains(KeyCode.LEFT)) return true;
         if (action == GameAction.MOVE_RIGHT && activeKeys.contains(KeyCode.RIGHT)) return true;
         if (action == GameAction.ATTACK && activeKeys.contains(KeyCode.J)) return true;
+        // Atalho exclusivo de demonstração/inspeção visual da IA (cones de visão e rastros) para apresentação
         if (action == GameAction.DEBUG_OVERLAY && activeKeys.contains(KeyCode.H)) return true;
         return false;
     }

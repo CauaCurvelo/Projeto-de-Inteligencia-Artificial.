@@ -141,43 +141,53 @@ public class TerrainRenderer {
         }
     }
 
-    private void renderFastLowDetailStaticTile(TileType type, double sx, double sy, int ts, int col, int row,
-                                               TileMap tileMap, BiomeTerrainPalette pal) {
+    /**
+     * Desenho ultrarrápido de fallback (1 fillRect por tile) usado enquanto chunks distantes
+     * aguardam o orçamento de bake progressivo sem travar o frame inicial.
+     */
+    public static void renderFastFallbackTile(GraphicsContext targetGc, TileType type, double sx, double sy,
+                                              int ts, int col, int row, TileMap tileMap) {
+        BiomeTerrainPalette pal = BiomeTerrainPalette.of(tileMap.getBiomeAt(col, row));
         switch (type) {
             case GRASS:
             case TREE:
-                gc.setFill(type == TileType.TREE ? pal.tallGrassStem : Color.hsb(pal.grassHueBase, pal.grassSatBase, pal.grassBriOpen));
-                gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+                targetGc.setFill(type == TileType.TREE ? pal.tallGrassStem : Color.hsb(pal.grassHueBase, pal.grassSatBase, pal.grassBriOpen));
+                targetGc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
                 break;
             case TALL_GRASS:
-                gc.setFill(pal.tallGrassStem);
-                gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+                targetGc.setFill(pal.tallGrassStem);
+                targetGc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
                 break;
             case DIRT_PATH:
-                gc.setFill(Color.hsb(pal.dirtHue, pal.dirtSat, pal.dirtBri));
-                gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+                targetGc.setFill(Color.hsb(pal.dirtHue, pal.dirtSat, pal.dirtBri));
+                targetGc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
                 break;
             case MUD:
-                gc.setFill(Color.hsb(pal.mudHue, pal.mudSat, pal.mudBri));
-                gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+                targetGc.setFill(Color.hsb(pal.mudHue, pal.mudSat, pal.mudBri));
+                targetGc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
                 break;
             case WATER:
                 boolean isDeep = tileMap.getTileAt(col, row - 1) == TileType.WATER
                         && tileMap.getTileAt(col, row + 1) == TileType.WATER
                         && tileMap.getTileAt(col - 1, row) == TileType.WATER
                         && tileMap.getTileAt(col + 1, row) == TileType.WATER;
-                gc.setFill(isDeep ? pal.waterDeep : pal.waterShallow);
-                gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+                targetGc.setFill(isDeep ? pal.waterDeep : pal.waterShallow);
+                targetGc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
                 break;
             case ICE:
-                gc.setFill(Color.web("#BAE6FD"));
-                gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+                targetGc.setFill(Color.web("#BAE6FD"));
+                targetGc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
                 break;
             case WALL:
-                gc.setFill(WALL_BASE);
-                gc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
+                targetGc.setFill(WALL_BASE);
+                targetGc.fillRect(sx, sy, ts + 0.6, ts + 0.6);
                 break;
         }
+    }
+
+    private void renderFastLowDetailStaticTile(TileType type, double sx, double sy, int ts, int col, int row,
+                                               TileMap tileMap, BiomeTerrainPalette pal) {
+        renderFastFallbackTile(gc, type, sx, sy, ts, col, row, tileMap);
     }
 
     private void renderDetailedGrass(double sx, double sy, int ts, int col, int row, double macro, double micro,

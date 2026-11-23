@@ -290,9 +290,10 @@ public class GroundItemRenderer {
 
             // Brilho / Glint metálico sutil intermitente para auxiliar a percepção do jogador atento
             double phase = (animTime * 1.2 + (trap.getCol() * 0.47 + trap.getRow() * 0.31)) % 2.6;
+            if (phase < 0) phase += 2.6;
             if (phase < 0.35) {
                 double glintNorm = phase / 0.35;
-                double glintAlpha = Math.sin(glintNorm * Math.PI);
+                double glintAlpha = Math.max(0.0, Math.min(1.0, Math.sin(glintNorm * Math.PI)));
                 double glintX = tx - 9.0 + (glintNorm * 18.0);
                 double glintY = ty - 4.0 + (Math.sin(glintNorm * Math.PI) * 1.5);
 

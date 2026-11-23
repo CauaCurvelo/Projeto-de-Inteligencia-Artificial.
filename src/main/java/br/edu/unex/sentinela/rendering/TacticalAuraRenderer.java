@@ -3,9 +3,11 @@ package br.edu.unex.sentinela.rendering;
 import br.edu.unex.sentinela.ai.AIState;
 import br.edu.unex.sentinela.ai.Node;
 import br.edu.unex.sentinela.entity.Enemy;
+import br.edu.unex.sentinela.entity.PassiveAnimal;
 import br.edu.unex.sentinela.entity.Player;
 import br.edu.unex.sentinela.settings.GameSettings;
 import br.edu.unex.sentinela.settings.GraphicsQuality;
+import br.edu.unex.sentinela.world.Footprint;
 import br.edu.unex.sentinela.world.TileMap;
 import br.edu.unex.sentinela.world.World;
 import javafx.scene.canvas.GraphicsContext;
@@ -16,6 +18,9 @@ import javafx.scene.paint.Stop;
 import javafx.scene.shape.ArcType;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.TextAlignment;
 
 import java.util.List;
 
@@ -26,6 +31,7 @@ import java.util.List;
  * - Ondas de sonar acústico e aura de camuflagem da raposa integradas ao solo
  */
 public class TacticalAuraRenderer {
+    private static final Font AI_TAG_FONT = Font.font("Consolas", FontWeight.BOLD, 9.5);
     private final GraphicsContext gc;
 
     public TacticalAuraRenderer(GraphicsContext gc) {
@@ -39,8 +45,14 @@ public class TacticalAuraRenderer {
         boolean showCones = br.edu.unex.sentinela.settings.GameSettings.get().isShowVisionCones();
 
         int ts = TileMap.TILE_SIZE;
+        Player player = world.getPlayer();
+        double px = player.getX() - camX;
+        double py = player.getY() - camY;
 
-        // 1. Renderiza Trilhas de Perseguição e Cones de Visão dos Inimigos no solo
+        // 0. Cadeia de Rastro Olfativo (Scent Trail) da Raposa no solo
+        renderScentTrailChain(world.getScentTrail(), camX, camY, visibleW, visibleH, animTime);
+
+        // 1. Renderiza Trilhas de Perseguição, Cones de Visão, Vetores e Telemetria FSM dos Inimigos
         for (Enemy enemy : world.getEnemies()) {
             double ex = enemy.getX() - camX;
             double ey = enemy.getY() - camY;
@@ -53,7 +65,7 @@ public class TacticalAuraRenderer {
 
             Color stateColor = resolveTacticalStateColor(enemy.getState());
 
-            // A. Linha de Rastreamento / Rota até o Personagem (Fluida e Moderna, sem quadrados de grade)
+            // A. Linha de Rastreamento / Rota A* até o Alvo
             if (showTrails) {
                 renderSmoothTrackingTrail(enemy, ex, ey, camX, camY, ts, stateColor, animTime);
             }
@@ -62,12 +74,15 @@ public class TacticalAuraRenderer {
             if (showCones) {
                 renderModernVisionCone(enemy, ex, ey, stateColor, animTime);
             }
+
+            // C. Vetor de Steering + Linha de Visada Hostil + Tag Técnica (FSM / Suspeita / Nós A*)
+            renderEnemyAiTelemetry(enemy, ex, ey, px, py, stateColor);
         }
 
-        // 2. Renderiza Ondas Acústicas de Ruído da Raposa (Sonar Ripple)
-        Player player = world.getPlayer();
-        double px = player.getX() - camX;
-        double py = player.getY() - camY;
+        // 2. Sensores e Estado Comportamental das Presas Silvestres (Coelhos, Cervos, Sapos, Pássaros)
+        renderPassiveAnimalSensors(world.getPassiveAnimals(), camX, camY, visibleW, visibleH);
+
+        // 3. Renderiza Ondas Acústicas de Ruído da Raposa (Sonar Ripple)
         renderPlayerNoiseSonar(player, px, py, animTime);
     }
 
@@ -243,6 +258,138 @@ public class TacticalAuraRenderer {
             gc.setStroke(Color.web("#80DEEA", alpha));
             gc.setLineWidth(1.8 * (1.0 - phase * 0.5));
             gc.strokeOval(px - rWave, py - rWave, rWave * 2, rWave * 2);
+        }
+        gc.restore();
+    }
+
+    /**
+     * Desenha a cadeia de rastros olfativos (pegadas com odor seguidas pelo Cão Rastreador).
+     */
+    private void renderScentTrailChain(List<Footprint> scentTrail, double camX, double camY,
+                                       double visibleW, double visibleH, double animTime) {
+        if (scentTrail == null || scentTrail.size() < 2) return;
+
+        gc.save();
+        gc.setLineCap(StrokeLineCap.ROUND);
+        double prevX = Double.NaN, prevY = Double.NaN;
+        for (Footprint fp : scentTrail) {
+            if (!fp.isPlayerOrigin()) continue;
+            double sx = fp.getX() - camX;
+            double sy = fp.getY() - camY;
+            double alpha = Math.max(0.10, Math.min(0.85, fp.getAlpha()));
+
+            if (!Double.isNaN(prevX) && Math.hypot(sx - prevX, sy - prevY) < 120.0) {
+                if ((sx >= -40 && sx <= visibleW + 40 && sy >= -40 && sy <= visibleH + 40)
+                        || (prevX >= -40 && prevX <= visibleW + 40 && prevY >= -40 && prevY <= visibleH + 40)) {
+                    gc.setStroke(Color.web("#CE93D8", alpha * 0.52));
+                    gc.setLineWidth(1.6);
+                    gc.setLineDashes(3.5, 4.5);
+                    gc.strokeLine(prevX, prevY, sx, sy);
+                    gc.setLineDashes(null);
+                }
+            }
+            if (sx >= -24 && sx <= visibleW + 24 && sy >= -24 && sy <= visibleH + 24) {
+                double r = 3.2 + Math.sin(animTime * 4.0 + fp.getX() * 0.1) * 0.6;
+                gc.setFill(Color.web("#E040FB", alpha * 0.25));
+                gc.fillOval(sx - r, sy - r, r * 2, r * 2);
+            }
+            prevX = sx;
+            prevY = sy;
+        }
+        gc.restore();
+    }
+
+    /**
+     * Desenha vetor de direção (Steering), linha de visada hostil e tag técnica (FSM / Suspeita / Nós A*).
+     */
+    private void renderEnemyAiTelemetry(Enemy enemy, double ex, double ey, double px, double py, Color stateColor) {
+        gc.save();
+        // 1. Vetor de direção (Steering heading)
+        double ang = enemy.getFaceAngle();
+        double tipX = ex + Math.cos(ang) * 24.0;
+        double tipY = ey + Math.sin(ang) * 24.0;
+        gc.setStroke(stateColor.deriveColor(0, 1.0, 1.25, 0.80));
+        gc.setLineWidth(1.8);
+        gc.strokeLine(ex, ey, tipX, tipY);
+        gc.fillOval(tipX - 2.2, tipY - 2.2, 4.4, 4.4);
+
+        // 2. Linha de visada direta quando em combate/perseguição ao jogador
+        AIState st = enemy.getState();
+        if (st == AIState.CHASE || st == AIState.AIMING || st == AIState.KITING || st == AIState.ROARING) {
+            gc.setStroke(Color.web("#FF5252", 0.35));
+            gc.setLineWidth(1.2);
+            gc.setLineDashes(4.0, 4.0);
+            gc.strokeLine(ex, ey, px, py);
+            gc.setLineDashes(null);
+        }
+
+        // 3. Tag técnica compacta: FSM + Suspeita% + Nós A*
+        List<Node> path = enemy.getCurrentPath();
+        int remNodes = (path != null && enemy.getCurrentPathIndex() < path.size())
+                ? (path.size() - enemy.getCurrentPathIndex()) : 0;
+        int suspPct = (int) Math.round(Math.max(0.0, Math.min(100.0, enemy.getSuspicionMeter() * 100.0)));
+
+        StringBuilder sb = new StringBuilder("FSM: ").append(st.name());
+        if (suspPct > 1 && st != AIState.CHASE && st != AIState.AIMING) {
+            sb.append(" ").append(suspPct).append("%");
+        }
+        if (remNodes > 0) {
+            sb.append(" · A*:").append(remNodes);
+        }
+
+        String label = sb.toString();
+        double boxW = Math.max(82.0, label.length() * 5.7 + 12.0);
+        double boxH = 14.0;
+        double bx = ex - boxW * 0.5;
+        double by = ey + 20.0;
+
+        gc.setFill(Color.web("#080D11", 0.78));
+        gc.fillRoundRect(bx, by, boxW, boxH, 5, 5);
+        gc.setStroke(stateColor.deriveColor(0, 1.0, 1.1, 0.55));
+        gc.setLineWidth(0.9);
+        gc.strokeRoundRect(bx, by, boxW, boxH, 5, 5);
+
+        gc.setFont(AI_TAG_FONT);
+        gc.setFill(stateColor.deriveColor(0, 0.7, 1.35, 0.95));
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.fillText(label, ex, by + 10.5);
+        gc.restore();
+    }
+
+    /**
+     * Desenha anel de percepção e estado das presas silvestres (Coelho, Cervo, Sapo, Pássaro).
+     */
+    private void renderPassiveAnimalSensors(List<PassiveAnimal> animals, double camX, double camY,
+                                            double visibleW, double visibleH) {
+        if (animals == null || animals.isEmpty()) return;
+        gc.save();
+        gc.setFont(AI_TAG_FONT);
+        gc.setTextAlign(TextAlignment.CENTER);
+
+        for (PassiveAnimal pa : animals) {
+            if (pa.isDead() || pa.isBurrowed()) continue;
+            double ax = pa.getX() - camX;
+            double ay = pa.getY() - camY;
+            if (ax < -90 || ax > visibleW + 90 || ay < -90 || ay > visibleH + 90) continue;
+
+            PassiveAnimal.State st = pa.getState();
+            boolean fleeing = st == PassiveAnimal.State.FLEEING || st == PassiveAnimal.State.FLYING_AWAY;
+            boolean alert = st == PassiveAnimal.State.ALERT;
+            Color col = fleeing ? Color.web("#FF6E40") : (alert ? Color.web("#FFD54F") : Color.web("#38BDF8"));
+
+            double ringR = fleeing ? 34.0 : 24.0;
+            gc.setStroke(col.deriveColor(0, 1.0, 1.0, fleeing ? 0.55 : 0.30));
+            gc.setLineWidth(1.1);
+            gc.setLineDashes(3.5, 4.0);
+            gc.strokeOval(ax - ringR, ay - ringR, ringR * 2, ringR * 2);
+            gc.setLineDashes(null);
+
+            String tag = pa.getType().name() + ": " + st.name();
+            double bw = tag.length() * 5.6 + 10.0;
+            gc.setFill(Color.web("#080D11", 0.72));
+            gc.fillRoundRect(ax - bw * 0.5, ay + 14.0, bw, 13.0, 4, 4);
+            gc.setFill(col);
+            gc.fillText(tag, ax, ay + 23.5);
         }
         gc.restore();
     }

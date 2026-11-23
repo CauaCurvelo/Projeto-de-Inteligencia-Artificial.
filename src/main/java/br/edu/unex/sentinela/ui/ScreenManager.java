@@ -16,7 +16,6 @@ import javafx.scene.layout.StackPane;
  */
 public class ScreenManager extends StackPane {
     private ScreenState currentState = ScreenState.MAIN_MENU;
-    private ScreenState previousState = ScreenState.MAIN_MENU;
     private boolean matchPaused = false;
 
     private final World world;
@@ -103,7 +102,6 @@ public class ScreenManager extends StackPane {
     public void showGameOver() {
         if (currentState != ScreenState.GAME_OVER) {
             matchPaused = false;
-            previousState = ScreenState.PLAYING;
             currentState = ScreenState.GAME_OVER;
             updateScreenView();
             requestFocus();
@@ -114,7 +112,6 @@ public class ScreenManager extends StackPane {
         matchPaused = false;
         world.reset();
         AchievementTracker.get().resetRunStats();
-        previousState = ScreenState.MAIN_MENU;
         currentState = ScreenState.PLAYING;
         updateScreenView();
     }
@@ -122,7 +119,6 @@ public class ScreenManager extends StackPane {
     public void pauseGame() {
         if (currentState == ScreenState.PLAYING) {
             matchPaused = true;
-            previousState = ScreenState.PLAYING;
             currentState = ScreenState.PAUSED;
             updateScreenView();
         }
@@ -146,13 +142,11 @@ public class ScreenManager extends StackPane {
         matchPaused = false;
         recordCurrentMatchIfApplicable("Retorno ao Menu Principal");
         world.reset();
-        previousState = ScreenState.MAIN_MENU;
         currentState = ScreenState.MAIN_MENU;
         updateScreenView();
     }
 
     public void navigate(ScreenState target) {
-        this.previousState = this.currentState;
         this.currentState = target;
         updateScreenView();
     }
@@ -160,10 +154,8 @@ public class ScreenManager extends StackPane {
     public void navigateBack() {
         if (matchPaused) {
             currentState = ScreenState.PAUSED;
-            previousState = ScreenState.PLAYING;
         } else {
             currentState = ScreenState.MAIN_MENU;
-            previousState = ScreenState.MAIN_MENU;
         }
         updateScreenView();
     }
