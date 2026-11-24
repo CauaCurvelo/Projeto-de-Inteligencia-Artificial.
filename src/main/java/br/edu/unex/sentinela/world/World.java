@@ -546,9 +546,9 @@ public class World {
                     }
                 }
 
-                // Inimigos pisando na armadilha
+                // Inimigos pisando na armadilha (o caçador dono não cai na própria armadilha)
                 for (Enemy enemy : enemies) {
-                    if (enemy.getHp() <= 0) continue;
+                    if (enemy.getHp() <= 0 || enemy == trap.getOwner()) continue;
                     double distEnemy = Math.hypot(enemy.getX() - trap.getX(), enemy.getY() - trap.getY());
                     if (distEnemy < 15.0) {
                         trap.snap();

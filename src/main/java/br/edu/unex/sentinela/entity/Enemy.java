@@ -393,26 +393,56 @@ public class Enemy {
     private boolean tryDeployBearTrap(TileMap tileMap, List<BearTrap> trapList, int curCol, int curRow, Player player, double minSpacing) {
         if (trapList == null || trapList.size() >= 48) return false;
 
-        for (BearTrap t : trapList) {
-            double d = Math.hypot(t.getX() - x, t.getY() - y);
-            if (d < minSpacing) {
-                return false;
+        double baseAngle = faceAngle;
+        if (player != null && (state == AIState.CHASE || state == AIState.AIMING
+                || state == AIState.KITING || state == AIState.ALERT || state == AIState.SUSPICIOUS)) {
+            baseAngle = Math.atan2(player.getY() - y, player.getX() - x);
+        }
+
+        double[] distances = { 34.0, 26.0 };
+        double[] angleOffsets = { 0.0, 0.45, -0.45 };
+        double deployX = Double.NaN;
+        double deployY = Double.NaN;
+
+        outer:
+        for (double dist : distances) {
+            for (double off : angleOffsets) {
+                double candAngle = baseAngle + off;
+                double cx = x + Math.cos(candAngle) * dist;
+                double cy = y + Math.sin(candAngle) * dist;
+                int tCol = (int) Math.floor(cx / TileMap.TILE_SIZE);
+                int tRow = (int) Math.floor(cy / TileMap.TILE_SIZE);
+                TileType tTile = tileMap.getTileAt(tCol, tRow);
+                if (!tTile.isWalkable() || tTile == TileType.WATER) {
+                    continue;
+                }
+                boolean tooClose = false;
+                for (BearTrap t : trapList) {
+                    if (Math.hypot(t.getX() - cx, t.getY() - cy) < minSpacing) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (!tooClose) {
+                    deployX = cx;
+                    deployY = cy;
+                    break outer;
+                }
             }
         }
 
-        TileType curTile = tileMap.getTileAt(curCol, curRow);
-        if (!curTile.isWalkable() || curTile == TileType.WATER) {
+        if (Double.isNaN(deployX)) {
             return false;
         }
 
-        trapList.add(new BearTrap(x, y));
+        trapList.add(new BearTrap(deployX, deployY, this));
 
         if (player != null) {
-            double dist = Math.hypot(x - player.getX(), y - player.getY());
+            double dist = Math.hypot(deployX - player.getX(), deployY - player.getY());
             double maxDist = 18 * 32.0;
             if (dist < maxDist) {
                 double a = 1.0 - (dist / maxDist);
-                double pan = Math.max(-0.85, Math.min(0.85, (x - player.getX()) / 320.0));
+                double pan = Math.max(-0.85, Math.min(0.85, (deployX - player.getX()) / 320.0));
                 br.edu.unex.sentinela.audio.AudioEngine.get().play(
                     br.edu.unex.sentinela.audio.SoundId.ARROW_THUD, 0.75 * a * a, pan, 0.85
                 );
