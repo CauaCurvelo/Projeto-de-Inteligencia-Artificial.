@@ -23,15 +23,16 @@
 ---
 
 ## 📖 1. Visão Geral e Proposta do Projeto
-O **Sentinela: Instinto Selvagem** é um simulador de sobrevivência ecológica em perspectiva *Top-Down 2D*, construído em Java puro com aceleração gráfica via JavaFX nativo. 
+O **Sentinela: Instinto Selvagem** é um simulador de sobrevivência ecológica em perspectiva *Top-Down 2.5D*, construído em Java 17 com renderização procedural em JavaFX e síntese sonora em tempo real (`javax.sound.sampled`), sem dependência de sprites ou arquivos de áudio externos.
 
-Ao contrário de abordagens clássicas em que o jogador comanda um avatar caçador, a proposta deste projeto inverte os papéis: o usuário assume o controle de um espécime silvestre nativo (raposa) tentando sobreviver às pressões impostas por uma cadeia de **agentes inteligentes concorrentes e hostis** (caçadores humanos armados, cães farejadores de matilha, animais rivais competidores e superpredadores alfa).
+Ao contrário de abordagens clássicas em que o jogador comanda um avatar caçador, a proposta deste projeto inverte os papéis: o usuário assume o controle de uma raposa tentando sobreviver às pressões impostas por um ecossistema vivo com **14 espécies** — entre **presas ágeis** (coelhos, cervos, sapos e pássaros), **rivais** (lobos, javalis e texugos), **ameaça humana** (caçadores com arco e armadilhas de urso + cães farejadores) e **4 chefes territoriais** (Urso Pardo Alfa, Urso Polar Alfa, Pantera Negra e Crocodilo do Rio).
 
 O projeto serve como bancada prática para aplicação e validação em tempo real de **algoritmos fundamentais de Inteligência Artificial**, combinando:
-1. **Navegação Ótima:** Algoritmo de busca informada A* (*A-Star Search*) com heurística de Manhattan admissível e ponderação de custos por terreno ($g(n)$).
-2. **Tomada de Decisão:** Máquinas de Estados Finitos estritas (*Finite State Machines - FSM*) com comportamentos táticos de patrulha, suspeita progressiva, combate territorial e ataque entre predadores.
-3. **Percepção Multissensorial Simulada:** Visão setorial em cone com traçado de raios (*Raycasting*) para verificação de oclusão por obstáculos, acústica com propagação de ondas de ruído em tempo real e rastreamento químico de feromônios através de cadeia de pegadas com decaimento temporal.
-4. **Mundo Procedural Infinito:** Geração contínua em tempo de execução via ruído fractal multi-oitavas (*fBm - Fractal Brownian Motion*) estruturado em chunks matriciais dinâmicos.
+1. **Navegação Ótima:** Algoritmo de busca informada **A\* em 8 direções (heurística Octile)** com bloqueio de corte de quinas, suavização **String-Pulling** e ponderação de custos por terreno ($g(n)$).
+2. **Locomoção Orgânica (Steering Behaviors):** Vetores de velocidade com inércia, força de separação entre agentes e deslizamento lateral em obstáculos (*wall-sliding*).
+3. **Tomada de Decisão (FSM):** Máquinas de Estados Finitos com **21 estados comportamentais** (`AIState`), incluindo patrulha, suspeita progressiva, rastreamento olfativo, emboscada, fuga de presas e disputas territoriais entre predadores e chefes.
+4. **Percepção Multissensorial Simulada:** Visão setorial em cone com traçado de raios (*Raycasting*) e oclusão por grama alta/árvores, acústica com ondas de ruído ao correr e rastreamento olfativo através de pegadas com decaimento temporal.
+5. **Mundo Procedural Infinito:** Geração contínua em tempo de execução via ruído fractal multi-oitavas (*fBm*) em chunks dinâmicos com **5 biomas** (Clareira Verde, Mata Fechada, Pântano Sombrio, Serra Granítica e Tundra Nevada).
 
 ---
 
@@ -46,73 +47,64 @@ O projeto serve como bancada prática para aplicação e validação em tempo re
                                          ▼
                       ┌────────────────────────────────────────┐
                       │    MÁQUINA DE ESTADOS FINITOS (FSM)    │
-                      │  Patrol ➔ Suspicious ➔ Chase ➔ Combat  │
+                      │  21 Estados (Patrol ➔ Chase ➔ Combat)  │
                       └──────────────────┬─────────────────────┘
                                          │
                                          ▼
                       ┌────────────────────────────────────────┐
                       │         NAVEGAÇÃO E PATHFINDING        │
-                      │       Algoritmo A* (Heurística)        │
-                      │     Custos Ponderados por Terreno      │
+                      │    A* 8 Direções (Octile) + Steering   │
+                      │  String-Pulling + Custos por Terreno   │
                       └────────────────────────────────────────┘
 ```
 
-### 2.1 Algoritmo A* com Heurística de Manhattan
+### 2.1 Algoritmo A* em 8 Direções com Heurística Octile e String-Pulling
 O planejamento de rotas é operado pela classe `Pathfinder.java`. A função de avaliação é formulada como:
 $$f(n) = g(n) + h(n)$$
 Onde:
-- $g(n)$ é o custo real acumulado da origem até o nó $n$. Cada tile do mapa possui um custo específico de travessia baseado na física do terreno.
-- $h(n)$ é a função heurística estimada de $n$ até o destino, calculada pela **Distância de Manhattan**:
-  $$h(n) = |col_{atual} - col_{alvo}| + |row_{atual} - row_{alvo}|$$
-
-*Justificativa Formal:* Por estarmos lidando com um grid ortogonal (4 direções primárias), a heurística de Manhattan é **matematicamente admissível** ($\forall n, h(n) \leq h^*(n)$) e **consistente** ($h(n) \leq c(n, p) + h(p)$), garantindo que a primeira rota expandida seja a rota ótima e reduzindo a expansão de nós na `PriorityQueue` a patamares computacionalmente desprezíveis (execução contínua a 60 FPS).
+- $g(n)$ é o custo real acumulado da origem até o nó $n$, ponderado pela física do terreno (ex.: lama e água têm custo elevado; movimento diagonal multiplica por $\sqrt{2} \approx 1{,}414$).
+- $h(n)$ é a **Distância Octile** (admissível e consistente para movimentação em 8 direções sem corte de quinas), seguida de suavização **String-Pulling** (`smoothPath`) para eliminar trajetórias em zigue-zague e entregar rotas fluidas aos *Steering Behaviors*.
 
 ### 2.2 Custos Ponderados de Terreno e Influência no Comportamento da IA
-A IA não enxerga apenas distâncias euclidianas; ela toma decisões ecológicas baseadas nos custos de transição dos terrenos (`TileType`):
-- **Trilha de Terra (`DIRT_PATH` - Custo 1):** Superfície de menor resistência. Caçadores e predadores convergem suas patrulhas naturais para as trilhas.
+A IA toma decisões ecológicas baseadas nos custos e efeitos dos terrenos (`TileType`):
+- **Trilha de Terra (`DIRT_PATH` - Custo 1):** Superfície de menor resistência onde caçadores e patrulhas convergem naturalmente.
 - **Grama Pura (`GRASS` - Custo 1):** Piso padrão de deslocamento.
-- **Grama Alta (`TALL_GRASS` - Custo 1):** Não freia a locomoção, mas reduz o cone de visão de caçadores sobre a raposa em **75%** (fator de camuflagem).
-- **Lamaçal (`MUD` - Custo 3):** O A* calcula que percorrer 3 blocos de grama limpa é preferível a atravessar 1 bloco de lama. O agente desvia ativamente de pântanos.
-- **Água / Rio (`WATER` - Custo 4):** Nadar penaliza a velocidade em 60%. Caçadores e cães evitam entrar na água, buscando ativamente as **pontes naturais de terra firme** para interceptar a raposa.
-- **Árvores e Paredões (`TREE` / `WALL` - Custo 999 / Obstáculo):** Bloqueiam completamente a passagem e a linha de visão do *Raycasting*.
+- **Grama Alta (`TALL_GRASS` - Custo 1):** Reduz drasticamente o cone de visão dos inimigos sobre a raposa (fator de camuflagem).
+- **Lamaçal (`MUD` - Custo 3):** Penaliza a velocidade e eleva o custo no A\*, fazendo agentes desviarem de atoleiros (exceto variantes adaptadas ao brejo).
+- **Água / Rio (`WATER` - Custo 4) e Gelo (`ICE`):** Nadar reduz a velocidade e **corta o rastro de cheiro** seguido pelos cães farejadores.
+- **Árvores e Paredões (`TREE` / `WALL` - Obstáculo):** Bloqueiam passagem e a linha de visão do *Raycasting*.
 
-### 2.3 Máquina de Estados Finitos (FSM)
-Cada criatura é governada por estados mutuamente exclusivos:
-- `PATROL`: Patrulha autônoma com escolha estocástica de nós válidos.
-- `SUSPICIOUS`: Gatilho disparado por estímulo acústico distante ou vislumbre no cone periférico. Uma barra de suspeita sobe de 0% a 100%.
-- `ALERT`: Estado de prontidão e varredura ativa após perder contato temporário com o alvo.
-- `CHASE`: Perseguição contínua com recálculo adaptativo de caminho A*.
-- `AIMING`: Estacionamento para traçado de mira e disparo de projétil à distância (Caçador).
-- `SNIFFING_TRACK`: Rastreamento encadeado de pegadas olfativas nó a nó (Cão de Caça).
-- `SEARCHING_FOOD` & `EATING`: Coleta e consumo oportunista de recursos antes do jogador (Rivais).
-- `TERRITORIAL_ATTACK`: Engajamento violento em defesa de comida ou espaço territorial.
-- `FIGHTING_ENEMY`: Combate inter-espécies (Superpredadores predando caçadores e outros animais).
+### 2.3 Máquina de Estados Finitos (21 Estados em `AIState`)
+Cada criatura é governada por estados comportamentais especializados:
+- **Percepção & Alerta:** `PATROL`, `SUSPICIOUS` (0%–100%), `ALERT`, `SNIFFING_TRACK` (Cão farejando pegadas).
+- **Caça & Combate:** `CHASE`, `AIMING` / `KITING` (Caçador com arco e recuo tático), `MELEE_ATTACK`, `CHARGING` (Investida de javali), `STALKING` (Espreita da pantera), `TERRITORIAL_ATTACK`, `FIGHTING_ENEMY` (Disputas entre feras e chefes), `ROARING` (Fúria de chefe), `HUNTING_PREY`.
+- **Ecossistema & Sobrevivência:** `SEARCHING_FOOD`, `EATING`, `DRINKING`, `SATIATED`, `RESTING`, `RETREATING` e `TRAPPED` (Preso em armadilha de urso).
 
 ---
 
 ## 🎮 3. Mecânicas de Jogo e Dinâmica de Simulação
 
-- **Sistema de Saúde Estilo Zelda:** Corações visuais discretos. O jogador sofre perda de coração ao ser atingido, recebendo um *burst* de adrenalina (invulnerabilidade temporária com *damage flash*).
-- **Sistema de Fome Metabólica:** Dreno contínuo acelerado ao correr (*Sprint*). Atingir 0% acarreta morte por inanição.
-- **Combate Físico & Meat Drops:** A raposa pode desferir mordidas e patadas frontais (`Espaço`, `J` ou `Clique Esquerdo`). Ao zerar a vida de um inimigo, ele tomba e derruba carne assada com osso no cenário. Coletar a carne recupera **+1 Coração de Vida**, **+50 de Fome** e concede bônus de pontuação.
-- **Clima Dinâmico e Impacto Sensorial:** Alternância cíclica entre **Céu Limpo**, **Chuva** (dissolve pegadas e abafa o som) e **Neblina** (reduz os cones de visão em 45%).
-- **Persistência de Recordes (`highscore.dat`):** Serialização binária em disco de maior pontuação e tempo recorde de sobrevivência.
+- **Saúde & Vida Baixa:** Corações visuais discretos com invulnerabilidade temporária ao sofrer dano. Com apenas **1 coração**, a velocidade é reduzida e uma aura carmesim pulsa no personagem e nas bordas da tela.
+- **Fome Metabólica & Stamina:** Correr (*Sprint*) drena stamina e ataques primários consomem **15%** de energia (entrando em exaustão ao zerar). Se a nutrição cair para **≤ 25%**, o sprint é bloqueado até a raposa se alimentar.
+- **Combate, Presas & Tocas:** A raposa pode morder (`Espaço`, `J` ou `Clique Esquerdo`), caçar presas silvestres ágeis (coelhos, cervos, sapos e pássaros), coletar frutas regionais e se esconder/recuperar em **tocas**. Caçadores arremessam **armadilhas de urso** no chão que prendem qualquer criatura desatenta.
+- **Clima Dinâmico & Ciclo Solar/Lunar:** Alternância entre **Céu Limpo**, **Chuva**, **Neblina** e **Tempestade com Raios**, além de transição contínua de dia, pôr do sol e noite com halo focal ao redor da raposa.
+- **Bestiário, Conquistas & Áudio Procedural:** Diário de campo animado das 14 espécies, histórico em CSV, conquistas até a platina *Espírito da Floresta* e síntese sonora multicanal ao vivo.
 
 ---
 
 ## 💻 4. Compilação e Execução
 
 ### Pré-requisitos
-- **Java Development Kit (JDK) 17 ou superior** instalado e configurado nas variáveis de ambiente (`JAVA_HOME`).
+- **Java Development Kit (JDK) 17 ou superior** instalado e configurado (`JAVA_HOME`).
 - **Apache Maven 3.8+** instalado.
 
 ### Executando pelo Terminal / Maven
-Clone o repositório e navegue até a pasta raiz:
 ```bash
-git clone https://github.com/CauaCurvelo/jogo.git
-cd jogo
+git clone https://github.com/CauaCurvelo/Projeto-de-Inteligencia-Artificial..git
+cd Projeto-de-Inteligencia-Artificial.
 mvn clean javafx:run
 ```
+Ou execute diretamente o pacote standalone em `dist/InstintoSelvagem.exe` (Windows).
 
 ---
 
@@ -121,8 +113,11 @@ mvn clean javafx:run
 | Comando | Ação |
 | :--- | :--- |
 | **W, A, S, D** ou **Setas** | Movimentação da raposa em 8 direções |
-| **Shift (Segurar)** | Corrida rápida (*Sprint*) — gera maior ruído acústico |
-| **Espaço / J / Botão Esquerdo** | Ataque de mordida / patada estilo Zelda |
-| **Tecla [H]** ou **[F3]** | Alternar Modo de Depuração da IA (Cones de visão e rotas A*) |
+| **Shift (Segurar)** | Corrida rápida (*Sprint*) — consome stamina e gera ruído acústico |
+| **Espaço / J / Botão Esquerdo** | Ataque de mordida (custo de 15% de stamina) |
+| **ESC** | Menu de Pausa (Configurações, Bestiário e Conquistas) |
+| **+ / -** | Ajustar Zoom da câmera |
 | **Tecla [F11]** | Alternar Modo Tela Cheia (Fullscreen) |
-| **Tecla [R]** | Reiniciar a partida e gerar novo mundo procedural |
+| **Tecla [R]** (no Game Over) | Reiniciar a partida e gerar novo mundo procedural |
+
+> **Modo Demonstração / Inspeção de IA (`H` ou `F3`):** Atalho exclusivo para apresentação acadêmica que exibe em tempo real os cones de visão (*Raycasting*), rotas A\* em 8 direções, vetores de *Steering*, tags FSM, cadeia olfativa, sensores de presas e sonar acústico.
